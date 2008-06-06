@@ -41,7 +41,7 @@ import org.nuxeo.ecm.core.schema.types.Type;
  * @author <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
  *
  */
-@SuppressWarnings({ "SuppressionAnnotation" })
+@SuppressWarnings( { "SuppressionAnnotation" })
 public class ArrayProperty extends JCRScalarProperty {
 
     ArrayProperty(JCRNodeProxy parent, Property property, Field field) {
@@ -214,9 +214,9 @@ public class ArrayProperty extends JCRScalarProperty {
                 }
                 return ar;
             } else if (type == PropertyType.DATE) {
-                Calendar[] ar = new Calendar[values.length];
+                long[] ar = new long[values.length];
                 for (int i = 0; i < values.length; i++) {
-                    ar[i] = values[i].getDate();
+                    ar[i] = values[i].getLong();
                 }
                 return ar;
             } else if (type == PropertyType.BOOLEAN) {
