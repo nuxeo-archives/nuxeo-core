@@ -26,9 +26,8 @@ import javax.jcr.RepositoryException;
 import org.apache.jackrabbit.core.ItemImpl;
 import org.apache.jackrabbit.core.NodeImpl;
 import org.apache.jackrabbit.core.nodetype.NodeTypeImpl;
-import org.apache.jackrabbit.name.MalformedPathException;
-import org.apache.jackrabbit.name.Path;
-import org.apache.jackrabbit.name.Path.PathElement;
+import org.apache.jackrabbit.spi.Path;
+import org.apache.jackrabbit.spi.Path.Element;
 
 /**
  * @author <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
@@ -105,9 +104,9 @@ public final class ModelAdapter {
     }
 
     public static String getPath(String wsName, Node node)
-            throws MalformedPathException, RepositoryException {
+            throws RepositoryException {
         Path path = ((ItemImpl) node).getPrimaryPath().getCanonicalPath();
-        PathElement[] elements = path.getElements();
+        Element[] elements = path.getElements();
         if (elements.length < 3) {
             return "/"; // the root
         }
