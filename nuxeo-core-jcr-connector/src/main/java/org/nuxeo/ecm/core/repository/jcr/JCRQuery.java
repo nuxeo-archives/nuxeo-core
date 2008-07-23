@@ -70,7 +70,7 @@ public class JCRQuery implements Query {
             //log.info("!jcr Query: " + jcrQuery.getStatement());
             // run query within a controlable thread
             // use
-            if (sqlQuery.limit > -1) {
+            if (sqlQuery.limit > 0) {
                 QueryImpl jq = (QueryImpl)jcrQuery;
                 jq.setLimit(sqlQuery.limit);
                 jq.setOffset(sqlQuery.offset);

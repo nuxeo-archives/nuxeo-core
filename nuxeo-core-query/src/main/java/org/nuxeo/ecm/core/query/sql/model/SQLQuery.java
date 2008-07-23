@@ -32,8 +32,8 @@ public class SQLQuery implements ASTNode {
     public final OrderByClause orderBy;
     public final GroupByClause groupBy;
     public final HavingClause having;
-    public int limit = -1;
-    public int offset = 0;
+    public long limit = 0;
+    public long offset = 0;
 
     public SQLQuery() {
         this(new SelectClause(), new FromClause());
@@ -155,14 +155,14 @@ public class SQLQuery implements ASTNode {
     /**
      * @return the limit.
      */
-    public int getLimit() {
+    public long getLimit() {
         return limit;
     }
 
     /**
      * @return the offset.
      */
-    public int getOffset() {
+    public long getOffset() {
         return offset;
     }
 
