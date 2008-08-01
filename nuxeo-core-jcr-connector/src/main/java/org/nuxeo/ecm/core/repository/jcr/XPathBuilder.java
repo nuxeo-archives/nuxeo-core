@@ -207,16 +207,16 @@ public class XPathBuilder implements QueryConstants {
                 xq.predicate.append(" ").append(operator(expr.operator)).append(" '")
                 .append(type).append("'");
                 return true;
-            } else if (name.equals(ECM_MIXINTYPE)) {
-                if (expr.rvalue.getClass() != StringLiteral.class) {
-                    throw new QueryException(
-                            "Invalid query:  ecm:fulltext can only be compared against string values");
-                }
-                String type = ((StringLiteral) expr.rvalue).value;
-                xq.predicate.append("@").append(JcrConstants.JCR_MIXINTYPES);
-                xq.predicate.append(" ").append(operator(expr.operator)).append(" '")
-                .append(NodeConstants.NS_ECM_MIXIN_PREFIX).append(":").append(type).append("'");
-                return true;                
+//            } else if (name.equals(ECM_MIXINTYPE)) {
+//                if (expr.rvalue.getClass() != StringLiteral.class) {
+//                    throw new QueryException(
+//                            "Invalid query:  ecm:fulltext can only be compared against string values");
+//                }
+//                String type = ((StringLiteral) expr.rvalue).value;
+//                xq.predicate.append("@").append(JcrConstants.JCR_MIXINTYPES);
+//                xq.predicate.append(" ").append(operator(expr.operator)).append(" '")
+//                .append(NodeConstants.NS_ECM_MIXIN_PREFIX).append(":").append(type).append("'");
+//                return true;                
             } else if (name.equals(ECM_NAME)) {
                 if (expr.rvalue.getClass() != StringLiteral.class) {
                     throw new QueryException(

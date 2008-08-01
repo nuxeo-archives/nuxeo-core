@@ -87,7 +87,7 @@ org.apache.jackrabbit.core.query.lucene.SearchIndex {
 
     private void addFacets(NamePathResolver resolver, IndexFormatVersion indexFormatVersion, NodeState node, Document doc) {
         try {
-            Name name = NodeConstants.ECM_MIXIN_TYPES.qname;
+            Name name = NodeConstants.ECM_MIXIN_TYPE.qname;
             String propName = resolver.getJCRName(name);
             if (indexFormatVersion.getVersion()
                     >= IndexFormatVersion.V2.getVersion()) {
