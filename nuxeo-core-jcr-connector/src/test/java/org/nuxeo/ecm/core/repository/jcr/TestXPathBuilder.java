@@ -62,6 +62,13 @@ public class TestXPathBuilder extends TestCase {
         x = "//element(*,ecmnt:documentProxy)/jcr:deref(@ecm:refFrozenNode, '*')[(jcr:contains(., '%MyText%')) and (@jcr:primaryType = 'ecmdt:File')]";
         assertEquals(x, XPathBuilder.fromNXQL(q));
 
+        q = "SELECT * FROM Document WHERE ecm:mixinType != 'HiddenInNavigation'";
+        System.out.println(XPathBuilder.fromNXQL(q));
+        x = "//element(*,ecmnt:documentProxy)/jcr:deref(@ecm:refFrozenNode, '*')[(jcr:contains(., '%MyText%')) and (@jcr:primaryType = 'ecmdt:File')]";
+//        assertEquals(x, XPathBuilder.fromNXQL(q));
+
+        
+        
         // TODO XXX bs
         // This test is disabled since it is not passing in Java6. In java6 the expected date in xs:dateTime
         // is T00:00:00.000Z and not T00:00:00.000+01:00

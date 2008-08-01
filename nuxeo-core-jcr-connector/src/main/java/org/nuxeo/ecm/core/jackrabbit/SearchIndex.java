@@ -19,6 +19,9 @@
 
 package org.nuxeo.ecm.core.jackrabbit;
 
+import java.util.Set;
+
+import javax.jcr.NamespaceException;
 import javax.jcr.RepositoryException;
 
 import org.apache.jackrabbit.core.NodeId;
@@ -31,29 +34,89 @@ import org.apache.jackrabbit.core.state.ItemStateException;
 import org.apache.jackrabbit.core.state.ItemStateManager;
 import org.apache.jackrabbit.core.state.NodeState;
 import org.apache.jackrabbit.core.state.PropertyState;
+import org.apache.jackrabbit.spi.Name;
+import org.apache.jackrabbit.spi.commons.conversion.NamePathResolver;
 import org.apache.jackrabbit.spi.commons.conversion.NameResolver;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.nuxeo.ecm.core.repository.jcr.NodeConstants;
+import org.nuxeo.ecm.core.repository.jcr.TypeAdapter;
+import org.nuxeo.ecm.core.schema.DocumentType;
+import org.nuxeo.ecm.core.schema.SchemaManager;
+import org.nuxeo.runtime.api.Framework;
+import org.w3c.dom.traversal.DocumentTraversal;
 
 /**
  * @author <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
  *
  */
 public class SearchIndex extends
-        org.apache.jackrabbit.core.query.lucene.SearchIndex {
+org.apache.jackrabbit.core.query.lucene.SearchIndex {
+
+
+    private static SchemaManager mgr = Framework.getLocalService(SchemaManager.class);
+
+
+
 
     @Override
     protected Document createDocument(NodeState node,
             NamespaceMappings nsMappings, IndexFormatVersion indexFormatVersion)
-            throws RepositoryException {
+    throws RepositoryException {
 
+
+        Document doc = null;
         if (node.getNodeTypeName().equals(NodeConstants.ECM_NT_DOCUMENT_PROXY.qname)) {
-            return createProxyDocument(node, nsMappings, indexFormatVersion);
+            doc = createProxyDocument(node, nsMappings, indexFormatVersion);
         } else {
-            return super.createDocument(node, nsMappings, indexFormatVersion);
+            doc = super.createDocument(node, nsMappings, indexFormatVersion);
+        }
+        NamePathResolver resolver = NamePathResolverImpl.create(nsMappings);
+        if ( node.getNodeTypeName().getNamespaceURI().equals(NodeConstants.NS_ECM_DOCS_URI)) {
+            addFacets(resolver, indexFormatVersion, node, doc);
+        }
+        return doc;
+    }
+
+    Set<String> getFacets(NodeState  node) {
+        Name name = node.getNodeTypeName();
+        String typeName = name.getLocalName();
+        DocumentType dt =  mgr.getDocumentType(typeName);
+        return dt == null ? null : dt.getFacets();
+    }
+
+    private void addFacets(NamePathResolver resolver, IndexFormatVersion indexFormatVersion, NodeState node, Document doc) {
+        try {
+            Name name = NodeConstants.ECM_MIXIN_TYPES.qname;
+            String propName = resolver.getJCRName(name);
+            if (indexFormatVersion.getVersion()
+                    >= IndexFormatVersion.V2.getVersion()) {
+                String fieldName = name.getLocalName();
+                try {
+                    fieldName = resolver.getJCRName(name);
+                } catch (NamespaceException e) {
+                    // will never happen
+                }
+                doc.add(new Field(FieldNames.PROPERTIES_SET, fieldName, Field.Store.NO, Field.Index.NO_NORMS));
+            }
+            Set<String> facets = getFacets(node);
+            if (facets != null ) {
+                for (String facet : facets) {
+                    Field field = new Field(FieldNames.PROPERTIES,
+                            FieldNames.createNamedValue(propName, facet),
+                            Field.Store.NO, Field.Index.NO_NORMS,
+                            Field.TermVector.NO);
+                    doc.add(field);
+                }
+                doc.add(new Field(FieldNames.MVP, propName, Field.Store.NO, Field.Index.UN_TOKENIZED, Field.TermVector.NO));
+            }
+        } catch (NamespaceException e) {
+            // will never happen, prefixes are created dynamically
         }
     }
+
+
+
 
     protected Document createProxyDocument(NodeState node,
             NamespaceMappings nsMappings,
