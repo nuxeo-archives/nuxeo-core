@@ -49,6 +49,9 @@ public interface NodeConstants {
     String NS_ECM_VERSIONING_URI = "http://nuxeo.org/ecm/jcr/versioning";
     String NS_ECM_VERSIONING_PREFIX = "ecmver";
 
+    // virtual property used only when indexing
+    JCRName ECM_MIXIN_TYPE = new JCRName("mixinType", NS_ECM_SYSTEM_URI, NS_ECM_SYSTEM_PREFIX);
+    
     // ------------- QNames ---------------------
     JCRName ECM_NT_BASE = new JCRName("base", NS_ECM_TYPES_URI, NS_ECM_TYPES_PREFIX);
     JCRName ECM_NT_CONTAINER = new JCRName("container", NS_ECM_TYPES_URI, NS_ECM_TYPES_PREFIX);

@@ -26,12 +26,16 @@ public class SQLQuery implements ASTNode {
 
     private static final long serialVersionUID = 6383829486216039408L;
 
+    private String queryString;
+    
     public final SelectClause select;
     public final FromClause from;
     public final WhereClause where;
     public final OrderByClause orderBy;
     public final GroupByClause groupBy;
     public final HavingClause having;
+    public long limit = 0;
+    public long offset = 0;
 
     public SQLQuery() {
         this(new SelectClause(), new FromClause());
@@ -85,6 +89,10 @@ public class SQLQuery implements ASTNode {
     @Override
     // FIXME: not finished
     public String toString() {
+        if ( queryString != null ){
+            return queryString;
+        }
+        // build the query
         StringBuilder buf = new StringBuilder();
         buf.append("SELECT ").append(select).append(" FROM ").append(from);
         if (where != null) {
@@ -136,6 +144,34 @@ public class SQLQuery implements ASTNode {
         return false;
     }
 
+    /**
+     * @param limit the limit to set.
+     */
+    public void setLimit(int limit) {
+        this.limit = limit;
+    }
+
+    /**
+     * @param offset the offset to set.
+     */
+    public void setOffset(int offset) {
+        this.offset = offset;
+    }
+
+    /**
+     * @return the limit.
+     */
+    public long getLimit() {
+        return limit;
+    }
+
+    /**
+     * @return the offset.
+     */
+    public long getOffset() {
+        return offset;
+    }
+
     @Override
     public int hashCode() {
         int result = 17;
@@ -146,6 +182,14 @@ public class SQLQuery implements ASTNode {
         result = 37 * result + (groupBy == null ? 0 : groupBy.hashCode());
         result = 37 * result + (having == null ? 0 : having.hashCode());
         return result;
+    }
+
+    public String getQueryString() {
+        return queryString;
+    }
+
+    public void setQueryString(String queryString) {
+        this.queryString = queryString;
     }
 
 }

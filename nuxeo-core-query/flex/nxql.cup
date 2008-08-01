@@ -102,6 +102,10 @@ non terminal String			from_key;
 			{: RESULT = new SQLQuery(select, from, where, order); :}
 			| select_clause:select from_clause:from order_by_clause:order
 			{: RESULT = new SQLQuery(select, from, null, order); :}
+			| query:q LIMIT INTEGER:l
+			{: q.limit = Long.parseLong(l); RESULT = q; :}
+			| query:q LIMIT INTEGER:o COMMA INTEGER:l
+			{: q.limit = Long.parseLong(l); q.offset = Long.parseLong(o); RESULT = q; :}
 			;
 
 
