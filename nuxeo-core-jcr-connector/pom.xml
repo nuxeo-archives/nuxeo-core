@@ -55,6 +55,10 @@
     </dependency>
     <dependency>
       <groupId>org.apache.jackrabbit</groupId>
+      <artifactId>jackrabbit-text-extractors</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.jackrabbit</groupId>
       <artifactId>jackrabbit-jcr-commons</artifactId>
     </dependency>
     <dependency>
@@ -86,6 +90,22 @@
       <groupId>commons-collections</groupId>
       <artifactId>commons-collections</artifactId>
     </dependency>
+    <dependency>
+        <groupId>pdfbox</groupId>
+        <artifactId>pdfbox</artifactId>
+        <version>0.7.3</version>
+    </dependency>
+    <dependency>
+        <groupId>poi</groupId>
+        <artifactId>poi</artifactId>
+        <version>3.1-FINAL</version>
+    </dependency>
+        <dependency>
+        <groupId>org.textmining</groupId>
+        <artifactId>tm-extractors</artifactId>
+        <version>0.4</version>
+    </dependency>
+
   </dependencies>
 
   <build>
@@ -130,6 +150,18 @@
                 <artifactItem>
                   <groupId>javax.jcr</groupId>
                   <artifactId>jcr</artifactId>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>pdfbox</groupId>
+                  <artifactId>pdfbox</artifactId>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>poi</groupId>
+                  <artifactId>poi</artifactId>
+                </artifactItem>
+                <artifactItem>
+                    <groupId>org.textmining</groupId>
+                    <artifactId>tm-extractors</artifactId>
                 </artifactItem>
               </artifactItems>
               <outputDirectory>${project.build.outputDirectory}</outputDirectory>
