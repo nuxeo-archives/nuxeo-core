@@ -32,6 +32,7 @@ import org.apache.jackrabbit.core.query.lucene.NamePathResolverImpl;
 import org.apache.jackrabbit.core.query.lucene.NamespaceMappings;
 import org.apache.jackrabbit.core.state.ItemStateException;
 import org.apache.jackrabbit.core.state.ItemStateManager;
+import org.apache.jackrabbit.core.state.NoSuchItemStateException;
 import org.apache.jackrabbit.core.state.NodeState;
 import org.apache.jackrabbit.core.state.PropertyState;
 import org.apache.jackrabbit.spi.Name;
@@ -74,6 +75,7 @@ org.apache.jackrabbit.core.query.lucene.SearchIndex {
         NamePathResolver resolver = NamePathResolverImpl.create(nsMappings);
         if ( node.getNodeTypeName().getNamespaceURI().equals(NodeConstants.NS_ECM_DOCS_URI)) {
             addFacets(resolver, indexFormatVersion, node, doc);
+            addParent(resolver, indexFormatVersion, node, doc);
         }
         return doc;
     }
@@ -114,7 +116,38 @@ org.apache.jackrabbit.core.query.lucene.SearchIndex {
             // will never happen, prefixes are created dynamically
         }
     }
+    
+    private void addParent(NamePathResolver resolver, IndexFormatVersion indexFormatVersion, NodeState node, Document doc) {
+        Name name = NodeConstants.ECM_PARENT_ID.qname;
+        try {
+            String propName = resolver.getJCRName(name);
+            ItemStateManager stateMgr = getContext().getItemStateManager();
+            
+            NodeId parentId = node.getParentId();
+            if ( parentId == null ) {
+                return ;
+            }
+            NodeState parent = (NodeState) stateMgr.getItemState(parentId);
+            
+            parentId = parent.getParentId();
+            if ( parentId == null ) {
+                return ;
+            }
+            parent = (NodeState) stateMgr.getItemState(parentId);
+            
+            Field field = new Field(FieldNames.PROPERTIES,
+                    FieldNames.createNamedValue(propName, parent.getId().toString()),
+                    Field.Store.NO, Field.Index.NO_NORMS,
+                    Field.TermVector.NO);
+            doc.add(field);
+        } catch (NamespaceException e) {
+            // will never happen, prefixes are created dynamically
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
+    
 
 
 
