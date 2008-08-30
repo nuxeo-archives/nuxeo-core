@@ -57,7 +57,7 @@ import org.nuxeo.ecm.core.versioning.DocumentVersion;
  * @author DM
  *
  */
-final class VerServUtils {
+final public class VerServUtils {
 
     public static final String START_VERSION_NODE = "root";
 
@@ -500,7 +500,7 @@ final class VerServUtils {
         return docNode.setProperty(propname, true).getBoolean();
     }
 
-    static void setCheckedOut(Node docNode, boolean checkedout)
+    static public void setCheckedOut(Node docNode, boolean checkedout)
             throws RepositoryException {
         final String propname = NodeConstants.ECM_VER_ISCHECKEDOUT.rawname;
         docNode.setProperty(propname, checkedout);

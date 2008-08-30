@@ -47,7 +47,9 @@
     <doctype name="Folder" extends="Document">
       <schema name="common" />
       <schema name="dublincore" />
+      <schema name="uid" />
       <facet name="Folderish" />
+      <facet name="Versionable" />
     </doctype>
 
     <doctype name="OrderedFolder" extends="Document">

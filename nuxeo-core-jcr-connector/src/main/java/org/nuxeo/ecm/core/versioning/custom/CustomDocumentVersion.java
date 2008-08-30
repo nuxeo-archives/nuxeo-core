@@ -62,7 +62,7 @@ public class CustomDocumentVersion extends JCRDocument implements
      *   node. This node contains version metadata.
      * @throws RepositoryException
      */
-    CustomDocumentVersion(JCRSession session, Node versionNode)
+    public CustomDocumentVersion(JCRSession session, Node versionNode)
             throws RepositoryException {
 
         if (versionNode == null) {
