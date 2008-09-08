@@ -53,6 +53,7 @@ import org.nuxeo.ecm.core.versioning.DocumentVersion;
  * Utility class used by <code>CustomVersioningService</code>. This contains methods to
  * easy construction of a Document version by embedding several storage peculiarities
  * of a version node.
+ * Rux NXP-2617 made it public and also few methods to be able to use it from extension.
  *
  * @author DM
  *
