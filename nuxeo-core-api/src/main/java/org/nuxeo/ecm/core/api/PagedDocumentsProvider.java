@@ -19,6 +19,8 @@
 
 package org.nuxeo.ecm.core.api;
 
+import org.nuxeo.ecm.core.api.provider.ResultsProvider;
+
 
 
 /**

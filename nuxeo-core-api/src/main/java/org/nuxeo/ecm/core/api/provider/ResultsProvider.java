@@ -16,10 +16,12 @@
  *
  * $Id $
  */
-package org.nuxeo.ecm.core.api;
+package org.nuxeo.ecm.core.api.provider;
 
 import java.io.Serializable;
 import java.util.List;
+
+import org.nuxeo.ecm.core.api.SortInfo;
 
 /**
  * Interface that provide means to access a result set by pages, allowing easy

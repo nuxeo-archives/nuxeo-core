@@ -22,9 +22,9 @@ package org.nuxeo.ecm.core.api.impl;
 import java.util.Collections;
 import java.util.List;
 
-import org.nuxeo.ecm.core.api.ResultsProvider;
-import org.nuxeo.ecm.core.api.ResultsProviderException;
 import org.nuxeo.ecm.core.api.SortInfo;
+import org.nuxeo.ecm.core.api.provider.ResultsProvider;
+import org.nuxeo.ecm.core.api.provider.ResultsProviderException;
 
 public class EmptyResultsProvider<E> implements ResultsProvider<E> {
 

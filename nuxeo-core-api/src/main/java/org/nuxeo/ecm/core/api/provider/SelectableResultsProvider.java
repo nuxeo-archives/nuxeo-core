@@ -16,7 +16,7 @@
  *
  * $Id $
  */
-package org.nuxeo.ecm.core.api;
+package org.nuxeo.ecm.core.api.provider;
 
 import java.util.List;
 

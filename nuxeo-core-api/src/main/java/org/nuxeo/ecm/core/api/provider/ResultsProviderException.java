@@ -1,4 +1,4 @@
-package org.nuxeo.ecm.core.api;
+package org.nuxeo.ecm.core.api.provider;
 
 /**
  * Exception thrown by ResultsProvider components

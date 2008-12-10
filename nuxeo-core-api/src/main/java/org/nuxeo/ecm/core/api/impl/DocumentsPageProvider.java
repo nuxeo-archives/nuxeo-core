@@ -28,9 +28,9 @@ import org.apache.commons.logging.LogFactory;
 import org.nuxeo.ecm.core.api.DocumentModel;
 import org.nuxeo.ecm.core.api.DocumentModelIterator;
 import org.nuxeo.ecm.core.api.DocumentModelList;
-import org.nuxeo.ecm.core.api.ResultsProvider;
-import org.nuxeo.ecm.core.api.ResultsProviderException;
 import org.nuxeo.ecm.core.api.SortInfo;
+import org.nuxeo.ecm.core.api.provider.ResultsProvider;
+import org.nuxeo.ecm.core.api.provider.ResultsProviderException;
 
 /**
  * Keeps track of current page and previous pages loaded from document iterator.
