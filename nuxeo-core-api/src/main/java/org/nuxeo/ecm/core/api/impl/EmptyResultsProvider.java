@@ -19,17 +19,19 @@
 
 package org.nuxeo.ecm.core.api.impl;
 
-import org.nuxeo.ecm.core.api.ClientException;
-import org.nuxeo.ecm.core.api.DocumentModelList;
-import org.nuxeo.ecm.core.api.PagedDocumentsProvider;
+import java.util.Collections;
+import java.util.List;
+
+import org.nuxeo.ecm.core.api.ResultsProvider;
+import org.nuxeo.ecm.core.api.ResultsProviderException;
 import org.nuxeo.ecm.core.api.SortInfo;
 
-public class EmptyResultsProvider implements PagedDocumentsProvider {
+public class EmptyResultsProvider<E> implements ResultsProvider<E> {
 
-    private static final long serialVersionUID = 1090501391257515681L;
+    private static final long serialVersionUID = 1L;
 
-    public DocumentModelList getCurrentPage() {
-        return new DocumentModelListImpl();
+    public List<E> getCurrentPage() {
+        return Collections.emptyList();
     }
 
     public int getCurrentPageIndex() {
@@ -48,7 +50,7 @@ public class EmptyResultsProvider implements PagedDocumentsProvider {
         return "";
     }
 
-    public DocumentModelList getNextPage() {
+    public List<E> getNextPage() {
         return null;
     }
 
@@ -56,7 +58,7 @@ public class EmptyResultsProvider implements PagedDocumentsProvider {
         return 0;
     }
 
-    public DocumentModelList getPage(int page) {
+    public List<E> getPage(int page) {
         return null;
     }
 
@@ -81,7 +83,7 @@ public class EmptyResultsProvider implements PagedDocumentsProvider {
     public void previous() {
     }
 
-    public void refresh() throws ClientException {
+    public void refresh() throws ResultsProviderException {
     }
 
     public void rewind() {

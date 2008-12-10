@@ -1,3 +1,21 @@
+/*
+ * (C) Copyright 2008 Nuxeo SAS (http://nuxeo.com/) and contributors.
+ *
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the GNU Lesser General Public License
+ * (LGPL) version 2.1 which accompanies this distribution, and is available at
+ * http://www.gnu.org/licenses/lgpl.html
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
+ *
+ * Contributors:
+ *     Nuxeo - initial API and implementation
+ *
+ * $Id $
+ */
 package org.nuxeo.ecm.core.api;
 
 import java.io.Serializable;
@@ -43,14 +61,15 @@ public interface ResultsProvider<E> extends Serializable {
      *
      * @param page the page index, starting from 0
      * @return
+     * @throws ResultsProviderException is requested page is not available
      */
-    List<E> getPage(int page);
+    List<E> getPage(int page) throws ResultsProviderException;
 
     /**
      * Force refresh of the current page
-     * @throws ClientException
+     * @throws ResultsProviderException
      */
-    void refresh() throws ClientException;
+    void refresh() throws ResultsProviderException;
 
     /**
      * @return a boolean expressing if there are further pages.
@@ -62,7 +81,6 @@ public interface ResultsProvider<E> extends Serializable {
      */
     boolean isPreviousPageAvailable();
 
-
     /**
      * @return the number of elements in current page.
      */
@@ -71,6 +89,7 @@ public interface ResultsProvider<E> extends Serializable {
     /**
      *
      * @return the number of requested page size.
+
      */
     int getPageSize();
 
@@ -88,9 +107,10 @@ public interface ResultsProvider<E> extends Serializable {
      * in terms of returned value and state of the provider, although
      * implementation details might imply a performance difference.
      *
-     * @return the next page of documents
+     * @return the next page
+     * @throws ResultsProviderException is requested page is not available
      */
-    List<E> getNextPage();
+    List<E> getNextPage() throws ResultsProviderException;
 
     /**
      * @return number of result elements if available or <code>UNKNOWN_SIZE</code> if it is unknown
@@ -119,23 +139,27 @@ public interface ResultsProvider<E> extends Serializable {
 
     /**
      * Go to the first page
+     * @throws ResultsProviderException is requested page is not available
      */
-    void rewind();
+    void rewind() throws ResultsProviderException;
 
     /**
      * Go to the previous page
+     * @throws ResultsProviderException is requested page is not available
      */
-    void previous();
+    void previous() throws ResultsProviderException;
 
     /**
      * Go to the next page
+     * @throws ResultsProviderException is requested page is not available
      */
-    void next();
+    void next() throws ResultsProviderException;
 
     /**
      * Go to the last page
+     * @throws ResultsProviderException is requested page is not available
      */
-    void last();
+    void last() throws ResultsProviderException;
 
     /**
      * @return the sorting info for this provider
@@ -156,6 +180,5 @@ public interface ResultsProvider<E> extends Serializable {
      * @param name the provider identifier
      */
     void setName(String name);
-
 
 }

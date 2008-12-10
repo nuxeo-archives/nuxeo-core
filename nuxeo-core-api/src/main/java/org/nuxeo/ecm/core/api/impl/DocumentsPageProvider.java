@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2006-2007 Nuxeo SAS (http://nuxeo.com/) and contributors.
+ * (C) Copyright 2006-2008 Nuxeo SAS (http://nuxeo.com/) and contributors.
  *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the GNU Lesser General Public License
@@ -25,11 +25,11 @@ import java.util.NoSuchElementException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.nuxeo.ecm.core.api.ClientException;
 import org.nuxeo.ecm.core.api.DocumentModel;
 import org.nuxeo.ecm.core.api.DocumentModelIterator;
 import org.nuxeo.ecm.core.api.DocumentModelList;
-import org.nuxeo.ecm.core.api.PagedDocumentsProvider;
+import org.nuxeo.ecm.core.api.ResultsProvider;
+import org.nuxeo.ecm.core.api.ResultsProviderException;
 import org.nuxeo.ecm.core.api.SortInfo;
 
 /**
@@ -37,7 +37,7 @@ import org.nuxeo.ecm.core.api.SortInfo;
  *
  * @author <a href="mailto:dm@nuxeo.com">Dragos Mihalache</a>
  */
-public class DocumentsPageProvider implements PagedDocumentsProvider {
+public class DocumentsPageProvider implements ResultsProvider<DocumentModel> {
 
     /**
      * Generated serial version uid.
@@ -227,7 +227,7 @@ public class DocumentsPageProvider implements PagedDocumentsProvider {
      * Nothing can't be done to refresh this provider's pages
      * the whole provider should be instead replaced
      **/
-    public void refresh() throws ClientException {
+    public void refresh() throws ResultsProviderException {
     }
 
     // TODO stop duplication
