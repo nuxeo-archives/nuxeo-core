@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2006-2007 Nuxeo SAS (http://nuxeo.com/) and contributors.
+ * (C) Copyright 2006-2008 Nuxeo SAS (http://nuxeo.com/) and contributors.
  *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the GNU Lesser General Public License
@@ -14,22 +14,26 @@
  * Contributors:
  *     Nuxeo - initial API and implementation
  *
- * $Id: JOOoConvertPluginImpl.java 18651 2007-05-13 20:28:53Z sfermigier $
+ * $Id$
  */
 
-package org.nuxeo.ecm.core.api.impl;
+package org.nuxeo.ecm.core.api.provider;
 
 import java.util.Collections;
 import java.util.List;
 
 import org.nuxeo.ecm.core.api.SortInfo;
-import org.nuxeo.ecm.core.api.provider.ResultsProvider;
-import org.nuxeo.ecm.core.api.provider.ResultsProviderException;
 
 public class EmptyResultsProvider<E> implements ResultsProvider<E> {
 
     private static final long serialVersionUID = 1L;
-
+    
+    protected String name;
+    
+    public static <T> ResultsProvider<T> getInstance() {
+        return new EmptyResultsProvider<T>();
+    }
+    
     public List<E> getCurrentPage() {
         return Collections.emptyList();
     }
@@ -92,20 +96,21 @@ public class EmptyResultsProvider<E> implements ResultsProvider<E> {
     public int getPageSize() {
         return 0;
     }
-
-    public String getName() {
-        return null;
-    }
-
+    
     public SortInfo getSortInfo() {
         return null;
     }
-
+    
     public boolean isSortable() {
         return false;
     }
 
+    public String getName() {
+        return name;
+    }
+
     public void setName(String name) {
+        this.name = name;
     }
 
 }

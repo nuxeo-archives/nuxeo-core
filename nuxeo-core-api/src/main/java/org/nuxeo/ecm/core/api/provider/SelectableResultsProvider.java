@@ -69,11 +69,38 @@ public interface SelectableResultsProvider<E> extends ResultsProvider<E> {
      */
     List<E> getSelectedResultItems() throws ResultsProviderException;
 
+    /**
+     * @return true if item is selected
+     */
+    boolean isSelected(E item);
+
+    /**
+     * Mark item as selected
+     */
+    void select(E item);
+
+    /**
+     * Mark item as not selected
+     */
+    void unselect(E item);
+
     /*
      * SelectionListener registration and API
      */
 
+    /**
+     * Interface to be implemented by components that want to react to item
+     * selection.
+     * 
+     * @author ogrisel
+     * 
+     * @param <E> the type of selected items
+     */
     public static interface SelectionListener<E> {
+
+        void handleSelect(SelectableResultsProvider<E> provider, E item);
+
+        void handleUnselect(SelectableResultsProvider<E> provider, E item);
 
     }
 

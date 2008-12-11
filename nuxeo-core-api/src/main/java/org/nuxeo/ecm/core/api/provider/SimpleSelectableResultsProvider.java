@@ -1,10 +1,21 @@
 package org.nuxeo.ecm.core.api.provider;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.nuxeo.ecm.core.api.SortInfo;
 
+/**
+ * Adapter to transform a normal ResultProvider implementation into a
+ * SelectableResultProvider that stores its selection internally as a list
+ * field.
+ * 
+ * @author ogrisel
+ * 
+ * @param <E> the type of results elements
+ */
 public class SimpleSelectableResultsProvider<E> implements
         SelectableResultsProvider<E> {
 
@@ -14,7 +25,7 @@ public class SimpleSelectableResultsProvider<E> implements
 
     protected final List<SelectionListener<E>> listeners = new ArrayList<SelectionListener<E>>();
     
-    protected final List<E> selected = new ArrayList<E>();
+    protected final Set<E> selected = new LinkedHashSet<E>();
 
     public SimpleSelectableResultsProvider(ResultsProvider<E> provider) {
         this.provider = provider;
@@ -22,12 +33,15 @@ public class SimpleSelectableResultsProvider<E> implements
 
     public List<SelectableResultItem<E>> getSelectableCurrentPage()
             throws ResultsProviderException {
-        // TODO Auto-generated method stub
-        return null;
+        List<SelectableResultItem<E>> wrappedPage = new ArrayList<SelectableResultItem<E>>();
+        for (E item: getCurrentPage()) {
+            wrappedPage.add(new SimpleSelectableResultItem<E>(this, item));
+        }
+        return wrappedPage;
     }
 
     public List<E> getSelectedResultItems() throws ResultsProviderException {
-        return selected;
+        return new ArrayList<E>(selected);
     }
     
     /*
@@ -45,6 +59,25 @@ public class SimpleSelectableResultsProvider<E> implements
     @SuppressWarnings("unchecked")
     public SelectionListener<E>[] getSelectModelListeners() {
         return listeners.toArray(new SelectionListener[listeners.size()]);
+    }
+
+
+    public boolean isSelected(E item) {
+        return selected.contains(item);
+    }
+
+    public void select(E item) {
+        selected.add(item);
+        for (SelectionListener<E> listener: listeners) {
+            listener.handleSelect(this, item);
+        }
+    }
+
+    public void unselect(E item) {
+        selected.remove(item);
+        for (SelectionListener<E> listener: listeners) {
+            listener.handleUnselect(this, item);
+        }
     }
     
     /*
