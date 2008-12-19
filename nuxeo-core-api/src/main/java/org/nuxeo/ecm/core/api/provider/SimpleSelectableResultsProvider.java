@@ -42,21 +42,22 @@ public class SimpleSelectableResultsProvider<E> implements
     protected final ResultsProvider<E> provider;
 
     protected final List<SelectionListener<E>> listeners = new ArrayList<SelectionListener<E>>();
-    
+
     protected final Set<E> selected = new LinkedHashSet<E>();
     
-    public SimpleSelectableResultsProvider() {
-        provider =  new MemoryListResultsProvider<E>();
-    }
-
     public SimpleSelectableResultsProvider(ResultsProvider<E> provider) {
         this.provider = provider;
+    }
+
+    public SimpleSelectableResultsProvider(String name, List<E> items,
+            int pageSize, SortInfo sortInfo) {
+        this(new MemoryListResultsProvider<E>(name, items, pageSize, sortInfo));
     }
 
     public List<SelectableResultItem<E>> getSelectableCurrentPage()
             throws ResultsProviderException {
         List<SelectableResultItem<E>> wrappedPage = new ArrayList<SelectableResultItem<E>>();
-        for (E item: getCurrentPage()) {
+        for (E item : getCurrentPage()) {
             wrappedPage.add(new SimpleSelectableResultItem<E>(this, item));
         }
         return wrappedPage;
@@ -65,15 +66,15 @@ public class SimpleSelectableResultsProvider<E> implements
     public List<E> getSelectedResultItems() throws ResultsProviderException {
         return new ArrayList<E>(selected);
     }
-    
+
     /*
      * Listeners registration API
      */
-    
+
     public void addSelectionListener(SelectionListener<E> listener) {
         listeners.add(listener);
     }
-    
+
     public void removeSelectModelListener(SelectionListener<E> listener) {
         listeners.remove(listener);
     }
@@ -83,25 +84,34 @@ public class SimpleSelectableResultsProvider<E> implements
         return listeners.toArray(new SelectionListener[listeners.size()]);
     }
 
-
     public boolean isSelected(E item) {
         return selected.contains(item);
     }
 
-    public void select(E item) {
+    public void select(E item) throws ResultsProviderException {
+        if (!getCurrentPage().contains(item)) {
+            throw new ResultsProviderException(String.format(
+                    "item %s is not part of current page (with index %d)",
+                    item, getCurrentPageIndex()));
+        }
         selected.add(item);
-        for (SelectionListener<E> listener: listeners) {
+        for (SelectionListener<E> listener : listeners) {
             listener.handleSelect(this, item);
         }
     }
 
-    public void unselect(E item) {
+    public void unselect(E item) throws ResultsProviderException {
+        if (!getCurrentPage().contains(item)) {
+            throw new ResultsProviderException(String.format(
+                    "item %s is not part of current page (with index %d)",
+                    item, getCurrentPageIndex()));
+        }
         selected.remove(item);
-        for (SelectionListener<E> listener: listeners) {
+        for (SelectionListener<E> listener : listeners) {
             listener.handleUnselect(this, item);
         }
     }
-    
+
     /*
      * Wrapped ResultsProvider API
      */
@@ -189,5 +199,5 @@ public class SimpleSelectableResultsProvider<E> implements
     public void setName(String name) {
         provider.setName(name);
     }
-    
+
 }

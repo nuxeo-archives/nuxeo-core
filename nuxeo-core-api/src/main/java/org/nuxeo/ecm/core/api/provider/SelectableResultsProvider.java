@@ -44,9 +44,9 @@ public interface SelectableResultsProvider<E> extends ResultsProvider<E> {
 
         boolean isSelected();
 
-        void select();
+        void select() throws ResultsProviderException;
 
-        void unselect();
+        void unselect() throws ResultsProviderException;
 
         /**
          * @return the wrapped result element
@@ -76,13 +76,15 @@ public interface SelectableResultsProvider<E> extends ResultsProvider<E> {
 
     /**
      * Mark item as selected
+     * @throws ResultsProviderException if item is not part of current page
      */
-    void select(E item);
+    void select(E item) throws ResultsProviderException;
 
     /**
      * Mark item as not selected
+     * @throws ResultsProviderException if item is not part of current page
      */
-    void unselect(E item);
+    void unselect(E item) throws ResultsProviderException;
 
     /*
      * SelectionListener registration and API

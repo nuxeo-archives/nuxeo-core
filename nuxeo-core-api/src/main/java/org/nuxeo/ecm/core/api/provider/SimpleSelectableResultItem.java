@@ -51,11 +51,11 @@ public class SimpleSelectableResultItem<E> implements SelectableResultItem<E> {
         return provider.isSelected(item);
     }
 
-    public void select() {
+    public void select() throws ResultsProviderException {
         provider.select(item);
     }
 
-    public void unselect() {
+    public void unselect() throws ResultsProviderException  {
         provider.unselect(item);
     }
 
