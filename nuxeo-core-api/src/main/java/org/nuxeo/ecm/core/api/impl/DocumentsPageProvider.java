@@ -29,15 +29,15 @@ import org.nuxeo.ecm.core.api.DocumentModel;
 import org.nuxeo.ecm.core.api.DocumentModelIterator;
 import org.nuxeo.ecm.core.api.DocumentModelList;
 import org.nuxeo.ecm.core.api.SortInfo;
-import org.nuxeo.ecm.core.api.provider.ResultsProvider;
-import org.nuxeo.ecm.core.api.provider.ResultsProviderException;
+import org.nuxeo.ecm.core.api.pagination.Pages;
+import org.nuxeo.ecm.core.api.pagination.PaginationException;
 
 /**
  * Keeps track of current page and previous pages loaded from document iterator.
  *
  * @author <a href="mailto:dm@nuxeo.com">Dragos Mihalache</a>
  */
-public class DocumentsPageProvider implements ResultsProvider<DocumentModel> {
+public class DocumentsPageProvider implements Pages<DocumentModel> {
 
     /**
      * Generated serial version uid.
@@ -186,7 +186,7 @@ public class DocumentsPageProvider implements ResultsProvider<DocumentModel> {
         return currentPageIndex > 0;
     }
 
-    public void last() {
+    public void lastPage() {
         int lastPage = getNumberOfPages();
         if (lastPage == UNKNOWN_SIZE) {
             while (isNextPageAvailable()) {
@@ -201,17 +201,17 @@ public class DocumentsPageProvider implements ResultsProvider<DocumentModel> {
         return getPage(currentPageIndex + 1);
     }
 
-    public void next() {
+    public void nextPage() {
         getPage(currentPageIndex + 1);
     }
 
-    public void previous() {
+    public void previousPage() {
         if (currentPageIndex > 0) {
             setCurrentPage(currentPageIndex - 1);
         }
     }
 
-    public void rewind() {
+    public void firstPage() {
         getPage(0);
     }
 
@@ -227,7 +227,7 @@ public class DocumentsPageProvider implements ResultsProvider<DocumentModel> {
      * Nothing can't be done to refresh this provider's pages
      * the whole provider should be instead replaced
      **/
-    public void refresh() throws ResultsProviderException {
+    public void refresh() throws PaginationException {
     }
 
     // TODO stop duplication

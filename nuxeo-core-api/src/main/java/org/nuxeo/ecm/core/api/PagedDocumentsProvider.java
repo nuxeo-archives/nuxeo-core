@@ -19,7 +19,7 @@
 
 package org.nuxeo.ecm.core.api;
 
-import org.nuxeo.ecm.core.api.provider.ResultsProvider;
+import org.nuxeo.ecm.core.api.pagination.Pages;
 
 
 
@@ -33,7 +33,7 @@ import org.nuxeo.ecm.core.api.provider.ResultsProvider;
  * @deprecated use RestultsProvider<DocumentModel> directly instead
  */
 @Deprecated
-public interface PagedDocumentsProvider extends ResultsProvider<DocumentModel> {
+public interface PagedDocumentsProvider extends Pages<DocumentModel> {
 
 
 }
