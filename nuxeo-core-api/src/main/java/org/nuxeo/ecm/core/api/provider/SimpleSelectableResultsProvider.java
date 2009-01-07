@@ -112,6 +112,31 @@ public class SimpleSelectableResultsProvider<E> implements
         }
     }
 
+    public boolean isAllSelected() {
+        for (E item: getCurrentPage()) {
+            if (!selected.contains(item)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public void selectAll() throws ResultsProviderException {
+        for (E item : getCurrentPage()) {
+            if (!selected.contains(item)) {
+                select(item);
+            }
+        }
+    }
+
+    public void unselectAll() throws ResultsProviderException {
+        for (E item : getCurrentPage()) {
+            if (selected.contains(item)) {
+                unselect(item);
+            }
+        }
+    }
+
     /*
      * Wrapped ResultsProvider API
      */

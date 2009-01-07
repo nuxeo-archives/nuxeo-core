@@ -85,6 +85,21 @@ public interface SelectableResultsProvider<E> extends ResultsProvider<E> {
      * @throws ResultsProviderException if item is not part of current page
      */
     void unselect(E item) throws ResultsProviderException;
+    
+    /**
+     * Select any unselected element in current page
+     */
+    void selectAll() throws ResultsProviderException;
+
+    /**
+     * Unselect any selected element in the current page
+     */
+    void unselectAll() throws ResultsProviderException;
+    
+    /**
+     * @return true if all items of the current page are marked as selected
+     */
+    boolean isAllSelected();
 
     /*
      * SelectionListener registration and API
