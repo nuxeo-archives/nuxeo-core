@@ -17,21 +17,21 @@
  * $Id$
  */
 
-package org.nuxeo.ecm.core.api.provider;
+package org.nuxeo.ecm.core.api.pagination;
 
 import java.util.Collections;
 import java.util.List;
 
 import org.nuxeo.ecm.core.api.SortInfo;
 
-public class EmptyResultsProvider<E> implements ResultsProvider<E> {
+public class EmptyPages<E> implements Pages<E> {
 
     private static final long serialVersionUID = 1L;
     
     protected String name;
     
-    public static <T> ResultsProvider<T> getInstance() {
-        return new EmptyResultsProvider<T>();
+    public static <T> Pages<T> getInstance() {
+        return new EmptyPages<T>();
     }
     
     public List<E> getCurrentPage() {
@@ -78,19 +78,19 @@ public class EmptyResultsProvider<E> implements ResultsProvider<E> {
         return false;
     }
 
-    public void last() {
+    public void lastPage() {
     }
 
-    public void next() {
+    public void nextPage() {
     }
 
-    public void previous() {
+    public void previousPage() {
     }
 
-    public void refresh() throws ResultsProviderException {
+    public void refresh() throws PaginationException {
     }
 
-    public void rewind() {
+    public void firstPage() {
     }
 
     public int getPageSize() {

@@ -16,7 +16,7 @@
  *
  * $Id $
  */
-package org.nuxeo.ecm.core.api.provider;
+package org.nuxeo.ecm.core.api.pagination;
 
 import java.io.Serializable;
 import java.util.List;
@@ -39,7 +39,7 @@ import org.nuxeo.ecm.core.api.SortInfo;
  * @author <a href="mailto:og@nuxeo.com">Olivier Grisel</a>
  *
  */
-public interface ResultsProvider<E> extends Serializable {
+public interface Pages<E> extends Serializable {
 
     /**
      * Constant to express that the total number of result elements is unknown.
@@ -63,15 +63,15 @@ public interface ResultsProvider<E> extends Serializable {
      *
      * @param page the page index, starting from 0
      * @return
-     * @throws ResultsProviderException is requested page is not available
+     * @throws PaginationException is requested page is not available
      */
-    List<E> getPage(int page) throws ResultsProviderException;
+    List<E> getPage(int page) throws PaginationException;
 
     /**
      * Force refresh of the current page
-     * @throws ResultsProviderException
+     * @throws PaginationException
      */
-    void refresh() throws ResultsProviderException;
+    void refresh() throws PaginationException;
 
     /**
      * @return a boolean expressing if there are further pages.
@@ -110,9 +110,9 @@ public interface ResultsProvider<E> extends Serializable {
      * implementation details might imply a performance difference.
      *
      * @return the next page
-     * @throws ResultsProviderException is requested page is not available
+     * @throws PaginationException is requested page is not available
      */
-    List<E> getNextPage() throws ResultsProviderException;
+    List<E> getNextPage() throws PaginationException;
 
     /**
      * @return number of result elements if available or <code>UNKNOWN_SIZE</code> if it is unknown
@@ -141,27 +141,27 @@ public interface ResultsProvider<E> extends Serializable {
 
     /**
      * Go to the first page
-     * @throws ResultsProviderException is requested page is not available
+     * @throws PaginationException is requested page is not available
      */
-    void rewind() throws ResultsProviderException;
+    void firstPage() throws PaginationException;
 
     /**
      * Go to the previous page
-     * @throws ResultsProviderException is requested page is not available
+     * @throws PaginationException is requested page is not available
      */
-    void previous() throws ResultsProviderException;
+    void previousPage() throws PaginationException;
 
     /**
      * Go to the next page
-     * @throws ResultsProviderException is requested page is not available
+     * @throws PaginationException is requested page is not available
      */
-    void next() throws ResultsProviderException;
+    void nextPage() throws PaginationException;
 
     /**
      * Go to the last page
-     * @throws ResultsProviderException is requested page is not available
+     * @throws PaginationException is requested page is not available
      */
-    void last() throws ResultsProviderException;
+    void lastPage() throws PaginationException;
 
     /**
      * @return the sorting info for this provider

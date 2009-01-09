@@ -16,7 +16,7 @@
  *
  * $Id $
  */
-package org.nuxeo.ecm.core.api.provider;
+package org.nuxeo.ecm.core.api.pagination;
 
 import java.util.List;
 
@@ -26,27 +26,27 @@ import java.util.List;
  * @param <E> the type of results element (e.g. DocumentModel, DashboardItem,
  *            ...)
  */
-public interface SelectableResultsProvider<E> extends ResultsProvider<E> {
+public interface SelectablePages<E> extends Pages<E> {
 
     /**
-     * Wrapper interface to wrap a results element into a selectable component
+     * Wrapper interface to wrap a paginated element into a selectable component
      * 
      * @param <E> the type of the wrapped result element (e.g. DocumentModel,
      *            DashboardItem, ...)
      */
-    public static interface SelectableResultItem<E> {
+    public static interface SelectablePageElement<E> {
 
         /**
-         * @return the SelectableResultsProvider instance that holds the
+         * @return the SelectablePages instance that holds the
          *         selection
          */
-        SelectableResultsProvider<E> getProvider();
+        SelectablePages<E> getPages();
 
         boolean isSelected();
 
-        void select() throws ResultsProviderException;
+        void select() throws PaginationException;
 
-        void unselect() throws ResultsProviderException;
+        void unselect() throws PaginationException;
 
         /**
          * @return the wrapped result element
@@ -57,17 +57,17 @@ public interface SelectableResultsProvider<E> extends ResultsProvider<E> {
 
     /**
      * @return the list of items of the current page wrapped into
-     *         SelectableResultItem objects that provide selection API
-     * @throws ResultsProviderException
+     *         SelectablePageItem objects that provide selection API
+     * @throws PaginationException
      */
-    List<SelectableResultItem<E>> getSelectableCurrentPage()
-            throws ResultsProviderException;
+    List<SelectablePageElement<E>> getSelectableCurrentPage()
+            throws PaginationException;
 
     /**
      * @return the list of items that are marked as selected on any page
-     * @throws ResultsProviderException
+     * @throws PaginationException
      */
-    List<E> getSelectedResultItems() throws ResultsProviderException;
+    List<E> getSelectedElements() throws PaginationException;
 
     /**
      * @return true if item is selected
@@ -76,30 +76,30 @@ public interface SelectableResultsProvider<E> extends ResultsProvider<E> {
 
     /**
      * Mark item as selected
-     * @throws ResultsProviderException if item is not part of current page
+     * @throws PaginationException if item is not part of current page
      */
-    void select(E item) throws ResultsProviderException;
+    void select(E item) throws PaginationException;
 
     /**
      * Mark item as not selected
-     * @throws ResultsProviderException if item is not part of current page
+     * @throws PaginationException if item is not part of current page
      */
-    void unselect(E item) throws ResultsProviderException;
+    void unselect(E item) throws PaginationException;
     
     /**
      * Select any unselected element in current page
      */
-    void selectAll() throws ResultsProviderException;
+    void selectCurrentPage() throws PaginationException;
 
     /**
      * Unselect any selected element in the current page
      */
-    void unselectAll() throws ResultsProviderException;
+    void unselectCurrentPage() throws PaginationException;
     
     /**
      * @return true if all items of the current page are marked as selected
      */
-    boolean isAllSelected();
+    boolean isCurrentPageSelected();
 
     /*
      * SelectionListener registration and API
@@ -115,9 +115,9 @@ public interface SelectableResultsProvider<E> extends ResultsProvider<E> {
      */
     public static interface SelectionListener<E> {
 
-        void handleSelect(SelectableResultsProvider<E> provider, E item);
+        void handleSelect(SelectablePages<E> pages, E item);
 
-        void handleUnselect(SelectableResultsProvider<E> provider, E item);
+        void handleUnselect(SelectablePages<E> pages, E item);
 
     }
 

@@ -16,7 +16,7 @@
  *
  * $Id $
  */
-package org.nuxeo.ecm.core.api.provider;
+package org.nuxeo.ecm.core.api.pagination;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -34,36 +34,35 @@ import org.nuxeo.ecm.core.api.SortInfo;
  * 
  * @param <E> the type of results elements
  */
-public class SimpleSelectableResultsProvider<E> implements
-        SelectableResultsProvider<E> {
+public class SimpleSelectablePages<E> implements SelectablePages<E> {
 
     private static final long serialVersionUID = 1L;
 
-    protected final ResultsProvider<E> provider;
+    protected final Pages<E> provider;
 
     protected final List<SelectionListener<E>> listeners = new ArrayList<SelectionListener<E>>();
 
     protected final Set<E> selected = new LinkedHashSet<E>();
-    
-    public SimpleSelectableResultsProvider(ResultsProvider<E> provider) {
+
+    public SimpleSelectablePages(Pages<E> provider) {
         this.provider = provider;
     }
 
-    public SimpleSelectableResultsProvider(String name, List<E> items,
-            int pageSize, SortInfo sortInfo) {
-        this(new MemoryListResultsProvider<E>(name, items, pageSize, sortInfo));
+    public SimpleSelectablePages(String name, List<E> items, int pageSize,
+            SortInfo sortInfo) {
+        this(new MemoryPages<E>(name, items, pageSize, sortInfo));
     }
 
-    public List<SelectableResultItem<E>> getSelectableCurrentPage()
-            throws ResultsProviderException {
-        List<SelectableResultItem<E>> wrappedPage = new ArrayList<SelectableResultItem<E>>();
+    public List<SelectablePageElement<E>> getSelectableCurrentPage()
+            throws PaginationException {
+        List<SelectablePageElement<E>> wrappedPage = new ArrayList<SelectablePageElement<E>>();
         for (E item : getCurrentPage()) {
-            wrappedPage.add(new SimpleSelectableResultItem<E>(this, item));
+            wrappedPage.add(new SimpleSelectablePageElement<E>(this, item));
         }
         return wrappedPage;
     }
 
-    public List<E> getSelectedResultItems() throws ResultsProviderException {
+    public List<E> getSelectedElements() throws PaginationException {
         return new ArrayList<E>(selected);
     }
 
@@ -88,9 +87,9 @@ public class SimpleSelectableResultsProvider<E> implements
         return selected.contains(item);
     }
 
-    public void select(E item) throws ResultsProviderException {
+    public void select(E item) throws PaginationException {
         if (!getCurrentPage().contains(item)) {
-            throw new ResultsProviderException(String.format(
+            throw new PaginationException(String.format(
                     "item %s is not part of current page (with index %d)",
                     item, getCurrentPageIndex()));
         }
@@ -100,9 +99,9 @@ public class SimpleSelectableResultsProvider<E> implements
         }
     }
 
-    public void unselect(E item) throws ResultsProviderException {
+    public void unselect(E item) throws PaginationException {
         if (!getCurrentPage().contains(item)) {
-            throw new ResultsProviderException(String.format(
+            throw new PaginationException(String.format(
                     "item %s is not part of current page (with index %d)",
                     item, getCurrentPageIndex()));
         }
@@ -112,8 +111,8 @@ public class SimpleSelectableResultsProvider<E> implements
         }
     }
 
-    public boolean isAllSelected() {
-        for (E item: getCurrentPage()) {
+    public boolean isCurrentPageSelected() {
+        for (E item : getCurrentPage()) {
             if (!selected.contains(item)) {
                 return false;
             }
@@ -121,7 +120,7 @@ public class SimpleSelectableResultsProvider<E> implements
         return true;
     }
 
-    public void selectAll() throws ResultsProviderException {
+    public void selectCurrentPage() throws PaginationException {
         for (E item : getCurrentPage()) {
             if (!selected.contains(item)) {
                 select(item);
@@ -129,7 +128,7 @@ public class SimpleSelectableResultsProvider<E> implements
         }
     }
 
-    public void unselectAll() throws ResultsProviderException {
+    public void unselectCurrentPage() throws PaginationException {
         for (E item : getCurrentPage()) {
             if (selected.contains(item)) {
                 unselect(item);
@@ -138,7 +137,7 @@ public class SimpleSelectableResultsProvider<E> implements
     }
 
     /*
-     * Wrapped ResultsProvider API
+     * Wrapped Pages API
      */
 
     public List<E> getCurrentPage() {
@@ -165,7 +164,7 @@ public class SimpleSelectableResultsProvider<E> implements
         return provider.getName();
     }
 
-    public List<E> getNextPage() throws ResultsProviderException {
+    public List<E> getNextPage() throws PaginationException {
         return provider.getNextPage();
     }
 
@@ -173,7 +172,7 @@ public class SimpleSelectableResultsProvider<E> implements
         return provider.getNumberOfPages();
     }
 
-    public List<E> getPage(int page) throws ResultsProviderException {
+    public List<E> getPage(int page) throws PaginationException {
         return provider.getPage(page);
     }
 
@@ -201,24 +200,24 @@ public class SimpleSelectableResultsProvider<E> implements
         return provider.isSortable();
     }
 
-    public void last() throws ResultsProviderException {
-        provider.last();
+    public void lastPage() throws PaginationException {
+        provider.lastPage();
     }
 
-    public void next() throws ResultsProviderException {
-        provider.next();
+    public void nextPage() throws PaginationException {
+        provider.nextPage();
     }
 
-    public void previous() throws ResultsProviderException {
-        provider.previous();
+    public void previousPage() throws PaginationException {
+        provider.previousPage();
     }
 
-    public void refresh() throws ResultsProviderException {
+    public void refresh() throws PaginationException {
         provider.refresh();
     }
 
-    public void rewind() throws ResultsProviderException {
-        provider.rewind();
+    public void firstPage() throws PaginationException {
+        provider.firstPage();
     }
 
     public void setName(String name) {

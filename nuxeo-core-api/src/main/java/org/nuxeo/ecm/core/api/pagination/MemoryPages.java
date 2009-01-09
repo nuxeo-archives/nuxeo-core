@@ -16,21 +16,21 @@
  *
  * $Id $
  */
-package org.nuxeo.ecm.core.api.provider;
+package org.nuxeo.ecm.core.api.pagination;
 
 import java.util.List;
 
 import org.nuxeo.ecm.core.api.SortInfo;
 
 /**
- * Simple implementation of the ResultsProvider<E> interface that hold all the
+ * Simple implementation of the Pages<E> interface that hold all the
  * pages in memory.
  * 
  * @author ogrisel
  * 
  * @param <E> the type of the element items
  */
-public class MemoryListResultsProvider<E> implements ResultsProvider<E> {
+public class MemoryPages<E> implements Pages<E> {
 
     private static final long serialVersionUID = 1L;
     
@@ -48,7 +48,7 @@ public class MemoryListResultsProvider<E> implements ResultsProvider<E> {
 
     protected String name;
     
-    public MemoryListResultsProvider(String name, List<E> items, int pageSize, SortInfo sortInfo) {
+    public MemoryPages(String name, List<E> items, int pageSize, SortInfo sortInfo) {
         this.name = name;
         this.items = items;
         this.pageSize = pageSize;
@@ -91,8 +91,8 @@ public class MemoryListResultsProvider<E> implements ResultsProvider<E> {
         return String.format("%d/%d", currentPageIndex + 1, getNumberOfPages());
     }
 
-    public List<E> getNextPage() throws ResultsProviderException {
-        next();
+    public List<E> getNextPage() throws PaginationException {
+        nextPage();
         return getCurrentPage();
     }
 
@@ -100,13 +100,13 @@ public class MemoryListResultsProvider<E> implements ResultsProvider<E> {
         return nbPages;
     }
 
-    public List<E> getPage(int page) throws ResultsProviderException {
+    public List<E> getPage(int page) throws PaginationException {
         if (page >= nbPages) {
-            throw new ResultsProviderException(String.format(
+            throw new PaginationException(String.format(
                     "cannot get page #%d of a results provider with %d pages",
                     page, nbPages));
         } else if (page < 0) {
-            throw new ResultsProviderException(String.format(
+            throw new PaginationException(String.format(
                     "cannot get page with negative index %d", page));
         }
         currentPageIndex = page;
@@ -137,29 +137,29 @@ public class MemoryListResultsProvider<E> implements ResultsProvider<E> {
         return sortInfo != null;
     }
 
-    public void last() throws ResultsProviderException {
+    public void lastPage() throws PaginationException {
         currentPageIndex = nbPages - 1;
     }
 
-    public void next() throws ResultsProviderException {
+    public void nextPage() throws PaginationException {
         if (currentPageIndex == nbPages - 1) {
-            throw new ResultsProviderException("already at last page");
+            throw new PaginationException("already at last page");
         }
         currentPageIndex++;
     }
 
-    public void previous() throws ResultsProviderException {
+    public void previousPage() throws PaginationException {
         if (currentPageIndex == 0) {
-            throw new ResultsProviderException("already at first page");
+            throw new PaginationException("already at first page");
         }
         currentPageIndex--;
     }
 
-    public void refresh() throws ResultsProviderException {
+    public void refresh() throws PaginationException {
         // nothing to do
     }
 
-    public void rewind() throws ResultsProviderException {
+    public void firstPage() throws PaginationException {
         currentPageIndex = 0;
     }
 

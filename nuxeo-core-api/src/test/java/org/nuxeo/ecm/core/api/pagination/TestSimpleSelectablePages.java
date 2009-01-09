@@ -1,42 +1,45 @@
-package org.nuxeo.ecm.core.api.provider;
+package org.nuxeo.ecm.core.api.pagination;
 
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import org.nuxeo.ecm.core.api.provider.SelectableResultsProvider.SelectableResultItem;
+import org.nuxeo.ecm.core.api.pagination.PaginationException;
+import org.nuxeo.ecm.core.api.pagination.SelectablePages;
+import org.nuxeo.ecm.core.api.pagination.SimpleSelectablePages;
+import org.nuxeo.ecm.core.api.pagination.SelectablePages.SelectablePageElement;
 
-public class TestSimpleSelectableResultsProvider extends
-        TestMemoryListResultsProvider {
+public class TestSimpleSelectablePages extends
+        TestMemoryPages {
 
-    SelectableResultsProvider<String> sprovider2;
+    SelectablePages<String> spagesBy2;
 
-    SelectableResultsProvider<String> sprovider3;
+    SelectablePages<String> spagesBy3;
 
-    SelectableResultsProvider<String> sprovider12;
+    SelectablePages<String> spagesBy12;
 
     public void setUp() {
-        providerContent = Arrays.asList("zero", "one", "two", "three", "four",
+        pagesContent = Arrays.asList("zero", "one", "two", "three", "four",
                 "five", "six", "seven", "eight", "nine", "ten");
 
-        sprovider2 = new SimpleSelectableResultsProvider<String>("twoByTwo",
-                providerContent, 2, null);
-        provider2 = sprovider2;
+        spagesBy2 = new SimpleSelectablePages<String>("twoByTwo",
+                pagesContent, 2, null);
+        pagesBy2 = spagesBy2;
 
-        sprovider3 = new SimpleSelectableResultsProvider<String>(
-                "threeByThree", providerContent, 3, null);
-        provider3 = sprovider3;
+        spagesBy3 = new SimpleSelectablePages<String>(
+                "threeByThree", pagesContent, 3, null);
+        pagesBy3 = spagesBy3;
 
-        sprovider12 = new SimpleSelectableResultsProvider<String>(
-                "twelveBytwelve", providerContent, 12, null);
-        provider12 = sprovider12;
+        spagesBy12 = new SimpleSelectablePages<String>(
+                "twelveBytwelve", pagesContent, 12, null);
+        pagesBy12 = spagesBy12;
     }
 
     public void testSelectOnDefaultPage() throws Exception {
 
-        List<SelectableResultItem<String>> selectableCurrentPage2 = sprovider2.getSelectableCurrentPage();
-        List<SelectableResultItem<String>> selectableCurrentPage3 = sprovider3.getSelectableCurrentPage();
-        List<SelectableResultItem<String>> selectableCurrentPage12 = sprovider12.getSelectableCurrentPage();
+        List<SelectablePageElement<String>> selectableCurrentPage2 = spagesBy2.getSelectableCurrentPage();
+        List<SelectablePageElement<String>> selectableCurrentPage3 = spagesBy3.getSelectableCurrentPage();
+        List<SelectablePageElement<String>> selectableCurrentPage12 = spagesBy12.getSelectableCurrentPage();
 
         // selectable rows have same size as regular paged lists
         assertEquals(2, selectableCurrentPage2.size());
@@ -45,11 +48,11 @@ public class TestSimpleSelectableResultsProvider extends
 
         // nothing selected by default
         assertEquals(Collections.emptyList(),
-                sprovider2.getSelectedResultItems());
+                spagesBy2.getSelectedElements());
         assertEquals(Collections.emptyList(),
-                sprovider3.getSelectedResultItems());
+                spagesBy3.getSelectedElements());
         assertEquals(Collections.emptyList(),
-                sprovider12.getSelectedResultItems());
+                spagesBy12.getSelectedElements());
 
         assertEquals("zero", selectableCurrentPage2.get(0).getData());
         assertEquals("one", selectableCurrentPage2.get(1).getData());
@@ -63,26 +66,26 @@ public class TestSimpleSelectableResultsProvider extends
         assertEquals(false, selectableCurrentPage3.get(1).isSelected());
         assertEquals(false, selectableCurrentPage3.get(2).isSelected());
 
-        // select some results from the provider API
-        sprovider2.select("one");
+        // select some results from the pagination API
+        spagesBy2.select("one");
         try {
-            sprovider2.select("two");
+            spagesBy2.select("two");
             fail("should not be able to select elements that are not present in the current page");
-        } catch (ResultsProviderException e) {
+        } catch (PaginationException e) {
         }
-        sprovider3.select("one");
-        sprovider3.select("two");
-        sprovider12.select("one");
-        sprovider12.select("two");
+        spagesBy3.select("one");
+        spagesBy3.select("two");
+        spagesBy12.select("one");
+        spagesBy12.select("two");
 
-        assertEquals(Arrays.asList("one"), sprovider2.getSelectedResultItems());
+        assertEquals(Arrays.asList("one"), spagesBy2.getSelectedElements());
         assertEquals(Arrays.asList("one", "two"),
-                sprovider3.getSelectedResultItems());
+                spagesBy3.getSelectedElements());
         assertEquals(Arrays.asList("one", "two"),
-                sprovider12.getSelectedResultItems());
+                spagesBy12.getSelectedElements());
 
-        selectableCurrentPage2 = sprovider2.getSelectableCurrentPage();
-        selectableCurrentPage3 = sprovider3.getSelectableCurrentPage();
+        selectableCurrentPage2 = spagesBy2.getSelectableCurrentPage();
+        selectableCurrentPage3 = spagesBy3.getSelectableCurrentPage();
 
         assertEquals("zero", selectableCurrentPage2.get(0).getData());
         assertEquals("one", selectableCurrentPage2.get(1).getData());
@@ -105,19 +108,19 @@ public class TestSimpleSelectableResultsProvider extends
         
         // navigation should not affect the global selection but will change the
         // current row
-        sprovider2.next();
-        sprovider3.next();
-        assertEquals(Arrays.asList("one"), sprovider2.getSelectedResultItems());
+        spagesBy2.nextPage();
+        spagesBy3.nextPage();
+        assertEquals(Arrays.asList("one"), spagesBy2.getSelectedElements());
         assertEquals(Arrays.asList("one", "two"),
-                sprovider3.getSelectedResultItems());
+                spagesBy3.getSelectedElements());
 
-        // we can now select "two" in sprovider2
-        sprovider2.select("two");
+        // we can now select "two" in spagesBy2
+        spagesBy2.select("two");
         assertEquals(Arrays.asList("one", "two"),
-                sprovider2.getSelectedResultItems());
+                spagesBy2.getSelectedElements());
 
-        List<SelectableResultItem<String>> selectableCurrentPage2 = sprovider2.getSelectableCurrentPage();
-        List<SelectableResultItem<String>> selectableCurrentPage3 = sprovider3.getSelectableCurrentPage();
+        List<SelectablePageElement<String>> selectableCurrentPage2 = spagesBy2.getSelectableCurrentPage();
+        List<SelectablePageElement<String>> selectableCurrentPage3 = spagesBy3.getSelectableCurrentPage();
 
         assertEquals("two", selectableCurrentPage2.get(0).getData());
         assertEquals("three", selectableCurrentPage2.get(1).getData());
@@ -132,18 +135,18 @@ public class TestSimpleSelectableResultsProvider extends
         assertEquals(false, selectableCurrentPage3.get(2).isSelected());
 
         // let use unselect the current page elements
-        assertEquals(false, sprovider2.isAllSelected());
-        sprovider2.unselectAll();
+        assertEquals(false, spagesBy2.isCurrentPageSelected());
+        spagesBy2.unselectCurrentPage();
         assertEquals("two", selectableCurrentPage2.get(0).getData());
         assertEquals("three", selectableCurrentPage2.get(1).getData());
         assertEquals(false, selectableCurrentPage2.get(0).isSelected());
         assertEquals(false, selectableCurrentPage2.get(1).isSelected());
         // there is still one element selected on the first page of
-        // sprovider2:
-        assertEquals(Arrays.asList("one"), sprovider2.getSelectedResultItems());
+        // spagesBy2:
+        assertEquals(Arrays.asList("one"), spagesBy2.getSelectedElements());
 
-        assertEquals(false, sprovider3.isAllSelected());
-        sprovider3.unselectAll();
+        assertEquals(false, spagesBy3.isCurrentPageSelected());
+        spagesBy3.unselectCurrentPage();
         assertEquals("three", selectableCurrentPage3.get(0).getData());
         assertEquals("four", selectableCurrentPage3.get(1).getData());
         assertEquals("five", selectableCurrentPage3.get(2).getData());
@@ -151,71 +154,71 @@ public class TestSimpleSelectableResultsProvider extends
         assertEquals(false, selectableCurrentPage3.get(1).isSelected());
         assertEquals(false, selectableCurrentPage3.get(2).isSelected());
         // there are still elements selected on the first page of
-        // sprovider3:
+        // spagesBy3:
         assertEquals(Arrays.asList("one", "two"),
-                sprovider3.getSelectedResultItems());
+                spagesBy3.getSelectedElements());
 
         // select all
-        sprovider2.selectAll();
+        spagesBy2.selectCurrentPage();
         assertEquals("two", selectableCurrentPage2.get(0).getData());
         assertEquals("three", selectableCurrentPage2.get(1).getData());
         assertEquals(true, selectableCurrentPage2.get(0).isSelected());
         assertEquals(true, selectableCurrentPage2.get(1).isSelected());
-        assertEquals(true, sprovider2.isAllSelected());
+        assertEquals(true, spagesBy2.isCurrentPageSelected());
         assertEquals(Arrays.asList("one", "two", "three"),
-                sprovider2.getSelectedResultItems());
+                spagesBy2.getSelectedElements());
 
-        sprovider3.selectAll();
+        spagesBy3.selectCurrentPage();
         assertEquals("three", selectableCurrentPage3.get(0).getData());
         assertEquals("four", selectableCurrentPage3.get(1).getData());
         assertEquals("five", selectableCurrentPage3.get(2).getData());
         assertEquals(true, selectableCurrentPage3.get(0).isSelected());
         assertEquals(true, selectableCurrentPage3.get(1).isSelected());
         assertEquals(true, selectableCurrentPage3.get(2).isSelected());
-        assertEquals(true, sprovider3.isAllSelected());
+        assertEquals(true, spagesBy3.isCurrentPageSelected());
         assertEquals(Arrays.asList("one", "two", "three", "four", "five"),
-                sprovider3.getSelectedResultItems());
+                spagesBy3.getSelectedElements());
     }
 
     public void testSelectFromSelectableResultItem() throws Exception {
-        List<SelectableResultItem<String>> selectablePage = sprovider2.getSelectableCurrentPage();
+        List<SelectablePageElement<String>> selectablePage = spagesBy2.getSelectableCurrentPage();
         assertEquals(2, selectablePage.size());
         assertEquals(false, selectablePage.get(0).isSelected());
         assertEquals(false, selectablePage.get(1).isSelected());
 
         selectablePage.get(0).select();
         assertEquals(true, selectablePage.get(0).isSelected());
-        assertEquals(Arrays.asList("zero"), sprovider2.getSelectedResultItems());
+        assertEquals(Arrays.asList("zero"), spagesBy2.getSelectedElements());
 
         selectablePage.get(1).select();
         assertEquals(true, selectablePage.get(1).isSelected());
         assertEquals(Arrays.asList("zero", "one"),
-                sprovider2.getSelectedResultItems());
+                spagesBy2.getSelectedElements());
 
         selectablePage.get(0).unselect();
         assertEquals(false, selectablePage.get(0).isSelected());
-        assertEquals(Arrays.asList("one"), sprovider2.getSelectedResultItems());
+        assertEquals(Arrays.asList("one"), spagesBy2.getSelectedElements());
 
         // unselecting twice should not do anything
         selectablePage.get(0).unselect();
         assertEquals(false, selectablePage.get(0).isSelected());
-        assertEquals(Arrays.asList("one"), sprovider2.getSelectedResultItems());
+        assertEquals(Arrays.asList("one"), spagesBy2.getSelectedElements());
 
-        sprovider2.next();
-        sprovider2.getSelectableCurrentPage().get(1).select();
+        spagesBy2.nextPage();
+        spagesBy2.getSelectableCurrentPage().get(1).select();
         assertEquals(Arrays.asList("one", "three"),
-                sprovider2.getSelectedResultItems());
+                spagesBy2.getSelectedElements());
 
-        sprovider2.previous();
-        sprovider2.getSelectableCurrentPage().get(1).unselect();
+        spagesBy2.previousPage();
+        spagesBy2.getSelectableCurrentPage().get(1).unselect();
         assertEquals(false, selectablePage.get(1).isSelected());
         assertEquals(Arrays.asList("three"),
-                sprovider2.getSelectedResultItems());
+                spagesBy2.getSelectedElements());
 
-        sprovider2.next();
-        sprovider2.getSelectableCurrentPage().get(1).unselect();
+        spagesBy2.nextPage();
+        spagesBy2.getSelectableCurrentPage().get(1).unselect();
         assertEquals(Collections.emptyList(),
-                sprovider2.getSelectedResultItems());
+                spagesBy2.getSelectedElements());
     }
 
     public void testListeners() throws Exception {

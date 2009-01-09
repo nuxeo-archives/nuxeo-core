@@ -16,25 +16,26 @@
  *
  * $Id $
  */
-package org.nuxeo.ecm.core.api.provider;
+package org.nuxeo.ecm.core.api.pagination;
 
-import org.nuxeo.ecm.core.api.provider.SelectableResultsProvider.SelectableResultItem;
+import org.nuxeo.ecm.core.api.pagination.SelectablePages.SelectablePageElement;
+
 
 /**
- * Basic implementation of the SelectableResultItem that relies upon the
- * SelectableResultsProvider to hold the selection state of each item.
+ * Basic implementation of the SelectablePageItem that relies upon the
+ * SelectablePages to hold the selection state of each item.
  * 
  * @author ogrisel
  * 
  * @param <E>
  */
-public class SimpleSelectableResultItem<E> implements SelectableResultItem<E> {
+public class SimpleSelectablePageElement<E> implements SelectablePageElement<E> {
 
     protected final E item;
     
-    protected final SelectableResultsProvider<E> provider;
+    protected final SelectablePages<E> provider;
 
-    public SimpleSelectableResultItem(SelectableResultsProvider<E> provider, E item) {
+    public SimpleSelectablePageElement(SelectablePages<E> provider, E item) {
         this.item = item;
         this.provider = provider;
     }
@@ -43,7 +44,7 @@ public class SimpleSelectableResultItem<E> implements SelectableResultItem<E> {
         return item;
     }
 
-    public SelectableResultsProvider<E> getProvider() {
+    public SelectablePages<E> getPages() {
         return provider;
     }
 
@@ -51,11 +52,11 @@ public class SimpleSelectableResultItem<E> implements SelectableResultItem<E> {
         return provider.isSelected(item);
     }
 
-    public void select() throws ResultsProviderException {
+    public void select() throws PaginationException {
         provider.select(item);
     }
 
-    public void unselect() throws ResultsProviderException  {
+    public void unselect() throws PaginationException  {
         provider.unselect(item);
     }
 
