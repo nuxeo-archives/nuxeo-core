@@ -30,8 +30,12 @@ public class EmptyPages<E> implements Pages<E> {
     
     protected String name;
     
+    public EmptyPages(String name) {
+        this.name = name;
+    }
+
     public static <T> Pages<T> getInstance() {
-        return new EmptyPages<T>();
+        return new EmptyPages<T>(null);
     }
     
     public List<E> getCurrentPage() {

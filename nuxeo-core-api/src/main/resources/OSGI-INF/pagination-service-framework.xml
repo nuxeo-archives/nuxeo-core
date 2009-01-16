@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<component name="org.nuxeo.ecm.core.api.pagination.service.PaginationService">
+
+  <implementation
+          class="org.nuxeo.ecm.core.api.pagination.service.PaginationServiceImpl"/>
+  <documentation>
+    @author Olivier Grisel (og@nuxeo.com)
+  </documentation>
+
+  <service>
+    <provide interface="org.nuxeo.ecm.core.api.pagination.service.PaginationService" />
+  </service>
+
+  <extension-point name="pagesFactory">
+  <documentation>
+    @author Olivier Grisel (og@nuxeo.com)
+    This extension point lets you contribute custom factories for paginated list
+    of DocumentModels or other elements usually computed as the results
+    of some implementation specific query to a persistent backend.
+  </documentation>
+
+    <object
+      class="org.nuxeo.ecm.core.api.pagination.PagesFactoryDescriptor" />
+      
+  </extension-point>
+
+</component>
