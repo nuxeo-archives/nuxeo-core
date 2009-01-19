@@ -440,9 +440,7 @@ public class DocumentModelImpl implements DocumentModel, Cloneable {
             try {
                 dataModel = loadDataModel(schema);
             } catch (ClientException e) {
-                // TODO: how to handle exceptions?
-                log.error("ERROR getting the data model: " + schema + " for "
-                        + ref,e);
+		; // commented out for NXP-2981, not an error while processing a message of a already removed document
             }
         }
         return dataModel;
