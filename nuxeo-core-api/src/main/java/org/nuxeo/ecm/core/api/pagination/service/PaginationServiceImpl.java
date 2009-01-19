@@ -95,13 +95,12 @@ public class PaginationServiceImpl extends DefaultComponent implements
             descriptors.remove(lastIndex);
             log.debug("unregistered PaginatorFactoryDescriptor: "
                     + descriptor.getName());
+            // invalidate the cached merged map
+            factories = null;
         } else {
             log.warn("failed to unregister PaginatorFactoryDescriptor: no such descriptor "
                     + descriptor.getName());
         }
-
-        // invalidate the cached merged map
-        factories = null;
     }
 
     protected Map<String, PaginationFactory> getFactories() {

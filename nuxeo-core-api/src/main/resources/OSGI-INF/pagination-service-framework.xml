@@ -20,7 +20,7 @@
   </documentation>
 
     <object
-      class="org.nuxeo.ecm.core.api.pagination.PagesFactoryDescriptor" />
+      class="org.nuxeo.ecm.core.api.pagination.service.PaginationFactoryDescriptor" />
       
   </extension-point>
 

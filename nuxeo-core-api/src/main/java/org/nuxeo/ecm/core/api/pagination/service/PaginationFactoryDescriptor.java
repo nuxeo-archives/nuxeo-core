@@ -42,6 +42,9 @@ public class PaginationFactoryDescriptor {
 
     @XNode("@selectable")
     protected boolean selectable = false;
+    
+    @XNode("@sortable")
+    protected boolean sortable = true;
 
     @XNodeMap(value = "sortCriterion", key = "@name", type = LinkedHashMap.class, componentType = Boolean.class)
     protected LinkedHashMap<String, Boolean> sortCriteria;
@@ -75,7 +78,9 @@ public class PaginationFactoryDescriptor {
             throw new InstantiationException("factory class name required");
         }
         instance = (PaginationFactory) runtimeContext.loadClass(factoryClass).newInstance();
+        instance.setName(name);
         instance.setSelectable(selectable);
+        instance.setSortable(sortable);
         instance.setDefaultPageSize(pageSize);
         if (sortCriteria != null && !sortCriteria.isEmpty()) {
             // TODO: make SortInfo able to handle a list of (sort criterion,
