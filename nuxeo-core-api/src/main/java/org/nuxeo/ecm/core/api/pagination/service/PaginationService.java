@@ -18,7 +18,6 @@
  */
 package org.nuxeo.ecm.core.api.pagination.service;
 
-import java.io.Serializable;
 import java.util.Map;
 
 import org.nuxeo.ecm.core.api.SortInfo;
@@ -34,10 +33,10 @@ import org.nuxeo.ecm.core.api.pagination.PaginationException;
 public interface PaginationService {
 
     public <E> Pages<E> getPages(String paginatorName, SortInfo sortInfo,
-            Map<String, Serializable> context) throws PaginationException;
+            Map<String, Object> context) throws PaginationException;
 
     public <E> Pages<E> getPages(String paginatorName, SortInfo sortInfo,
-            int pageSize, Map<String, Serializable> context)
+            int pageSize, Map<String, Object> context)
             throws PaginationException;
 
     public <E> Pages<E> getEmptyPages(String paginatorName)

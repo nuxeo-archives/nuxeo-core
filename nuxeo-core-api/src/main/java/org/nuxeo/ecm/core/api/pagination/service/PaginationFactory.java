@@ -1,6 +1,5 @@
 package org.nuxeo.ecm.core.api.pagination.service;
 
-import java.io.Serializable;
 import java.util.Map;
 
 import org.nuxeo.ecm.core.api.SortInfo;
@@ -23,7 +22,7 @@ public interface PaginationFactory {
      * 
      */
     public <E> Pages<E> getPages(String paginatorName, SortInfo sortInfo,
-            int pageSize, Map<String, Serializable> context)
+            int pageSize, Map<String, Object> context)
             throws PaginationException;
 
     //

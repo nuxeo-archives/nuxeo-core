@@ -1,6 +1,5 @@
 package org.nuxeo.ecm.core.api.pagination.service;
 
-import java.io.Serializable;
 import java.util.Map;
 
 import org.apache.commons.logging.Log;
@@ -61,7 +60,7 @@ public abstract class AbstractPaginationFactory implements PaginationFactory {
     }
 
     public <E> Pages<E> getPages(String paginatorName, SortInfo sortInfo,
-            int pageSize, Map<String, Serializable> context)
+            int pageSize, Map<String, Object> context)
             throws PaginationException {
 
         if (!sortable && sortInfo != null) {
@@ -80,7 +79,7 @@ public abstract class AbstractPaginationFactory implements PaginationFactory {
     }
 
     abstract protected <E> Pages<E> getRawPages(String paginatorName,
-            SortInfo sortInfo, int pageSize, Map<String, Serializable> context)
+            SortInfo sortInfo, int pageSize, Map<String, Object> context)
             throws PaginationException;
 
 }

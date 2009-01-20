@@ -1,6 +1,5 @@
 package org.nuxeo.ecm.core.api.pagination.service;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -21,9 +20,10 @@ public class MemoryPaginationFactory extends AbstractPaginationFactory {
 
     public static final String ITEM_LIST_CONTEXT_KEY = "items";
 
+    @SuppressWarnings("unchecked")
     @Override
     protected <E> Pages<E> getRawPages(String paginatorName, SortInfo sortInfo,
-            int pageSize, Map<String, Serializable> context)
+            int pageSize, Map<String, Object> context)
             throws PaginationException {
 
         List<E> items = (List<E>) context.get(ITEM_LIST_CONTEXT_KEY);

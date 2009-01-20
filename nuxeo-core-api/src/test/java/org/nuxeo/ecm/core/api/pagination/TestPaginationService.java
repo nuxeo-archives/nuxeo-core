@@ -1,5 +1,10 @@
 package org.nuxeo.ecm.core.api.pagination;
 
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.nuxeo.ecm.core.api.pagination.service.MemoryPaginationFactory;
 import org.nuxeo.ecm.core.api.pagination.service.PaginationService;
 import org.nuxeo.runtime.api.Framework;
 import org.nuxeo.runtime.test.NXRuntimeTestCase;
@@ -17,7 +22,7 @@ public class TestPaginationService extends NXRuntimeTestCase {
                 "test-pagination-service-contrib.xml");
     }
 
-    public void testMemoryPaginationFactory() throws Exception {
+    public void testMissingPaginationFactory() throws Exception {
         PaginationService service = Framework.getService(PaginationService.class);
         assertNotNull(service);
 
@@ -29,6 +34,21 @@ public class TestPaginationService extends NXRuntimeTestCase {
         } catch (PaginationException e) {
             // expected exception
         }
+    }
+
+    public void testUnselectableMemoryPaginationFactory() throws Exception {
+        PaginationService service = Framework.getService(PaginationService.class);
+        assertNotNull(service);
+
+        Map<String, Object> context = new HashMap<String, Object>();
+        context.put(MemoryPaginationFactory.ITEM_LIST_CONTEXT_KEY,
+                Arrays.asList(0, 1, 2, 3, 4));
+        Pages<Long> pages = service.getPages("unselectable_memory_pagesize_3",
+                null, context);
+
+        assertNotNull(pages);
+        assertFalse(pages instanceof SelectablePages);
+
     }
 
 }

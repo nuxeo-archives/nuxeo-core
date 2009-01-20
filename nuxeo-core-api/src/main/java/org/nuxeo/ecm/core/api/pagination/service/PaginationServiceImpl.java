@@ -18,7 +18,6 @@
  */
 package org.nuxeo.ecm.core.api.pagination.service;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -122,12 +121,12 @@ public class PaginationServiceImpl extends DefaultComponent implements
     //
 
     public <E> Pages<E> getPages(String paginatorName, SortInfo sortInfo,
-            Map<String, Serializable> context) throws PaginationException {
+            Map<String, Object> context) throws PaginationException {
         return getPages(paginatorName, sortInfo, -1, context);
     }
 
     public <E> Pages<E> getPages(String paginatorName, SortInfo sortInfo,
-            int pageSize, Map<String, Serializable> context)
+            int pageSize, Map<String, Object> context)
             throws PaginationException {
         PaginationFactory factory = getFactories().get(paginatorName);
         if (factory == null) {
