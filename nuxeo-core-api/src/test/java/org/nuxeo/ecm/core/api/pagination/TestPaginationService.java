@@ -43,12 +43,33 @@ public class TestPaginationService extends NXRuntimeTestCase {
         Map<String, Object> context = new HashMap<String, Object>();
         context.put(MemoryPaginationFactory.ITEM_LIST_CONTEXT_KEY,
                 Arrays.asList(0, 1, 2, 3, 4));
-        Pages<Long> pages = service.getPages("unselectable_memory_pagesize_3",
-                null, context);
+        Pages<Integer> pages = service.getPages(
+                "unselectable_memory_pagesize_3", null, context);
 
         assertNotNull(pages);
         assertFalse(pages instanceof SelectablePages);
+        assertEquals(Arrays.asList(0, 1, 2), pages.getCurrentPage());
+    }
 
+    public void testSelectableMemoryPaginationFactory() throws Exception {
+        PaginationService service = Framework.getService(PaginationService.class);
+        assertNotNull(service);
+
+        Map<String, Object> context = new HashMap<String, Object>();
+        context.put(MemoryPaginationFactory.ITEM_LIST_CONTEXT_KEY,
+                Arrays.asList(0, 1, 2, 3, 4));
+        Pages<Integer> pages = service.getPages("selectable_memory_pagesize_2",
+                null, context);
+
+        assertNotNull(pages);
+        assertEquals(Arrays.asList(0, 1), pages.getCurrentPage());
+        assertTrue(pages instanceof SelectablePages);
+
+        SelectablePages<Integer> spages = (SelectablePages<Integer>) pages;
+        assertEquals(Arrays.asList(0, 1), spages.getCurrentPage());
+
+        spages.select(Integer.valueOf(1));
+        assertTrue(spages.isSelected(Integer.valueOf(1)));
     }
 
 }
