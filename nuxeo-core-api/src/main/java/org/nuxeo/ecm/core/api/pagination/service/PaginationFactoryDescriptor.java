@@ -44,7 +44,7 @@ public class PaginationFactoryDescriptor {
     protected boolean selectable = false;
     
     @XNode("@sortable")
-    protected boolean sortable = true;
+    protected boolean sortable = false;
 
     @XNodeMap(value = "sortCriterion", key = "@name", type = LinkedHashMap.class, componentType = Boolean.class)
     protected LinkedHashMap<String, Boolean> sortCriteria;
@@ -58,6 +58,9 @@ public class PaginationFactoryDescriptor {
         return name;
     }
 
+    /**
+     * Used for containment tests in unregisterContribution method
+     */
     @Override
     public boolean equals(Object o) {
         if (o instanceof PaginationFactoryDescriptor) {
@@ -65,7 +68,7 @@ public class PaginationFactoryDescriptor {
             if (name == null) {
                 return other.getName() == null;
             } else {
-                return this.getName().equals(other.getName());
+                return name.equals(other.getName());
             }
         }
         return false;

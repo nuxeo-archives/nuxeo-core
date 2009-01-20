@@ -91,7 +91,7 @@ public class PaginationServiceImpl extends DefaultComponent implements
 
         PaginationFactoryDescriptor descriptor = (PaginationFactoryDescriptor) contribution;
         int lastIndex = descriptors.lastIndexOf(descriptor);
-        if (lastIndex > 0) {
+        if (lastIndex >= 0) {
             descriptors.remove(lastIndex);
             log.debug("unregistered PaginatorFactoryDescriptor: "
                     + descriptor.getName());

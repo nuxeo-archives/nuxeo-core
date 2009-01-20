@@ -11,7 +11,7 @@
     <provide interface="org.nuxeo.ecm.core.api.pagination.service.PaginationService" />
   </service>
 
-  <extension-point name="pagesFactory">
+  <extension-point name="paginationFactories">
   <documentation>
     @author Olivier Grisel (og@nuxeo.com)
     This extension point lets you contribute custom factories for paginated list

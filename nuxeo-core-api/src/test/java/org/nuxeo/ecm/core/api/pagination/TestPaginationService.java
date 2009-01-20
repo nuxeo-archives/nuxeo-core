@@ -13,6 +13,8 @@ public class TestPaginationService extends NXRuntimeTestCase {
         // deployBundle("org.nuxeo.ecm.core.api");
         deployContrib("org.nuxeo.ecm.core.api",
                 "OSGI-INF/pagination-service-framework.xml");
+        deployContrib("org.nuxeo.ecm.core.api.test",
+                "test-pagination-service-contrib.xml");
     }
 
     public void testMemoryPaginationFactory() throws Exception {
