@@ -20,6 +20,15 @@ public class TestPaginationService extends NXRuntimeTestCase {
     public void testMemoryPaginationFactory() throws Exception {
         PaginationService service = Framework.getService(PaginationService.class);
         assertNotNull(service);
+
+        // test lookup of non registered factories
+        try {
+            service.getEmptyPages("missing paginator");
+            service.getPages("missing paginator", null, null);
+            fail("should have raised PaginationException");
+        } catch (PaginationException e) {
+            // expected exception
+        }
     }
 
 }

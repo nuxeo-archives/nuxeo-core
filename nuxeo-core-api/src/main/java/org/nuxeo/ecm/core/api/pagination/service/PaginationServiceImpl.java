@@ -20,6 +20,7 @@ package org.nuxeo.ecm.core.api.pagination.service;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -107,6 +108,7 @@ public class PaginationServiceImpl extends DefaultComponent implements
         if (factories == null) {
             // lazy computation of the merged map of factory instances from the
             // list of descriptors]
+            factories = new HashMap<String, PaginationFactory>();
             for (PaginationFactoryDescriptor descriptor : descriptors) {
                 factories.put(descriptor.getName(),
                         descriptor.getFactoryInstance());
@@ -138,7 +140,7 @@ public class PaginationServiceImpl extends DefaultComponent implements
 
     public <E> Pages<E> getEmptyPages(String paginatorName)
             throws PaginationException {
-        if (factories.containsKey(paginatorName)) {
+        if (!getFactories().containsKey(paginatorName)) {
             throw new PaginationException(
                     "could not find registered factory for Pages with name "
                             + paginatorName);
