@@ -83,11 +83,11 @@ public class ManagedConnectionFactoryImpl implements ManagedConnectionFactory,
      */
 
     public void setName(String name) {
-        this.name = name;
+        repositoryDescriptor.name = name;
     }
 
     public String getName() {
-        return name;
+        return repositoryDescriptor.name;
     }
 
     public void setXaDataSource(String xaDataSourceName) {
