@@ -45,6 +45,12 @@ public class RepositoryDescriptor {
     @XNode("clustering@delay")
     public long clusteringDelay;
 
+    /** Merges only non-JCA properties. */
+    public void mergeFrom(RepositoryDescriptor other) {
+        clusteringEnabled = other.clusteringEnabled;
+        clusteringDelay = other.clusteringDelay;
+    }
+
     @XNode("xa-datasource")
     public String xaDataSourceName;
 
