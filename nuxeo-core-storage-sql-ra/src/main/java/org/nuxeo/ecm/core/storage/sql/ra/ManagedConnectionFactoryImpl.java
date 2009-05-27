@@ -62,8 +62,6 @@ public class ManagedConnectionFactoryImpl implements ManagedConnectionFactory,
 
     private final RepositoryDescriptor repositoryDescriptor;
 
-    private String name;
-
     private transient ResourceAdapter resourceAdapter;
 
     private transient PrintWriter out;
@@ -201,7 +199,7 @@ public class ManagedConnectionFactoryImpl implements ManagedConnectionFactory,
 
     @Override
     public int hashCode() {
-        return name == null ? 0 : name.hashCode();
+        return repositoryDescriptor.name == null ? 0 : repositoryDescriptor.name.hashCode();
     }
 
     @Override
@@ -216,7 +214,8 @@ public class ManagedConnectionFactoryImpl implements ManagedConnectionFactory,
     }
 
     private boolean equals(ManagedConnectionFactoryImpl other) {
-        return name == null ? false : name.equals(other.name);
+        return repositoryDescriptor.name == null ? false
+                : repositoryDescriptor.name.equals(repositoryDescriptor.name);
     }
 
     /*
