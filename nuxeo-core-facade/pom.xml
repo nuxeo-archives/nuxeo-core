@@ -6,7 +6,7 @@
   <parent>
     <groupId>org.nuxeo.ecm.core</groupId>
     <artifactId>nuxeo-core-parent</artifactId>
-    <version>1.4.3</version>
+    <version>1.4.3.1-SNAPSHOT</version>
   </parent>
 
   <artifactId>nuxeo-core-facade</artifactId>
@@ -36,10 +36,6 @@
       <groupId>org.nuxeo.ecm.core</groupId>
       <artifactId>nuxeo-core-schema</artifactId>
     </dependency>
-    <dependency>
-      <groupId>org.nuxeo.ecm.core</groupId>
-      <artifactId>nuxeo-core-jcr-connector</artifactId>
-    </dependency>
 
     <dependency>
       <groupId>jboss</groupId>
@@ -66,10 +62,6 @@
     <dependency>
       <groupId>org.nuxeo.runtime</groupId>
       <artifactId>nuxeo-runtime-test</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.nuxeo.ecm.core</groupId>
-      <artifactId>nuxeo-core-jcr-connector-test</artifactId>
     </dependency>
 
     <dependency>

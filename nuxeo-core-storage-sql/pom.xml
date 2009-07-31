@@ -4,13 +4,12 @@
   <parent>
     <groupId>org.nuxeo.ecm.core</groupId>
     <artifactId>nuxeo-core-parent</artifactId>
-    <version>1.4.3</version>
+    <version>1.4.3.1-SNAPSHOT</version>
   </parent>
 
   <artifactId>nuxeo-core-storage-sql</artifactId>
   <name>Nuxeo Core SQL Storage</name>
   <description>Nuxeo Core: SQL Storage.</description>
-  <version>1.4.3.1-20090527</version>
 
   <dependencies>
     <dependency>
@@ -24,17 +23,14 @@
     <dependency>
       <groupId>org.nuxeo.ecm.core</groupId>
       <artifactId>nuxeo-core-api</artifactId>
-      <version>${version}</version>
     </dependency>
     <dependency>
       <groupId>org.nuxeo.ecm.core</groupId>
       <artifactId>nuxeo-core-query</artifactId>
-      <version>${version}</version>
     </dependency>
     <dependency>
       <groupId>org.nuxeo.ecm.core</groupId>
       <artifactId>nuxeo-core</artifactId>
-      <version>${version}</version>
     </dependency>
     <dependency>
       <groupId>commons-collections</groupId>
@@ -73,13 +69,11 @@
     <dependency>
       <groupId>org.nuxeo.ecm.core</groupId>
       <artifactId>nuxeo-core-query-test</artifactId>
-      <version>${version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.nuxeo.ecm.core</groupId>
       <artifactId>nuxeo-core-storage-sql-extensions</artifactId>
-      <version>${version}</version>
       <scope>test</scope>
     </dependency>
 

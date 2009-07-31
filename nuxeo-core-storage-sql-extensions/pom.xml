@@ -4,13 +4,12 @@
   <parent>
     <groupId>org.nuxeo.ecm.core</groupId>
     <artifactId>nuxeo-core-parent</artifactId>
-    <version>1.4.3</version>
+    <version>1.4.3.1-SNAPSHOT</version>
   </parent>
 
   <artifactId>nuxeo-core-storage-sql-extensions</artifactId>
   <name>Nuxeo Core SQL Storage DB Extensions</name>
   <description>Nuxeo Core: SQL Storage DB Extensions.</description>
-  <version>1.4.3.1-20090527</version>
 
   <dependencies>
     <dependency>
