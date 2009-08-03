@@ -32,4 +32,9 @@ public interface RepositoryStatusMBean {
      */
     String clearCaches();
 
+    /**
+     * Ask to clear Core Caches
+     */
+    String markForCacheClearing();
+
 }

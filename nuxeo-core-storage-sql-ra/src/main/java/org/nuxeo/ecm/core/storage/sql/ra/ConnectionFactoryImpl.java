@@ -39,6 +39,7 @@ import org.nuxeo.ecm.core.storage.StorageException;
 import org.nuxeo.ecm.core.storage.sql.ConnectionSpecImpl;
 import org.nuxeo.ecm.core.storage.sql.Repository;
 import org.nuxeo.ecm.core.storage.sql.Session;
+import org.nuxeo.ecm.core.storage.sql.coremodel.SQLRepository;
 import org.nuxeo.ecm.core.storage.sql.coremodel.SQLSecurityManager;
 import org.nuxeo.ecm.core.storage.sql.coremodel.SQLSession;
 import org.nuxeo.runtime.api.Framework;
@@ -49,7 +50,7 @@ import org.nuxeo.runtime.api.Framework;
  * <p>
  * An instance of this class is returned to the application when a JNDI lookup
  * is done. This is the datasource equivalent of {@link SQLRepository}.
- *
+ * 
  * @author Florent Guillaume
  */
 public class ConnectionFactoryImpl implements Repository,
@@ -123,7 +124,7 @@ public class ConnectionFactoryImpl implements Repository,
 
     /**
      * Gets a new connection, with no credentials.
-     *
+     * 
      * @return the connection
      */
     public Session getConnection() throws StorageException {
@@ -140,7 +141,7 @@ public class ConnectionFactoryImpl implements Repository,
 
     /**
      * Gets a new connection.
-     *
+     * 
      * @param connectionSpec the connection spec, containing credentials
      * @return the connection
      */
@@ -285,5 +286,9 @@ public class ConnectionFactoryImpl implements Repository,
 
     public void processClusterInvalidationsNext() {
         managedConnectionFactory.processClusterInvalidationsNext();
+    }
+
+    public int markForCacheClearing() {
+        return managedConnectionFactory.markForCacheClearing();
     }
 }

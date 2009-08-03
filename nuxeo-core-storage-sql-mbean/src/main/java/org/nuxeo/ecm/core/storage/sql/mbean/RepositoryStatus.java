@@ -31,7 +31,7 @@ import org.nuxeo.ecm.core.storage.sql.RepositoryManagement;
 
 /**
  * An MBean to manage SQL storage repositories.
- *
+ * 
  * @author Florent Guillaume
  */
 public class RepositoryStatus implements RepositoryStatusMBean {
@@ -99,6 +99,23 @@ public class RepositoryStatus implements RepositoryStatusMBean {
             buf.append("<b>").append(repository.getName()).append("</b>: ");
             buf.append(repository.clearCaches());
             buf.append("<br />");
+        }
+        return buf.toString();
+    }
+
+    public String markForCacheClearing() {
+        List<RepositoryManagement> repositories;
+        try {
+            repositories = getRepositories();
+        } catch (NamingException e) {
+            log.error("Error getting repositories", e);
+            return "Error!";
+        }
+        StringBuilder buf = new StringBuilder();
+        buf.append("Caches asked for clear for SQL repositories:<br />");
+        for (RepositoryManagement repository : repositories) {
+            buf.append("<b>").append(repository.getName()).append("</b>");
+            repository.markForCacheClearing();
         }
         return buf.toString();
     }

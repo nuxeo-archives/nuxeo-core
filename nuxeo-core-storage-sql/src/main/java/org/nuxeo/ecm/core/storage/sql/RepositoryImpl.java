@@ -43,7 +43,7 @@ import org.nuxeo.ecm.core.storage.sql.db.Dialect;
 import org.nuxeo.runtime.api.Framework;
 
 /**
- * @author Florent Guillaume 
+ * @author Florent Guillaume
  */
 public class RepositoryImpl implements Repository {
 
@@ -102,7 +102,7 @@ public class RepositoryImpl implements Repository {
     /**
      * Gets a new connection by logging in to the repository with default
      * credentials.
-     *
+     * 
      * @return the session
      * @throws StorageException
      */
@@ -113,15 +113,15 @@ public class RepositoryImpl implements Repository {
     /**
      * Gets a new connection by logging in to the repository with given
      * connection information (credentials).
-     *
+     * 
      * @param connectionSpec the parameters to use to connnect
      * @return the session
      * @throws StorageException
      */
     public synchronized SessionImpl getConnection(ConnectionSpec connectionSpec)
             throws StorageException {
-        assert connectionSpec == null ||
-                connectionSpec instanceof ConnectionSpecImpl;
+        assert connectionSpec == null
+                || connectionSpec instanceof ConnectionSpecImpl;
 
         Credentials credentials = connectionSpec == null ? null
                 : ((ConnectionSpecImpl) connectionSpec).getCredentials();
@@ -227,6 +227,13 @@ public class RepositoryImpl implements Repository {
                 - repositoryDescriptor.clusteringDelay - 1;
     }
 
+    public int markForCacheClearing() {
+        for (SessionImpl session : sessions) {
+            session.markForCacheClearing();
+        }
+        return sessions.size();
+    }
+
     /*
      * ----- -----
      */
@@ -278,15 +285,15 @@ public class RepositoryImpl implements Repository {
             } else {
                 String typeName = propertyName.substring(sep + 1);
                 if (!typeName.startsWith("java.lang.")) {
-                    typeName = "java.lang." +
-                            Character.toUpperCase(typeName.charAt(0)) +
-                            typeName.substring(1);
+                    typeName = "java.lang."
+                            + Character.toUpperCase(typeName.charAt(0))
+                            + typeName.substring(1);
                 }
                 try {
                     sig = new Class[] { Class.forName(typeName) };
                 } catch (ClassNotFoundException e) {
-                    log.error("Cannot find type " + typeName +
-                            " for property: " + propertyName, e);
+                    log.error("Cannot find type " + typeName
+                            + " for property: " + propertyName, e);
                     continue;
                 }
                 propertyName = propertyName.substring(0, sep);
@@ -302,14 +309,14 @@ public class RepositoryImpl implements Repository {
                 try {
                     value = m.invoke(null, new Object[] { value });
                 } catch (Exception e) {
-                    log.error("Cannot call " + typeName + ".valueOf(" + value +
-                            ")", e);
+                    log.error("Cannot call " + typeName + ".valueOf(" + value
+                            + ")", e);
                     continue;
                 }
             }
-            String methodName = "set" +
-                    Character.toUpperCase(propertyName.charAt(0)) +
-                    propertyName.substring(1);
+            String methodName = "set"
+                    + Character.toUpperCase(propertyName.charAt(0))
+                    + propertyName.substring(1);
             Method method;
             try {
                 method = xadatasource.getClass().getMethod(methodName, sig);
@@ -343,8 +350,8 @@ public class RepositoryImpl implements Repository {
             try {
                 method.invoke(xadatasource, new Object[] { value });
             } catch (Exception e) {
-                log.error("Cannot call JavaBean method " + className + "." +
-                        methodName + "(" + value + ")", e);
+                log.error("Cannot call JavaBean method " + className + "."
+                        + methodName + "(" + value + ")", e);
                 continue;
             }
         }
@@ -363,7 +370,8 @@ public class RepositoryImpl implements Repository {
             Connection connection = null;
             try {
                 connection = xaconnection.getConnection();
-                dialect = Dialect.createDialect(connection, repositoryDescriptor);
+                dialect = Dialect.createDialect(connection,
+                        repositoryDescriptor);
             } finally {
                 if (connection != null) {
                     connection.close();
@@ -384,7 +392,7 @@ public class RepositoryImpl implements Repository {
 
     /**
      * Sends invalidation data to relevant sessions.
-     *
+     * 
      * @param invalidations the invalidations
      * @param fromSession the session from which these invalidations originate,
      *            or {@code null} if they come from another cluster node

@@ -50,7 +50,7 @@ import org.nuxeo.runtime.api.Framework;
  * to create new {@link ManagedConnection} (the physical connection).
  * <p>
  * It also is a factory for {@link ConnectionFactory}s.
- *
+ * 
  * @author Florent Guillaume
  */
 public class ManagedConnectionFactoryImpl implements ManagedConnectionFactory,
@@ -199,7 +199,8 @@ public class ManagedConnectionFactoryImpl implements ManagedConnectionFactory,
 
     @Override
     public int hashCode() {
-        return repositoryDescriptor.name == null ? 0 : repositoryDescriptor.name.hashCode();
+        return repositoryDescriptor.name == null ? 0
+                : repositoryDescriptor.name.hashCode();
     }
 
     @Override
@@ -288,6 +289,10 @@ public class ManagedConnectionFactoryImpl implements ManagedConnectionFactory,
     protected SessionImpl getConnection(ConnectionSpecImpl connectionSpec)
             throws StorageException {
         return repository.getConnection(connectionSpec);
+    }
+
+    public int markForCacheClearing() {
+        return repository.markForCacheClearing();
     }
 
 }
