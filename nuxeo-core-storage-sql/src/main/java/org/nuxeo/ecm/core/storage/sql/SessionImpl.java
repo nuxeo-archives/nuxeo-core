@@ -51,7 +51,7 @@ import org.nuxeo.ecm.core.storage.StorageException;
 /**
  * The session is the main high level access point to data from the underlying
  * database.
- *
+ * 
  * @author Florent Guillaume
  */
 public class SessionImpl implements Session {
@@ -73,6 +73,8 @@ public class SessionImpl implements Session {
     private final TransactionalSession transactionalSession;
 
     private Node rootNode;
+
+    private boolean isMarkedForCacheClearing;
 
     SessionImpl(RepositoryImpl repository, SchemaManager schemaManager,
             Mapper mapper, Credentials credentials) throws StorageException {
@@ -103,7 +105,10 @@ public class SessionImpl implements Session {
             // avoid potential multi-threaded access to active session
             return 0;
         }
-        return context.clearCaches();
+
+        int cacheNumberCleared = context.clearCaches();
+        isMarkedForCacheClearing = false;
+        return cacheNumberCleared;
     }
 
     /*
@@ -339,8 +344,8 @@ public class SessionImpl implements Session {
     public Node addChildNode(Node parent, String name, Long pos,
             String typeName, boolean complexProp) throws StorageException {
         checkLive();
-        if (name == null || name.contains("/") || name.equals(".") ||
-                name.equals("..")) {
+        if (name == null || name.contains("/") || name.equals(".")
+                || name.equals("..")) {
             throw new IllegalArgumentException("Illegal name: " + name);
         }
         if (!model.isType(typeName)) {
@@ -415,8 +420,8 @@ public class SessionImpl implements Session {
     public Node getChildNode(Node parent, String name, boolean complexProp)
             throws StorageException {
         checkLive();
-        if (name == null || name.contains("/") || name.equals(".") ||
-                name.equals("..")) {
+        if (name == null || name.contains("/") || name.equals(".")
+                || name.equals("..")) {
             // XXX real parsing
             throw new IllegalArgumentException("Illegal name: " + name);
         }
@@ -562,8 +567,9 @@ public class SessionImpl implements Session {
         return nodes;
     }
 
-    public PartialList<Serializable> query(SQLQuery query, QueryFilter queryFilter,
-            boolean countTotal) throws StorageException {
+    public PartialList<Serializable> query(SQLQuery query,
+            QueryFilter queryFilter, boolean countTotal)
+            throws StorageException {
         try {
             return mapper.query(query, queryFilter, countTotal, this);
         } catch (SQLException e) {
@@ -662,6 +668,20 @@ public class SessionImpl implements Session {
         checkLive();
         // TODO Auto-generated method stub
         throw new RuntimeException("Not implemented");
+    }
+
+    public void markForCacheClearing() {
+        isMarkedForCacheClearing = true;
+    }
+
+    public int clearCache() {
+        int result = context.clearCaches();
+        isMarkedForCacheClearing = false;
+        return result;
+    }
+
+    public boolean isMarkedForCacheClearing() {
+        return isMarkedForCacheClearing;
     }
 
 }

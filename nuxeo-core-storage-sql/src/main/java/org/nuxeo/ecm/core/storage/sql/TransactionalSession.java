@@ -25,16 +25,16 @@ import org.nuxeo.ecm.core.storage.StorageException;
 
 /**
  * The transactional session is an {@link XAResource} for this session.
- *
+ * 
  * @author Florent Guillaume
  */
 public class TransactionalSession implements XAResource {
 
-    private final SessionImpl session;
+    protected final SessionImpl session;
 
-    private final Mapper mapper;
+    protected final Mapper mapper;
 
-    private boolean inTransaction;
+    protected boolean inTransaction;
 
     TransactionalSession(SessionImpl session, Mapper mapper) {
         this.session = session;
@@ -88,10 +88,14 @@ public class TransactionalSession implements XAResource {
             mapper.commit(xid, onePhase);
         } finally {
             inTransaction = false;
-            try {
-                session.sendInvalidationsToOthers();
-            } catch (StorageException e) {
-                throw (XAException) new XAException(XAException.XAER_RMERR).initCause(e);
+            if (session.isMarkedForCacheClearing()) {
+                session.clearCache();
+            } else {
+                try {
+                    session.sendInvalidationsToOthers();
+                } catch (StorageException e) {
+                    throw (XAException) new XAException(XAException.XAER_RMERR).initCause(e);
+                }
             }
         }
     }
