@@ -70,9 +70,4 @@ public class TestJCRRepositoryQuery extends QueryTestCase {
         // not done for JCR
     }
 
-    @Override
-    public void testEcmPathEqual() {
-        // not done for JCR
-    }
-
 }
