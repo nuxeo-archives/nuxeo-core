@@ -54,7 +54,8 @@ import org.nuxeo.runtime.api.Framework;
  * @author Florent Guillaume
  */
 public class ManagedConnectionFactoryImpl implements ManagedConnectionFactory,
-        ResourceAdapterAssociation, RepositoryManagement {
+        ResourceAdapterAssociation, RepositoryManagement,
+        DefaultPlatformComponentCleanupManagedConnectionFactory {
 
     private static final Log log = LogFactory.getLog(ManagedConnectionFactoryImpl.class);
 
@@ -76,6 +77,15 @@ public class ManagedConnectionFactoryImpl implements ManagedConnectionFactory,
         repositoryDescriptor.properties = new HashMap<String, String>();
     }
 
+    // NXP 3992 -- exposed this for clean shutdown on cluster 
+    public void terminateRepository() { 
+        synchronized (this) {
+            if (repository != null) {
+                repository.close();
+            }
+        }
+    }
+   
     /*
      * ----- Java Bean -----
      */

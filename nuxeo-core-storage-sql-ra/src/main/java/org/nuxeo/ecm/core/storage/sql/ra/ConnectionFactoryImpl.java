@@ -54,9 +54,10 @@ import org.nuxeo.runtime.api.Framework;
  * @author Florent Guillaume
  */
 public class ConnectionFactoryImpl implements Repository,
-        org.nuxeo.ecm.core.model.Repository {
+        org.nuxeo.ecm.core.model.Repository, DefaultPlatformComponentCleanupConnectionFactory {
 
     private static final long serialVersionUID = 1L;
+    private static final Log log = LogFactory.getLog(ConnectionFactoryImpl.class); 
 
     private final ManagedConnectionFactoryImpl managedConnectionFactory;
 
@@ -116,6 +117,11 @@ public class ConnectionFactoryImpl implements Repository,
                 throw new RuntimeException(e);
             }
         }
+    }
+
+    // NXP 3992 -- exposed this for clean shutdown on cluster 
+    public ManagedConnectionFactoryImpl getManagedConnectionFactory() {
+	return managedConnectionFactory; 
     }
 
     /*
