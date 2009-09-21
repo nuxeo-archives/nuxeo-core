@@ -37,6 +37,7 @@ import org.apache.commons.logging.LogFactory;
 import org.nuxeo.common.xmap.XMap;
 import org.nuxeo.ecm.core.NXCore;
 import org.nuxeo.ecm.core.schema.SchemaManager;
+import org.nuxeo.ecm.core.storage.DefaultPlatformComponentCleanupManagedConnectionFactory;
 import org.nuxeo.ecm.core.storage.StorageException;
 import org.nuxeo.ecm.core.storage.sql.ConnectionSpecImpl;
 import org.nuxeo.ecm.core.storage.sql.RepositoryDescriptor;

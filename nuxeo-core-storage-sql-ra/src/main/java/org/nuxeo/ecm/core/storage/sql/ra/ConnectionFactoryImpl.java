@@ -35,6 +35,7 @@ import org.nuxeo.ecm.core.repository.RepositoryService;
 import org.nuxeo.ecm.core.schema.SchemaManager;
 import org.nuxeo.ecm.core.security.SecurityManager;
 import org.nuxeo.ecm.core.storage.Credentials;
+import org.nuxeo.ecm.core.storage.DefaultPlatformComponentCleanupConnectionFactory;
 import org.nuxeo.ecm.core.storage.StorageException;
 import org.nuxeo.ecm.core.storage.sql.ConnectionSpecImpl;
 import org.nuxeo.ecm.core.storage.sql.Repository;
@@ -57,7 +58,6 @@ public class ConnectionFactoryImpl implements Repository,
         org.nuxeo.ecm.core.model.Repository, DefaultPlatformComponentCleanupConnectionFactory {
 
     private static final long serialVersionUID = 1L;
-    private static final Log log = LogFactory.getLog(ConnectionFactoryImpl.class); 
 
     private final ManagedConnectionFactoryImpl managedConnectionFactory;
 
