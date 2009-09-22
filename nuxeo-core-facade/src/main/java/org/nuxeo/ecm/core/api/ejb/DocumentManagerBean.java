@@ -49,6 +49,7 @@ import org.nuxeo.ecm.core.api.DocumentException;
 import org.nuxeo.ecm.core.api.DocumentModel;
 import org.nuxeo.ecm.core.api.DocumentModelList;
 import org.nuxeo.ecm.core.api.DocumentRef;
+import org.nuxeo.ecm.core.api.VersionModel;
 import org.nuxeo.ecm.core.api.ejb.local.DocumentManagerLocal;
 import org.nuxeo.ecm.core.api.security.SecuritySummaryEntry;
 import org.nuxeo.ecm.core.model.NoSuchRepositoryException;
@@ -120,7 +121,6 @@ public class DocumentManagerBean extends AbstractSession {
         }
     }
 
-
     @Override
     public Principal getPrincipal() {
         Principal principal;
@@ -135,7 +135,8 @@ public class DocumentManagerBean extends AbstractSession {
             principal = (Principal) sessionContext.get(CONTEXT_PRINCIPAL_KEY);
             if (principal == null) {
                 principal = context.getCallerPrincipal();
-                sessionContext.put(CONTEXT_PRINCIPAL_KEY, (Serializable) principal);
+                sessionContext.put(CONTEXT_PRINCIPAL_KEY,
+                        (Serializable) principal);
             }
         } catch (Throwable t) {
             // TODO: don't throw the exception for the moment, as we need to
@@ -202,7 +203,6 @@ public class DocumentManagerBean extends AbstractSession {
         Repository repo = NXCore.getRepository(repoName);
         return repo.getSession(context);
     }
-
 
     // ----------------------- cache interceptors ------------
 
@@ -294,6 +294,46 @@ public class DocumentManagerBean extends AbstractSession {
             throws ClientException {
         try {
             return super.getSecuritySummary(docModel, includeParents);
+        } catch (Throwable t) {
+            throw EJBExceptionHandler.wrapException(t);
+        }
+    }
+
+    @Override
+    public DocumentModel getSourceDocument(DocumentRef docRef)
+            throws ClientException {
+        try {
+            return super.getSourceDocument(docRef);
+        } catch (Throwable t) {
+            throw EJBExceptionHandler.wrapException(t);
+        }
+    }
+
+    @Override
+    public List<VersionModel> getVersionsForDocument(DocumentRef docRef)
+            throws ClientException {
+        try {
+            return super.getVersionsForDocument(docRef);
+        } catch (Throwable t) {
+            throw EJBExceptionHandler.wrapException(t);
+        }
+    }
+
+    @Override
+    public DocumentModel getLastDocumentVersion(DocumentRef docRef)
+            throws ClientException {
+        try {
+            return super.getLastDocumentVersion(docRef);
+        } catch (Throwable t) {
+            throw EJBExceptionHandler.wrapException(t);
+        }
+    }
+
+    @Override
+    public List<DocumentModel> getVersions(DocumentRef docRef)
+            throws ClientException {
+        try {
+            return super.getVersions(docRef);
         } catch (Throwable t) {
             throw EJBExceptionHandler.wrapException(t);
         }
