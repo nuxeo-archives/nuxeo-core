@@ -2101,8 +2101,9 @@ public abstract class AbstractSession implements CoreSession,
             checkPermission(doc, READ);
             checkPermission(section, ADD_CHILDREN);
 
+            List<String> removedProxyIds = Collections.emptyList();
             if (overwriteExistingProxy) {
-                removeExistingProxies(doc, section);
+                removedProxyIds = removeExistingProxies(doc, section);
             }
 
             // create the new proxy
@@ -2113,7 +2114,7 @@ public abstract class AbstractSession implements CoreSession,
                     + " of the document " + doc.getPath());
 
             Map<String, Serializable> options = new HashMap<String, Serializable>();
-
+            options.put(CoreEventConstants.REPLACED_PROXY_IDS, (Serializable) removedProxyIds);
             // notify for reindexing
             DocumentModel proxyModel = readModel(proxy, null);
             notifyEvent(DocumentEventTypes.DOCUMENT_PROXY_PUBLISHED,
@@ -2139,12 +2140,15 @@ public abstract class AbstractSession implements CoreSession,
      * Remove proxies for the same base document in the folder. doc may be a
      * normal document or a proxy.
      */
-    protected void removeExistingProxies(Document doc, Document folder)
+    protected List<String> removeExistingProxies(Document doc, Document folder)
             throws DocumentException, ClientException {
         Collection<Document> otherProxies = getSession().getProxies(doc, folder);
+        List<String> removedProxyIds = new ArrayList<String>(otherProxies.size());
         for (Document otherProxy : otherProxies) {
+            removedProxyIds.add(otherProxy.getUUID());
             removeNotifyOneDoc(otherProxy);
         }
+        return removedProxyIds;
     }
 
     public DocumentModelList getProxies(DocumentRef docRef,
@@ -2554,8 +2558,9 @@ public abstract class AbstractSession implements CoreSession,
                 checkPermission(doc, READ);
                 checkPermission(sec, ADD_CHILDREN);
 
+                List<String> removedProxyIds = Collections.emptyList();
                 if (overwriteExistingProxy) {
-                    removeExistingProxies(doc, sec);
+                    removedProxyIds = removeExistingProxies(doc, sec);
                 }
 
                 // publishing a proxy is just a copy
@@ -2564,6 +2569,7 @@ public abstract class AbstractSession implements CoreSession,
                         docToPublish.getName());
 
                 Map<String, Serializable> options = new HashMap<String, Serializable>();
+                options.put(CoreEventConstants.REPLACED_PROXY_IDS, (Serializable) removedProxyIds);
                 notifyEvent(DocumentEventTypes.DOCUMENT_PROXY_PUBLISHED,
                         newDocument, options, null, null, true, false);
 
