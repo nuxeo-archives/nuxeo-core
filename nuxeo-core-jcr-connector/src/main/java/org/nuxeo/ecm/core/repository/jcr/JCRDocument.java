@@ -130,12 +130,12 @@ public class JCRDocument extends AbstractDocument implements JCRNodeProxy {
     }
 
     public String getName() throws DocumentException {
-        try {
-            return node.getName();
-        } catch (RepositoryException e) {
-            throw new DocumentException(e);
-        }
-    }
+		try {
+			return node != null ? node.getName() : "";
+		} catch (RepositoryException e) {
+			throw new DocumentException(e);
+		}
+	}
 
     public String getUUID() throws DocumentException {
         try {
