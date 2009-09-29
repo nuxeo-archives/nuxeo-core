@@ -73,6 +73,10 @@ public class SessionImpl implements Session {
 
     private Node rootNode;
 
+    private long threadId;
+
+    private String threadName;
+
     SessionImpl(RepositoryImpl repository, SchemaManager schemaManager,
             Mapper mapper, Credentials credentials) throws StorageException {
         this.repository = repository;
@@ -102,7 +106,31 @@ public class SessionImpl implements Session {
             // avoid potential multi-threaded access to active session
             return 0;
         }
-        return context.clearCaches();
+        int n = context.clearCaches();
+        clearThread();
+        return n;
+    }
+
+    protected void checkThread() {
+        long currentThreadId = Thread.currentThread().getId();
+        if (threadId == currentThreadId) {
+            return;
+        }
+        String currentThreadName = Thread.currentThread().getName();
+        if (threadId == 0) {
+            threadId = currentThreadId;
+            threadName = currentThreadName;
+        } else {
+            String msg = String.format(
+                    "Concurrency Error: Session was started in thread %s (%s)"
+                            + " but is being used in thread %s (%s)", threadId,
+                    threadName, currentThreadId, currentThreadName);
+            log.debug(msg, new Exception(msg));
+        }
+    }
+
+    protected void clearThread() {
+        threadId = 0;
     }
 
     /*
@@ -153,6 +181,7 @@ public class SessionImpl implements Session {
     }
 
     public Node getRootNode() {
+        checkThread();
         checkLive();
         return rootNode;
     }
@@ -177,6 +206,7 @@ public class SessionImpl implements Session {
     }
 
     protected void flush() throws StorageException {
+        checkThread();
         context.updateFulltext(this);
         context.save();
     }
@@ -212,6 +242,7 @@ public class SessionImpl implements Session {
     }
 
     public Node getNodeById(Serializable id) throws StorageException {
+        checkThread();
         checkLive();
         if (id == null) {
             throw new IllegalArgumentException("Illegal null id");
