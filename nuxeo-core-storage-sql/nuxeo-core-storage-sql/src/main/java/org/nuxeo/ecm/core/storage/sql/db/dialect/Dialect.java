@@ -119,20 +119,31 @@ public abstract class Dialect {
         return 999;
     }
 
-    protected String makeName(String prefix, String string, String suffix) {
-        if (prefix.length() + string.length() + suffix.length() > getMaxNameSize()) {
+    protected int getMaxIndexNameSize() {
+        return 999;
+    }
+
+    protected String makeName(String prefix, String string, String suffix,
+            int maxNameSize) {
+        int length = prefix.length() + string.length() + suffix.length();
+        StringBuilder buf = new StringBuilder(length);
+        if (length > maxNameSize) {
             MessageDigest digest;
             try {
                 digest = MessageDigest.getInstance("MD5");
             } catch (NoSuchAlgorithmException e) {
                 throw new RuntimeException(e.toString(), e);
             }
-            byte[] bytes = string.getBytes();
+            byte[] bytes = (prefix + string).getBytes();
             digest.update(bytes, 0, bytes.length);
-            string = toHexString(digest.digest()).substring(0, 8);
+            buf.append(prefix.substring(0, 4));
+            buf.append('_');
+            buf.append(toHexString(digest.digest()).substring(0, 8));
+        } else {
+            buf.append(prefix).append(string);
         }
-        suffix = storesUpperCaseIdentifiers() ? suffix : suffix.toLowerCase();
-        return prefix + string + suffix;
+        buf.append(storesUpperCaseIdentifiers() ? suffix : suffix.toLowerCase());
+        return buf.toString();
     }
 
     protected static final char[] HEX_DIGITS = "0123456789ABCDEF".toCharArray();
@@ -149,12 +160,13 @@ public abstract class Dialect {
     public String getForeignKeyConstraintName(String tableName,
             String foreignColumnName, String foreignTableName) {
         return makeName(tableName + '_', foreignColumnName + '_'
-                + foreignTableName, "_FK");
+                + foreignTableName, "_FK", getMaxNameSize());
     }
 
     public String getIndexName(String tableName, List<String> columnNames) {
         return makeName(qualifyIndexName() ? tableName + '_' : "",
-                StringUtils.join(columnNames, '_'), "_IDX");
+                StringUtils.join(columnNames, '_'), "_IDX",
+                getMaxIndexNameSize());
     }
 
     public String getIdentitySelectString(String table, String column,
