@@ -36,6 +36,8 @@ import org.nuxeo.ecm.core.storage.StorageException;
  */
 public interface Session extends Connection {
 
+    String ALWAYS_GET_FRAGMENTS = "org.nuxeo.ecm.core.storage.sql.alwaysGetFragmentsFlag";
+
     /**
      * Checks if the session is live (not closed).
      *

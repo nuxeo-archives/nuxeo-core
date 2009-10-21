@@ -47,6 +47,7 @@ import org.nuxeo.ecm.core.schema.SchemaManager;
 import org.nuxeo.ecm.core.storage.Credentials;
 import org.nuxeo.ecm.core.storage.PartialList;
 import org.nuxeo.ecm.core.storage.StorageException;
+import org.nuxeo.runtime.api.Framework;
 
 /**
  * The session is the main high level access point to data from the underlying
@@ -75,6 +76,8 @@ public class SessionImpl implements Session {
     private Node rootNode;
 
     private boolean isMarkedForCacheClearing;
+
+    protected Boolean alwaysGetFragmentsFlag;
 
     SessionImpl(RepositoryImpl repository, SchemaManager schemaManager,
             Mapper mapper, Credentials credentials) throws StorageException {
@@ -259,10 +262,22 @@ public class SessionImpl implements Session {
         return new Node(this, context, childGroup);
     }
 
+    protected boolean alwaysGetFragments() {
+        if (alwaysGetFragmentsFlag == null) {
+            alwaysGetFragmentsFlag = Boolean.valueOf(Framework.getProperty(
+                    Session.ALWAYS_GET_FRAGMENTS, "false"));
+        }
+        return alwaysGetFragmentsFlag.booleanValue();
+    }
+
     protected FragmentsMap getFragments(Serializable id, String typeName,
             Serializable parentId, String name) throws StorageException {
         // TODO get all non-cached fragments at once using join / union
         FragmentsMap fragments = new FragmentsMap();
+        // force lazy fetch
+        if (!alwaysGetFragments()) {
+            return fragments;
+        }
         for (String fragmentName : model.getTypeSimpleFragments(typeName)) {
             Fragment fragment = context.get(fragmentName, id, true);
             fragments.put(fragmentName, fragment);
