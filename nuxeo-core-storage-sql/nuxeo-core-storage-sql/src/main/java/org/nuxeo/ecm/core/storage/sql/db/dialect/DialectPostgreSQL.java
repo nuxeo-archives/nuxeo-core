@@ -755,7 +755,10 @@ public class DialectPostgreSQL extends Dialect {
                         + "    IF (first AND newid IS NULL) THEN\n" //
                         + "      SELECT versionableid INTO newid FROM versions WHERE versions.id = curid;\n" //
                         + "    END IF;\n" //
-                        + "    first := false;\n" //
+                        + "    IF (first) THEN\n" //
+                        + "      -- Set first to false only if we are on a document\n" //
+                        + "      SELECT isproperty INTO first FROM hierarchy WHERE hierarchy.id = curid;\n" //
+                        + "    END IF;\n" //
                         + "    curid := newid;\n" //
                         + "  END LOOP;\n" //
                         + "  RETURN ret;\n" //
