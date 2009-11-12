@@ -304,6 +304,11 @@ public class DocumentModelFactory {
 
     public static DataModel exportSchema(String sid, DocumentRef docRef,
             Document doc, Schema schema) throws DocumentException {
+        if (log.isDebugEnabled()) {
+            log.debug(String.format("fetched: '%s' for doc '%s'",
+                    schema.getName(), docRef));
+        }
+
         DocumentPart part = new DocumentPartImpl(schema);
         if (doc != null) {
             try {
@@ -314,6 +319,11 @@ public class DocumentModelFactory {
                 throw new DocumentException("failed to read document part", e);
             }
         }
+        if (log.isDebugEnabled()) {
+            log.debug(String.format("fetched: '%s' for doc '%s'",
+                    schema.getName(), docRef));
+        }
+
         return new DataModelImpl(part);
     }
 
