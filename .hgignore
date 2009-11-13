@@ -7,3 +7,5 @@ target
 *~
 *.orig
 derby.log
+*.iml
+*.ipr
