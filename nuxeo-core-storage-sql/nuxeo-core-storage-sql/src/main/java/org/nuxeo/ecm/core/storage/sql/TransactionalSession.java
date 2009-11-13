@@ -21,20 +21,23 @@ import javax.transaction.xa.XAException;
 import javax.transaction.xa.XAResource;
 import javax.transaction.xa.Xid;
 
-import org.nuxeo.ecm.core.storage.StorageException;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 /**
  * The transactional session is an {@link XAResource} for this session.
- * 
+ *
  * @author Florent Guillaume
  */
 public class TransactionalSession implements XAResource {
 
-    protected final SessionImpl session;
+    private static final Log log = LogFactory.getLog(TransactionalSession.class);
 
-    protected final Mapper mapper;
+    private final SessionImpl session;
 
-    protected boolean inTransaction;
+    private final Mapper mapper;
+
+    private boolean inTransaction;
 
     TransactionalSession(SessionImpl session, Mapper mapper) {
         this.session = session;
@@ -57,25 +60,37 @@ public class TransactionalSession implements XAResource {
         if (flags == TMNOFLAGS) {
             try {
                 session.processReceivedInvalidations();
-            } catch (StorageException e) {
+            } catch (Exception e) {
+                log.error("Could not start transaction", e);
                 throw (XAException) new XAException(XAException.XAER_RMERR).initCause(e);
             }
         }
         mapper.start(xid, flags);
         inTransaction = true;
+        session.checkThreadStart();
     }
 
     public void end(Xid xid, int flags) throws XAException {
+        boolean failed = true;
         try {
             if (flags != TMFAIL) {
                 try {
                     session.flush();
-                } catch (StorageException e) {
+                } catch (Exception e) {
+                    log.error("Could not end transaction", e);
                     throw (XAException) new XAException(XAException.XAER_RMERR).initCause(e);
                 }
             }
-        } finally {
+            failed = false;
             mapper.end(xid, flags);
+        } finally {
+            if (failed) {
+                try {
+                    mapper.end(xid, TMFAIL);
+                } finally {
+                    rollback(xid);
+                }
+            }
         }
     }
 
@@ -88,27 +103,36 @@ public class TransactionalSession implements XAResource {
             mapper.commit(xid, onePhase);
         } finally {
             inTransaction = false;
-            if (session.isMarkedForCacheClearing()) {
-                session.clearCache();
-            } else {
+            try {
                 try {
                     session.sendInvalidationsToOthers();
-                } catch (StorageException e) {
-                    throw (XAException) new XAException(XAException.XAER_RMERR).initCause(e);
+                } finally {
+                    session.checkThreadEnd();
                 }
+            } catch (Exception e) {
+                log.error("Could not commit transaction", e);
+                throw (XAException) new XAException(XAException.XAER_RMERR).initCause(e);
             }
         }
     }
 
     public void rollback(Xid xid) throws XAException {
         try {
-            mapper.rollback(xid);
-            session.rollback();
+            try {
+                mapper.rollback(xid);
+            } finally {
+                session.rollback();
+            }
         } finally {
             inTransaction = false;
             try {
-                session.sendInvalidationsToOthers();
-            } catch (StorageException e) {
+                try {
+                    session.sendInvalidationsToOthers();
+                } finally {
+                    session.checkThreadEnd();
+                }
+            } catch (Exception e) {
+                log.error("Could not rollback transaction", e);
                 throw (XAException) new XAException(XAException.XAER_RMERR).initCause(e);
             }
         }

@@ -22,6 +22,7 @@ import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
@@ -44,9 +45,9 @@ public class SQLDocumentVersion extends SQLDocument implements DocumentVersion {
 
     private final Node versionableNode;
 
-    protected SQLDocumentVersion(Node node, ComplexType type, SQLSession session)
-            throws DocumentException {
-        super(node, type, session, true);
+    protected SQLDocumentVersion(Node node, ComplexType type,
+            SQLSession session, boolean readonly) throws DocumentException {
+        super(node, type, session, readonly);
         versionableNode = session.getNodeById((Serializable) getProperty(
                 Model.VERSION_VERSIONABLE_PROP).getValue());
     }
@@ -122,7 +123,7 @@ public class SQLDocumentVersion extends SQLDocument implements DocumentVersion {
     }
 
     @Override
-    public void removeChild(String name) {
+    public void removeChild(String name) throws DocumentException {
         throw new UnsupportedOperationException();
     }
 
@@ -132,7 +133,8 @@ public class SQLDocumentVersion extends SQLDocument implements DocumentVersion {
     }
 
     @Override
-    public Document addChild(String name, String typeName) {
+    public Document addChild(String name, String typeName)
+            throws DocumentException {
         throw new UnsupportedOperationException();
     }
 
@@ -142,17 +144,22 @@ public class SQLDocumentVersion extends SQLDocument implements DocumentVersion {
     }
 
     @Override
-    public Iterator<Document> getChildren() {
+    public Iterator<Document> getChildren() throws DocumentException {
         return EmptyDocumentIterator.INSTANCE;
     }
 
     @Override
-    public boolean hasChild(String name) {
+    public List<String> getChildrenIds() throws DocumentException {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public boolean hasChild(String name) throws DocumentException {
         return false;
     }
 
     @Override
-    public boolean hasChildren() {
+    public boolean hasChildren() throws DocumentException {
         return false;
     }
 
@@ -238,8 +245,15 @@ public class SQLDocumentVersion extends SQLDocument implements DocumentVersion {
     }
 
     @Override
-    public void setPropertyValue(String name, Object value) {
-        throw new UnsupportedOperationException();
+    public void setPropertyValue(String name, Object value)
+            throws DocumentException {
+        if (readonly) {
+            throw new UnsupportedOperationException(String.format(
+                    "Cannot set property on a version: %s = %s", name, value));
+        } else {
+            // import
+            super.setPropertyValue(name, value);
+        }
     }
 
     @Override
@@ -248,8 +262,13 @@ public class SQLDocumentVersion extends SQLDocument implements DocumentVersion {
     }
 
     @Override
-    public void setBoolean(String name, boolean value) {
-        throw new UnsupportedOperationException();
+    public void setBoolean(String name, boolean value) throws DocumentException {
+        if (readonly) {
+            throw new UnsupportedOperationException();
+        } else {
+            // import
+            super.setBoolean(name, value);
+        }
     }
 
     @Override

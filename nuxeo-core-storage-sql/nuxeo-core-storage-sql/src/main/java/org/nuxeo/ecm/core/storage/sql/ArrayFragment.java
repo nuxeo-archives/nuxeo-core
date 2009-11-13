@@ -22,8 +22,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.nuxeo.ecm.core.storage.StorageException;
 import org.nuxeo.ecm.core.storage.sql.db.Column;
@@ -79,15 +80,39 @@ public class ArrayFragment extends CollectionFragment {
 
     @Override
     public String toString() {
-        return getClass().getSimpleName() + '(' + getTableName() + ", id=" +
-                getId() + ", " + Arrays.asList(array) + ')';
+        StringBuilder buf = new StringBuilder();
+        buf.append(getClass().getSimpleName());
+        buf.append('(');
+        buf.append(getTableName());
+        buf.append(", id=");
+        buf.append(getId());
+        buf.append(", state=");
+        buf.append(getState());
+        buf.append(", ");
+        buf.append('[');
+        for (int i = 0; i < array.length; i++) {
+            if (i > 0) {
+                buf.append(", ");
+            }
+            Serializable value = array[i];
+            boolean truncated = false;
+            if (value instanceof String && ((String) value).length() > 100) {
+                value = ((String) value).substring(0, 100);
+                truncated = true;
+            }
+            buf.append(value);
+            if (truncated) {
+                buf.append("...");
+            }
+        }
+        buf.append("])");
+        return buf.toString();
     }
 
     protected static final CollectionMaker MAKER = new CollectionMaker() {
 
-        public Serializable[] makeArray(Serializable id, ResultSet rs,
-                List<Column> columns, Context context, Model model)
-                throws SQLException {
+        public Serializable[] makeArray(ResultSet rs, List<Column> columns,
+                Context context, Model model) throws SQLException {
             // find the column containing the value
             // (the pos column is ignored, results are ordered)
             Column column = null;
@@ -97,7 +122,7 @@ public class ArrayFragment extends CollectionFragment {
                 }
             }
             if (column == null) {
-                throw new AssertionError(columns);
+                throw new RuntimeException(columns.toString());
             }
             List<Serializable> list = new ArrayList<Serializable>();
             while (rs.next()) {
@@ -112,6 +137,56 @@ public class ArrayFragment extends CollectionFragment {
                 list.add(value);
             }
             return column.listToArray(list);
+        }
+
+        public Map<Serializable, Serializable[]> makeArrays(ResultSet rs,
+                List<Column> columns, Context context, Model model)
+                throws SQLException {
+            // find the column containing the value
+            // (the pos column is ignored, results are ordered by id then pos)
+            Column valueColumn = null;
+            Column idColumn = null;
+            for (Column column : columns) {
+                String key = column.getKey();
+                if (key.equals(model.MAIN_KEY)) {
+                    idColumn = column;
+                } else if (key.equals(model.COLL_TABLE_VALUE_KEY)) {
+                    valueColumn = column;
+                }
+            }
+            if (valueColumn == null || idColumn == null) {
+                throw new RuntimeException(columns.toString());
+            }
+            Map<Serializable, Serializable[]> res = new HashMap<Serializable, Serializable[]>();
+            Serializable id = null;
+            List<Serializable> list = null;
+            while (rs.next()) {
+                int i = 1;
+                Serializable newId = null;
+                Serializable value = null;
+                for (Column column : columns) {
+                    Serializable v = column.getFromResultSet(rs, i++);
+                    if (column == idColumn) {
+                        newId = v;
+                    } else if (column == valueColumn) {
+                        value = v;
+                    }
+                }
+                if (newId != null && !newId.equals(id)) {
+                    // flush old list
+                    if (list != null) {
+                        res.put(id, valueColumn.listToArray(list));
+                    }
+                    id = newId;
+                    list = new ArrayList<Serializable>();
+                }
+                list.add(value);
+            }
+            if (id != null && list != null) {
+                // flush last list
+                res.put(id, valueColumn.listToArray(list));
+            }
+            return res;
         }
 
         public CollectionFragment makeCollection(Serializable id,
@@ -171,7 +246,7 @@ public class ArrayFragment extends CollectionFragment {
                 } else if (key.equals(model.COLL_TABLE_VALUE_KEY)) {
                     v = array[i];
                 } else {
-                    throw new AssertionError(key);
+                    throw new RuntimeException(key);
                 }
                 column.setToPreparedStatement(ps, n, v);
                 if (debugValues != null) {

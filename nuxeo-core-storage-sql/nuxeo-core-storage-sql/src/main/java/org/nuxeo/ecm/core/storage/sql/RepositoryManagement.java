@@ -34,7 +34,7 @@ public interface RepositoryManagement {
 
     /**
      * Clears all the caches.
-     * 
+     *
      * @return an indicative count of objects removed
      */
     int clearCaches();
@@ -43,10 +43,5 @@ public interface RepositoryManagement {
      * Makes sure that the next transaction will process cluster invalidations.
      */
     void processClusterInvalidationsNext();
-
-    /**
-     * Ask to clear cache of each context after the next
-     */
-    int markForCacheClearing();
 
 }

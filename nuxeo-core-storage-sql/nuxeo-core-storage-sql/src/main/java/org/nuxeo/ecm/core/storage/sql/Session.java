@@ -23,8 +23,8 @@ import java.util.List;
 
 import javax.resource.cci.Connection;
 
+import org.nuxeo.ecm.core.api.IterableQueryResult;
 import org.nuxeo.ecm.core.query.QueryFilter;
-import org.nuxeo.ecm.core.query.sql.model.SQLQuery;
 import org.nuxeo.ecm.core.storage.PartialList;
 import org.nuxeo.ecm.core.storage.StorageException;
 
@@ -36,14 +36,19 @@ import org.nuxeo.ecm.core.storage.StorageException;
  */
 public interface Session extends Connection {
 
-    String ALWAYS_GET_FRAGMENTS = "org.nuxeo.ecm.core.storage.sql.alwaysGetFragmentsFlag";
-
     /**
      * Checks if the session is live (not closed).
      *
      * @return {@code true} if the session is live
      */
     boolean isLive();
+
+    /**
+     * Gets the session repository name.
+     *
+     * @return the repository name
+     */
+    String getRepositoryName() throws StorageException;
 
     /**
      * Gets the {@link Model} associated to this session.
@@ -77,6 +82,15 @@ public interface Session extends Connection {
      * @throws StorageException
      */
     Node getNodeById(Serializable id) throws StorageException;
+
+    /**
+     * Gets several nodes given their ids.
+     *
+     * @param ids the ids
+     * @return the nodes, with elements being {@code null} if not found
+     * @throws StorageException
+     */
+    List<Node> getNodesByIds(List<Serializable> ids) throws StorageException;
 
     /**
      * Gets a node given its absolute path, or given an existing node and a
@@ -182,6 +196,22 @@ public interface Session extends Connection {
             boolean complexProp) throws StorageException;
 
     /**
+     * Creates a new child node with given id (used for import).
+     *
+     * @param id the id
+     * @param parent the parent to which the child is added
+     * @param name the child name
+     * @param pos the child position, or {@code null}
+     * @param typeName the child type
+     * @param complexProp whether this is a complex property ({@code true}) or a
+     *            regular child ({@code false})
+     * @return the new node
+     * @throws StorageException
+     */
+    Node addChildNode(Serializable id, Node parent, String name, Long pos,
+            String typeName, boolean complexProp) throws StorageException;
+
+    /**
      * Creates a proxy for a version node.
      *
      * @param targetId the target id
@@ -264,16 +294,15 @@ public interface Session extends Connection {
     void restoreByLabel(Node node, String label) throws StorageException;
 
     /**
-     * Gets a version of a node given its label.
-     * <p>
-     * A {@link #save} is automatically done first.
+     * Gets a version given its versionable id and label.
      *
-     * @param node the node
+     * @param versionableId the versionable id
      * @param label the label
      * @return the version node, or {@code null} if not found
      * @throws StorageException
      */
-    Node getVersionByLabel(Node node, String label) throws StorageException;
+    Node getVersionByLabel(Serializable versionableId, String label)
+            throws StorageException;
 
     /**
      * Gets all the versions for a given versionable node.
@@ -328,14 +357,44 @@ public interface Session extends Connection {
     /**
      * Makes a NXQL query to the database.
      *
-     * @param query the query as a parsed tree
+     * @param query the query
      * @param queryFilter the query filter
      * @param countTotal if {@code true}, also count the total size without
      *            offset/limit
      * @return the resulting list with total size included
      */
-    PartialList<Serializable> query(SQLQuery query,
-            QueryFilter queryFilter, boolean countTotal)
-            throws StorageException;
+    PartialList<Serializable> query(String query, QueryFilter queryFilter,
+            boolean countTotal) throws StorageException;
+
+    /**
+     *
+     * @throws StorageException
+     */
+    IterableQueryResult queryAndFetch(String query, String queryType,
+            QueryFilter queryFilter, Object... params) throws StorageException;
+
+    /**
+     * Read ACLs are optimized ACLs for the read permission, they need to be
+     * updated after document creation or ACL change.
+     * <p>
+     * This method flag the current session, the read ACLs update will be done
+     * automatically at save time.
+     *
+     */
+    public void requireReadAclsUpdate();
+
+    /**
+     * Update only the read ACLs that have changed.
+     *
+     * @throws StorageException
+     */
+    public void updateReadAcls() throws StorageException;
+
+    /**
+     * Rebuild the read ACLs for the wall repository.
+     *
+     * @throws StorageException
+     */
+    public void rebuildReadAcls() throws StorageException;
 
 }

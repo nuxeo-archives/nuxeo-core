@@ -28,6 +28,9 @@ import javax.resource.cci.Interaction;
 import javax.resource.cci.LocalTransaction;
 import javax.resource.cci.ResultSetInfo;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.nuxeo.ecm.core.api.IterableQueryResult;
 import org.nuxeo.ecm.core.query.QueryFilter;
 import org.nuxeo.ecm.core.query.sql.model.SQLQuery;
 import org.nuxeo.ecm.core.storage.PartialList;
@@ -48,6 +51,8 @@ import org.nuxeo.ecm.core.storage.sql.SessionImpl;
  * @author Florent Guillaume
  */
 public class ConnectionImpl implements Session {
+
+    private static final Log log = LogFactory.getLog(ConnectionImpl.class);
 
     private ManagedConnectionImpl managedConnection;
 
@@ -94,6 +99,10 @@ public class ConnectionImpl implements Session {
      */
 
     public void close() throws ResourceException {
+        if (managedConnection == null) {
+            log.error("Closing an already closed connection: " + this);
+            return;
+        }
         try {
             managedConnection.close(this);
         } finally {
@@ -123,13 +132,18 @@ public class ConnectionImpl implements Session {
 
     private Session getSession() throws StorageException {
         if (session == null) {
-            throw new StorageException("Cannot use closed connection handle: " + this);
+            throw new StorageException("Cannot use closed connection handle: "
+                    + this);
         }
         return session;
     }
 
     public boolean isLive() {
         return session != null && session.isLive();
+    }
+
+    public String getRepositoryName() throws StorageException {
+        return getSession().getRepositoryName();
     }
 
     public Binary getBinary(InputStream in) throws StorageException {
@@ -150,6 +164,11 @@ public class ConnectionImpl implements Session {
 
     public Node getNodeById(Serializable id) throws StorageException {
         return getSession().getNodeById(id);
+    }
+
+    public List<Node> getNodesByIds(List<Serializable> ids)
+            throws StorageException {
+        return getSession().getNodesByIds(ids);
     }
 
     public Node getNodeByPath(String path, Node node) throws StorageException {
@@ -179,6 +198,13 @@ public class ConnectionImpl implements Session {
     public Node addChildNode(Node parent, String name, Long pos,
             String typeName, boolean complexProp) throws StorageException {
         return getSession().addChildNode(parent, name, pos, typeName,
+                complexProp);
+    }
+
+    public Node addChildNode(Serializable id, Node parent, String name,
+            Long pos, String typeName, boolean complexProp)
+            throws StorageException {
+        return getSession().addChildNode(id, parent, name, pos, typeName,
                 complexProp);
     }
 
@@ -217,9 +243,9 @@ public class ConnectionImpl implements Session {
         getSession().restoreByLabel(node, label);
     }
 
-    public Node getVersionByLabel(Node node, String label)
+    public Node getVersionByLabel(Serializable versionableId, String label)
             throws StorageException {
-        return getSession().getVersionByLabel(node, label);
+        return getSession().getVersionByLabel(versionableId, label);
     }
 
     public List<Node> getVersions(Node node) throws StorageException {
@@ -240,10 +266,29 @@ public class ConnectionImpl implements Session {
         return getSession().addProxy(targetId, versionableId, parent, name, pos);
     }
 
-    public PartialList<Serializable> query(SQLQuery query,
+    public PartialList<Serializable> query(String query,
             QueryFilter queryFilter, boolean countTotal)
             throws StorageException {
         return getSession().query(query, queryFilter, countTotal);
+    }
+
+    public IterableQueryResult queryAndFetch(String query, String queryType,
+            QueryFilter queryFilter, Object... params) throws StorageException {
+        return getSession().queryAndFetch(query, queryType, queryFilter, params);
+    }
+
+    public void requireReadAclsUpdate() {
+        if (session != null) {
+            session.requireReadAclsUpdate();
+        }
+    }
+
+    public void updateReadAcls() throws StorageException {
+        getSession().updateReadAcls();
+    }
+
+    public void rebuildReadAcls() throws StorageException {
+        getSession().rebuildReadAcls();
     }
 
 }

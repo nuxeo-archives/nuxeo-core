@@ -28,6 +28,8 @@ import javax.resource.cci.ResourceAdapterMetaData;
 import javax.resource.spi.ConnectionManager;
 import javax.resource.spi.ConnectionRequestInfo;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.nuxeo.ecm.core.api.DocumentException;
 import org.nuxeo.ecm.core.api.NuxeoPrincipal;
 import org.nuxeo.ecm.core.repository.RepositoryDescriptor;
@@ -35,7 +37,6 @@ import org.nuxeo.ecm.core.repository.RepositoryService;
 import org.nuxeo.ecm.core.schema.SchemaManager;
 import org.nuxeo.ecm.core.security.SecurityManager;
 import org.nuxeo.ecm.core.storage.Credentials;
-import org.nuxeo.ecm.core.storage.DefaultPlatformComponentCleanupConnectionFactory;
 import org.nuxeo.ecm.core.storage.StorageException;
 import org.nuxeo.ecm.core.storage.sql.ConnectionSpecImpl;
 import org.nuxeo.ecm.core.storage.sql.Repository;
@@ -51,13 +52,15 @@ import org.nuxeo.runtime.api.Framework;
  * <p>
  * An instance of this class is returned to the application when a JNDI lookup
  * is done. This is the datasource equivalent of {@link SQLRepository}.
- * 
+ *
  * @author Florent Guillaume
  */
 public class ConnectionFactoryImpl implements Repository,
-        org.nuxeo.ecm.core.model.Repository, DefaultPlatformComponentCleanupConnectionFactory {
+        org.nuxeo.ecm.core.model.Repository {
 
     private static final long serialVersionUID = 1L;
+
+    private static final Log log = LogFactory.getLog(ConnectionFactoryImpl.class);
 
     private final ManagedConnectionFactoryImpl managedConnectionFactory;
 
@@ -85,11 +88,17 @@ public class ConnectionFactoryImpl implements Repository,
 
     public ConnectionFactoryImpl(
             ManagedConnectionFactoryImpl managedConnectionFactory,
-            ConnectionManager connectionManager) throws ResourceException {
+            ConnectionManager connectionManager) {
         this.managedConnectionFactory = managedConnectionFactory;
         this.connectionManager = connectionManager;
         managed = !(connectionManager instanceof ConnectionManagerImpl);
         name = managedConnectionFactory.getName();
+        log.info("ConnectionFactoryImpl got a name of " + name);
+    }
+
+    // NXP 3992 -- exposed this for clean shutdown on cluster
+    public ManagedConnectionFactoryImpl getManagedConnectionFactory() {
+        return managedConnectionFactory;
     }
 
     protected void initializeServices() {
@@ -119,18 +128,13 @@ public class ConnectionFactoryImpl implements Repository,
         }
     }
 
-    // NXP 3992 -- exposed this for clean shutdown on cluster 
-    public ManagedConnectionFactoryImpl getManagedConnectionFactory() {
-	return managedConnectionFactory; 
-    }
-
     /*
      * ----- javax.resource.cci.ConnectionFactory -----
      */
 
     /**
      * Gets a new connection, with no credentials.
-     * 
+     *
      * @return the connection
      */
     public Session getConnection() throws StorageException {
@@ -147,7 +151,7 @@ public class ConnectionFactoryImpl implements Repository,
 
     /**
      * Gets a new connection.
-     * 
+     *
      * @param connectionSpec the connection spec, containing credentials
      * @return the connection
      */
@@ -242,7 +246,7 @@ public class ConnectionFactoryImpl implements Repository,
         throw new UnsupportedOperationException("unused");
     }
 
-    public SecurityManager getSecurityManager() {
+    public SecurityManager getNuxeoSecurityManager() {
         initializeServices();
         return securityManager;
     }
@@ -266,8 +270,7 @@ public class ConnectionFactoryImpl implements Repository,
     }
 
     public void shutdown() {
-        throw new UnsupportedOperationException("Not implemented");
-        // close();
+        managedConnectionFactory.shutdown();
     }
 
     public int getStartedSessionsCount() {
@@ -294,7 +297,7 @@ public class ConnectionFactoryImpl implements Repository,
         managedConnectionFactory.processClusterInvalidationsNext();
     }
 
-    public int markForCacheClearing() {
-        return managedConnectionFactory.markForCacheClearing();
+    public boolean supportsTags() {
+        return true;
     }
 }

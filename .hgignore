@@ -6,6 +6,8 @@ bin
 target
 *~
 *.orig
+*.ok
 derby.log
 *.iml
 *.ipr
+.DS_Store

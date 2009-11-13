@@ -15,7 +15,7 @@
  *     Florent Guillaume
  */
 
-package org.nuxeo.ecm.core.storage.sql.mbean;
+package org.nuxeo.ecm.core.storage.sql.management;
 
 /**
  * @author Florent Guillaume
@@ -28,13 +28,14 @@ public interface RepositoryStatusMBean {
     String listActiveSessions();
 
     /**
+     * Return the opened sessions count
+     * @return
+     */
+    int getActiveSessionsCount();
+
+    /**
      * Clears the caches.
      */
     String clearCaches();
-
-    /**
-     * Ask to clear Core Caches
-     */
-    String markForCacheClearing();
 
 }

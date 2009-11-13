@@ -18,9 +18,13 @@
 package org.nuxeo.ecm.core.storage.sql;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -28,7 +32,16 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.nuxeo.common.utils.StringUtils;
+import org.nuxeo.ecm.core.api.ClientException;
+import org.nuxeo.ecm.core.event.Event;
+import org.nuxeo.ecm.core.event.EventContext;
+import org.nuxeo.ecm.core.event.EventProducer;
+import org.nuxeo.ecm.core.event.impl.EventContextImpl;
 import org.nuxeo.ecm.core.storage.StorageException;
+import org.nuxeo.ecm.core.storage.sql.Model.PropertyInfo;
+import org.nuxeo.ecm.core.storage.sql.coremodel.BinaryTextListener;
+import org.nuxeo.runtime.api.Framework;
 
 /**
  * The persistence context in use by a session.
@@ -38,7 +51,7 @@ import org.nuxeo.ecm.core.storage.StorageException;
  * <p>
  * This class mostly delegates all its work to per-fragment {@link Context}s. It
  * also deals with maintaining information about generated ids.
- * 
+ *
  * @author Florent Guillaume
  */
 public class PersistenceContext {
@@ -52,6 +65,8 @@ public class PersistenceContext {
     private final HierarchyContext hierContext;
 
     private final Model model;
+
+    private EventProducer eventProducer;
 
     /**
      * Fragment ids generated but not yet saved. We know that any fragment with
@@ -82,6 +97,17 @@ public class PersistenceContext {
         // are used and need this
         createdIds = new LinkedHashSet<Serializable>();
         oldIdMap = new HashMap<Serializable, Serializable>();
+    }
+
+    protected EventProducer getEventProducer() throws StorageException {
+        if (eventProducer == null) {
+            try {
+                eventProducer = Framework.getService(EventProducer.class);
+            } catch (Exception e) {
+                throw new StorageException("Unable to find EventProducer", e);
+            }
+        }
+        return eventProducer;
     }
 
     /**
@@ -115,8 +141,13 @@ public class PersistenceContext {
         return hierContext;
     }
 
-    public Serializable generateNewId() {
-        Serializable id = model.generateNewId();
+    /**
+     * Generates a new id, or used a pre-generated one (import).
+     */
+    public Serializable generateNewId(Serializable id) {
+        if (id == null) {
+            id = model.generateNewId();
+        }
         createdIds.add(id);
         return id;
     }
@@ -142,6 +173,134 @@ public class PersistenceContext {
             context.close();
         }
         // don't clean the contexts, we keep the pristine cache around
+    }
+
+    /**
+     * Update fulltext.
+     */
+    protected void updateFulltext(Session session) throws StorageException {
+        Set<Serializable> dirtyStrings = new HashSet<Serializable>();
+        Set<Serializable> dirtyBinaries = new HashSet<Serializable>();
+        for (Context context : contexts.values()) {
+            context.findDirtyDocuments(dirtyStrings, dirtyBinaries);
+        }
+        if (dirtyStrings.isEmpty() && dirtyBinaries.isEmpty()) {
+            return;
+        }
+
+        // update simpletext on documents with dirty strings
+        for (Serializable docId : dirtyStrings) {
+            if (docId == null) {
+                // cannot happen, but has been observed :(
+                log.error("Got null doc id in fulltext update, cannot happen");
+                continue;
+            }
+            Node document = session.getNodeById(docId);
+            if (document == null) {
+                // cannot happen
+                continue;
+            }
+
+            for (String indexName : model.getFulltextInfo().indexNames) {
+                Set<String> paths;
+                if (model.getFulltextInfo().indexesAllSimple.contains(indexName)) {
+                    // index all string fields, minus excluded ones
+                    // TODO XXX excluded ones...
+                    paths = model.getTypeSimpleTextPropertyPaths(document.getPrimaryType());
+                } else {
+                    // index configured fields
+                    paths = model.getFulltextInfo().propPathsByIndexSimple.get(indexName);
+                }
+                String strings = findFulltext(session, document, paths);
+                // Set the computed full text
+                // On INSERT/UPDATE a trigger will change the actual fulltext
+                String propName = model.FULLTEXT_SIMPLETEXT_PROP
+                        + model.getFulltextIndexSuffix(indexName);
+                document.setSingleProperty(propName, strings);
+            }
+        }
+
+        if (!dirtyBinaries.isEmpty()) {
+            log.debug("Queued documents for asynchronous fulltext extraction: "
+                    + dirtyBinaries.size());
+            EventContext eventContext = new EventContextImpl(dirtyBinaries,
+                    model.getFulltextInfo());
+            eventContext.setRepositoryName(session.getRepositoryName());
+            Event event = eventContext.newEvent(BinaryTextListener.EVENT_NAME);
+            try {
+                getEventProducer().fireEvent(event);
+            } catch (ClientException e) {
+                throw new StorageException(e);
+            }
+        }
+    }
+
+    private String findFulltext(Session session, Node document,
+            Set<String> paths) throws StorageException {
+        if (paths == null) {
+            return "";
+        }
+
+        String documentType = document.getPrimaryType();
+        List<String> strings = new LinkedList<String>();
+
+        for (String path : paths) {
+            PropertyInfo pi = model.getPathPropertyInfo(documentType, path);
+            if (pi == null) {
+                continue; // doc type doesn't have this property
+            }
+            if (pi.propertyType != PropertyType.STRING
+                    && pi.propertyType != PropertyType.ARRAY_STRING) {
+                continue;
+            }
+            List<Node> nodes = new ArrayList<Node>(
+                    Collections.singleton(document));
+            String[] names = path.split("/");
+            for (int i = 0; i < names.length; i++) {
+                String name = names[i];
+                List<Node> newNodes;
+                if (i + 1 < names.length && "*".equals(names[i + 1])) {
+                    // traverse complex list
+                    i++;
+                    newNodes = new ArrayList<Node>();
+                    for (Node node : nodes) {
+                        newNodes.addAll(session.getChildren(node, name, true));
+                    }
+                } else {
+                    if (i == names.length - 1) {
+                        // last path component: get value
+                        for (Node node : nodes) {
+                            if (pi.propertyType == PropertyType.STRING) {
+                                String v = node.getSimpleProperty(name).getString();
+                                if (v != null) {
+                                    strings.add(v);
+                                }
+                            } else /* ARRAY_STRING */{
+                                for (Serializable v : node.getCollectionProperty(
+                                        name).getValue()) {
+                                    if (v != null) {
+                                        strings.add((String) v);
+                                    }
+                                }
+                            }
+                        }
+                        newNodes = Collections.emptyList();
+                    } else {
+                        // traverse
+                        newNodes = new ArrayList<Node>(nodes.size());
+                        for (Node node : nodes) {
+                            node = session.getChildNode(node, name, true);
+                            if (node != null) {
+                                newNodes.add(node);
+                            }
+                        }
+                    }
+                }
+                nodes = newNodes;
+            }
+
+        }
+        return StringUtils.join(strings, " ");
     }
 
     /**
@@ -231,7 +390,7 @@ public class PersistenceContext {
 
     /**
      * Creates a new row in the context, for a new id (not yet saved).
-     * 
+     *
      * @param tableName the table name
      * @param id the new id
      * @param map the fragments map, or {@code null}
@@ -249,7 +408,7 @@ public class PersistenceContext {
      * <p>
      * If the fragment is not in the context, fetch it from the mapper. If it's
      * not in the database, returns {@code null} or an absent fragment.
-     * 
+     *
      * @param tableName the fragment table name
      * @param id the fragment id
      * @param allowAbsent {@code true} to return an absent fragment as an object
@@ -264,9 +423,28 @@ public class PersistenceContext {
     }
 
     /**
+     * Gets a list of fragments given a table name and their ids.
+     * <p>
+     * If the fragment is not in the context, fetch it from the mapper. If it's
+     * not in the database, uses {@code null} or an absent fragment.
+     *
+     * @param tableName the fragment table name
+     * @param ids the fragment ids (not empty)
+     * @param allowAbsent {@code true} to return an absent fragment as an object
+     *            instead of {@code null}
+     * @return the fragments, with a fragment being {@code null} if none is
+     *         found and {@value allowAbsent} was {@code false}
+     * @throws StorageException
+     */
+    public List<Fragment> getMulti(String tableName, List<Serializable> ids,
+            boolean allowAbsent) throws StorageException {
+        return getContext(tableName).getMulti(ids, allowAbsent);
+    }
+
+    /**
      * Finds a row in the hierarchy table given its parent id and name. If the
      * row is not in the context, fetch it from the mapper.
-     * 
+     *
      * @param parentId the parent id
      * @param name the name
      * @param complexProp whether to get complex properties or real children
@@ -280,7 +458,7 @@ public class PersistenceContext {
 
     /**
      * Finds all the children given a parent id.
-     * 
+     *
      * @param parentId the parent id
      * @param name the name of the children, or {@code null} for all
      * @param complexProp whether to get complex properties or real children
@@ -294,7 +472,7 @@ public class PersistenceContext {
 
     /**
      * Move a hierarchy fragment to a new parent with a new name.
-     * 
+     *
      * @param source the source
      * @param parentId the destination parent id
      * @param name the new name
@@ -307,7 +485,7 @@ public class PersistenceContext {
 
     /**
      * Copy a hierarchy (and its children) to a new parent with a new name.
-     * 
+     *
      * @param source the source of the copy
      * @param parentId the destination parent id
      * @param name the new name
@@ -321,7 +499,7 @@ public class PersistenceContext {
 
     /**
      * Removes a row.
-     * 
+     *
      * @param row
      * @throws StorageException
      */
@@ -337,7 +515,7 @@ public class PersistenceContext {
 
     /**
      * Checks in a node.
-     * 
+     *
      * @param node the node to check in
      * @param label the version label
      * @param description the version description
@@ -383,7 +561,7 @@ public class PersistenceContext {
 
     /**
      * Checks out a node.
-     * 
+     *
      * @param node the node to check out
      * @throws StorageException
      */
@@ -402,7 +580,7 @@ public class PersistenceContext {
      * Restores a node by label.
      * <p>
      * The restored node is checked in.
-     * 
+     *
      * @param node the node
      * @param label the version label to restore
      * @throws StorageException
@@ -454,7 +632,7 @@ public class PersistenceContext {
 
     /**
      * Gets a version id given a versionable id and a version label.
-     * 
+     *
      * @param versionableId the versionable id
      * @param label the version label
      * @return the version id, or {@code null} if not found
@@ -468,7 +646,7 @@ public class PersistenceContext {
 
     /**
      * Gets the the last version id given a versionable id.
-     * 
+     *
      * @param versionableId the versionabel id
      * @return the version id, or {@code null} if not found
      * @throws StorageException
@@ -476,12 +654,15 @@ public class PersistenceContext {
     public Serializable getLastVersion(Serializable versionableId)
             throws StorageException {
         Context versionsContext = getContext(model.VERSION_TABLE_NAME);
-        return mapper.getLastVersion(versionableId, versionsContext).getId();
+
+        SimpleFragment result = mapper.getLastVersion(versionableId,
+                versionsContext);
+        return (result == null) ? null : result.getId();
     }
 
     /**
      * Gets all the versions given a versionable id.
-     * 
+     *
      * @param versionableId the versionable id
      * @return the list of version fragments
      * @throws StorageException
@@ -501,7 +682,7 @@ public class PersistenceContext {
      * <p>
      * If the document is a proxy, then all similar proxies (pointing to any
      * version of the same versionable) are retrieved.
-     * 
+     *
      * @param document the document
      * @param parent the parent, or {@code null}
      * @return the list of proxies fragments
@@ -538,7 +719,7 @@ public class PersistenceContext {
 
     /**
      * Finds the id of the enclosing non-complex-property node.
-     * 
+     *
      * @param id the id
      * @return the id of the containing document, or {@code null} if there is no
      *         parent or the parent has been deleted.
@@ -546,11 +727,6 @@ public class PersistenceContext {
     protected Serializable getContainingDocument(Serializable id)
             throws StorageException {
         return hierContext.getContainingDocument(id);
-    }
-
-    public boolean isMarkedForCacheClearing() {
-        // TODO Auto-generated method stub
-        return false;
     }
 
 }

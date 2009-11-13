@@ -20,7 +20,10 @@ package org.nuxeo.ecm.core.storage.sql.ra;
 import java.io.FileInputStream;
 import java.io.PrintWriter;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.resource.ResourceException;
 import javax.resource.cci.ConnectionFactory;
@@ -37,7 +40,6 @@ import org.apache.commons.logging.LogFactory;
 import org.nuxeo.common.xmap.XMap;
 import org.nuxeo.ecm.core.NXCore;
 import org.nuxeo.ecm.core.schema.SchemaManager;
-import org.nuxeo.ecm.core.storage.DefaultPlatformComponentCleanupManagedConnectionFactory;
 import org.nuxeo.ecm.core.storage.StorageException;
 import org.nuxeo.ecm.core.storage.sql.ConnectionSpecImpl;
 import org.nuxeo.ecm.core.storage.sql.RepositoryDescriptor;
@@ -51,12 +53,11 @@ import org.nuxeo.runtime.api.Framework;
  * to create new {@link ManagedConnection} (the physical connection).
  * <p>
  * It also is a factory for {@link ConnectionFactory}s.
- * 
+ *
  * @author Florent Guillaume
  */
 public class ManagedConnectionFactoryImpl implements ManagedConnectionFactory,
-        ResourceAdapterAssociation, RepositoryManagement,
-        DefaultPlatformComponentCleanupManagedConnectionFactory {
+        ResourceAdapterAssociation, RepositoryManagement {
 
     private static final Log log = LogFactory.getLog(ManagedConnectionFactoryImpl.class);
 
@@ -78,15 +79,6 @@ public class ManagedConnectionFactoryImpl implements ManagedConnectionFactory,
         repositoryDescriptor.properties = new HashMap<String, String>();
     }
 
-    // NXP 3992 -- exposed this for clean shutdown on cluster 
-    public void terminateRepository() { 
-        synchronized (this) {
-            if (repository != null) {
-                repository.close();
-            }
-        }
-    }
-   
     /*
      * ----- Java Bean -----
      */
@@ -107,13 +99,16 @@ public class ManagedConnectionFactoryImpl implements ManagedConnectionFactory,
         return repositoryDescriptor.xaDataSourceName;
     }
 
+    /**
+     * Properties are specified in the format key=val1[;key2=val2;...]
+     * <p>
+     * If a value has to contain a semicolon, it can be escaped by doubling it.
+     *
+     * @see #parseProperties(String)
+     * @param property
+     */
     public void setProperty(String property) {
-        String[] split = property.split("=", 2);
-        if (split.length != 2) {
-            log.error("Invalid property: " + property);
-            return;
-        }
-        repositoryDescriptor.properties.put(split[0], split[1]);
+        repositoryDescriptor.properties.putAll(parseProperties(property));
     }
 
     public String getProperty() {
@@ -181,7 +176,7 @@ public class ManagedConnectionFactoryImpl implements ManagedConnectionFactory,
             ConnectionRequestInfo connectionRequestInfo)
             throws ResourceException {
         assert connectionRequestInfo instanceof ConnectionRequestInfoImpl;
-        initializeRepository();
+        initialize();
         return new ManagedConnectionImpl(this,
                 (ConnectionRequestInfoImpl) connectionRequestInfo);
     }
@@ -206,28 +201,6 @@ public class ManagedConnectionFactoryImpl implements ManagedConnectionFactory,
             return managedConnection;
         }
         return null;
-    }
-
-    @Override
-    public int hashCode() {
-        return repositoryDescriptor.name == null ? 0
-                : repositoryDescriptor.name.hashCode();
-    }
-
-    @Override
-    public boolean equals(Object other) {
-        if (other == this) {
-            return true;
-        }
-        if (other instanceof ManagedConnectionFactoryImpl) {
-            return equals((ManagedConnectionFactoryImpl) other);
-        }
-        return false;
-    }
-
-    private boolean equals(ManagedConnectionFactoryImpl other) {
-        return repositoryDescriptor.name == null ? false
-                : repositoryDescriptor.name.equals(repositoryDescriptor.name);
     }
 
     /*
@@ -258,7 +231,7 @@ public class ManagedConnectionFactoryImpl implements ManagedConnectionFactory,
      * ----- -----
      */
 
-    private void initializeRepository() throws StorageException {
+    private void initialize() throws StorageException {
         synchronized (this) {
             if (repository == null) {
                 // XXX TODO
@@ -271,6 +244,14 @@ public class ManagedConnectionFactoryImpl implements ManagedConnectionFactory,
                 repositoryDescriptor.mergeFrom(getRepositoryDescriptor(repositoryDescriptor.name));
                 repository = new RepositoryImpl(repositoryDescriptor,
                         schemaManager);
+            }
+        }
+    }
+
+    public void shutdown() {
+        synchronized (this) {
+            if (repository != null) {
+                repository.close();
             }
         }
     }
@@ -302,8 +283,43 @@ public class ManagedConnectionFactoryImpl implements ManagedConnectionFactory,
         return repository.getConnection(connectionSpec);
     }
 
-    public int markForCacheClearing() {
-        return repository.markForCacheClearing();
+    private static final Pattern KEYVALUE = Pattern.compile("([^=]*)=(.*)");
+
+    /**
+     * Parses a string of the form: <code>key1=val1;key2=val2;...</code> and
+     * collects the key/value pairs.
+     * <p>
+     * A ';' character may end the expression. If a value has to contain a ';',
+     * it can be escaped by doubling it.
+     * <p>
+     * Examples of valid expressions: <code>key1=val1</code>,
+     * <code>key1=val1;</code>, <code>key1=val1;key2=val2</code>,
+     * <code>key1=a=b;;c=d;key2=val2</code>.
+     * <p>
+     * Syntax errors are reported using the logger and will stop the parsing but
+     * already collected properties will be available. The ';' or '=' characters
+     * cannot be escaped in keys.
+     *
+     * @param expr the expression to parse
+     * @return a key/value map
+     */
+    public static Map<String, String> parseProperties(String expr) {
+        String SPECIAL = "\u1fff"; // never present in the strings to parse
+        Map<String, String> props = new HashMap<String, String>();
+        for (String kv : expr.replace(";;", SPECIAL).split(";")) {
+            kv = kv.replace(SPECIAL, ";");
+            if ("".equals(kv)) {
+                // empty starting string
+                continue;
+            }
+            Matcher m = KEYVALUE.matcher(kv);
+            if (m == null || !m.matches()) {
+                log.error("Invalid property expression: " + kv);
+                continue;
+            }
+            props.put(m.group(1), m.group(2));
+        }
+        return props;
     }
 
 }

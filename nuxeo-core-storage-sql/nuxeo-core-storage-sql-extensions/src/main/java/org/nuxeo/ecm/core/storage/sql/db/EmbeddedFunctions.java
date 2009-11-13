@@ -143,8 +143,8 @@ public class EmbeddedFunctions {
             Set<String> principals, Set<String> permissions)
             throws SQLException {
         if (log.isDebugEnabled()) {
-            logDebug("isAccessAllowed " + id + " " + principals + " " +
-                    permissions);
+            logDebug("isAccessAllowed " + id + " " + principals + " "
+                    + permissions);
         }
         PreparedStatement ps1 = null;
         PreparedStatement ps2 = null;
@@ -168,8 +168,8 @@ public class EmbeddedFunctions {
                     if (log.isDebugEnabled()) {
                         logDebug(" -> " + user + " " + permission + " " + grant);
                     }
-                    if (principals.contains(user) &&
-                            permissions.contains(permission)) {
+                    if (principals.contains(user)
+                            && permissions.contains(permission)) {
                         if (log.isDebugEnabled()) {
                             logDebug(" => " + grant);
                         }
@@ -235,10 +235,9 @@ public class EmbeddedFunctions {
      *
      * @param string1 the first string
      * @param string2 the second string
-     * @param a string with extracted words
+     * @return a string with extracted words
      */
-    public static String parseFullText(String string1, String string2)
-            throws SQLException {
+    public static String parseFullText(String string1, String string2) {
         Set<String> set = new HashSet<String>();
         set.addAll(parseFullText(string1));
         set.addAll(parseFullText(string2));
@@ -247,8 +246,7 @@ public class EmbeddedFunctions {
         return join(words, ' ');
     }
 
-    protected static Set<String> parseFullText(String string)
-            throws SQLException {
+    protected static Set<String> parseFullText(String string) {
         if (string == null) {
             return Collections.emptySet();
         }
@@ -311,7 +309,7 @@ public class EmbeddedFunctions {
             if (c == '\u00e6') {
                 buf.append("ae");
             } else if (c >= '\u00e0' && c <= '\u00ff') {
-                buf.append(UNACCENTED.charAt(((int) c) - 0xe0));
+                buf.append(UNACCENTED.charAt((c) - 0xe0));
             } else if (c == '\u0153') {
                 buf.append("oe");
             } else {

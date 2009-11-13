@@ -21,6 +21,8 @@ import java.io.Serializable;
 import java.util.ConcurrentModificationException;
 import java.util.HashMap;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.nuxeo.ecm.core.storage.StorageException;
 
 /**
@@ -47,6 +49,8 @@ public abstract class Fragment implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    private static final Log log = LogFactory.getLog(Fragment.class);
+
     /**
      * The id. If the fragment was just created, and database id generation is
      * used, the initial temporary id will be changed at save time to its final
@@ -57,7 +61,8 @@ public abstract class Fragment implements Serializable {
     /**
      * The possible states of a fragment.
      */
-    public static enum State {
+    public enum State {
+
         /**
          * The fragment is not attached to a persistence context.
          */
@@ -117,6 +122,11 @@ public abstract class Fragment implements Serializable {
 
     private transient Context context;
 
+    private void logStateTransition(State newState) {
+        log.info("(" + context.mapper.instanceNumber + ") " + id + '/'
+                + getTableName() + ' ' + state + " -> " + newState);
+    }
+
     /**
      * Constructs an empty {@link Fragment} with the given id (which may be a
      * temporary one).
@@ -126,7 +136,7 @@ public abstract class Fragment implements Serializable {
      * @param context the persistence context to which the fragment is tied, or
      *            {@code null}
      */
-    public Fragment(Serializable id, State state, Context context) {
+    protected Fragment(Serializable id, State state, Context context) {
         this.id = id;
         this.state = state;
         this.context = context;
@@ -224,7 +234,9 @@ public abstract class Fragment implements Serializable {
         case DELETED:
             break;
         case INVALIDATED_MODIFIED:
-            state = refetch();
+            State newState = refetch();
+            // logStateTransition(newState);
+            state = newState;
             break;
         case INVALIDATED_DELETED:
             throw new ConcurrentModificationException(
@@ -240,6 +252,7 @@ public abstract class Fragment implements Serializable {
         case ABSENT:
             context.pristine.remove(id);
             context.modified.put(id, this);
+            // logStateTransition(State.CREATED); // <---
             state = State.CREATED;
             break;
         case INVALIDATED_MODIFIED:
@@ -248,6 +261,7 @@ public abstract class Fragment implements Serializable {
         case PRISTINE:
             context.pristine.remove(id);
             context.modified.put(id, this);
+            // logStateTransition(State.MODIFIED);
             state = State.MODIFIED;
             break;
         case DETACHED:
@@ -272,24 +286,28 @@ public abstract class Fragment implements Serializable {
         case INVALIDATED_DELETED:
             context.pristine.remove(id);
             context = null;
+            // logStateTransition(State.DETACHED);
             state = State.DETACHED;
             break;
         case CREATED:
             context.modified.remove(id);
             context = null;
+            // logStateTransition(State.DETACHED);
             state = State.DETACHED;
             break;
         case PRISTINE:
         case INVALIDATED_MODIFIED:
             context.pristine.remove(id);
             context.modified.put(id, this);
+            // logStateTransition(State.DELETED);
             state = State.DELETED;
             break;
         case MODIFIED:
+            // logStateTransition(State.DELETED);
             state = State.DELETED;
             break;
         case DELETED:
-            throw new AssertionError(this);
+            throw new RuntimeException(this.toString());
         }
     }
 
@@ -309,13 +327,14 @@ public abstract class Fragment implements Serializable {
             // fall through
         case ABSENT:
         case PRISTINE:
+            // logStateTransition(State.INVALIDATED_MODIFIED);
             state = State.INVALIDATED_MODIFIED;
             break;
         case INVALIDATED_MODIFIED:
         case INVALIDATED_DELETED:
             break;
         case DETACHED:
-            throw new AssertionError(this);
+            throw new RuntimeException(this.toString());
         }
     }
 
@@ -334,13 +353,14 @@ public abstract class Fragment implements Serializable {
             // fall through
         case ABSENT:
         case PRISTINE:
+            // logStateTransition(State.INVALIDATED_MODIFIED);
             state = State.INVALIDATED_MODIFIED;
             break;
         case INVALIDATED_MODIFIED:
         case INVALIDATED_DELETED:
             break;
         case DETACHED:
-            throw new AssertionError(this);
+            throw new RuntimeException(this.toString());
         }
     }
 
@@ -348,6 +368,7 @@ public abstract class Fragment implements Serializable {
      * Detaches the fragment from its persistence context.
      */
     protected void setDetached() {
+        // logStateTransition(State.DETACHED);
         state = State.DETACHED;
         context = null;
     }
@@ -360,6 +381,7 @@ public abstract class Fragment implements Serializable {
         switch (state) {
         case CREATED:
         case MODIFIED:
+            // logStateTransition(State.PRISTINE); // <---
             state = State.PRISTINE;
             break;
         case ABSENT:
@@ -369,7 +391,7 @@ public abstract class Fragment implements Serializable {
         case INVALIDATED_MODIFIED:
         case INVALIDATED_DELETED:
             // incoherent with the pristine map + expected state
-            throw new AssertionError(this);
+            throw new RuntimeException(this.toString());
         }
     }
 
@@ -381,6 +403,7 @@ public abstract class Fragment implements Serializable {
         switch (state) {
         case ABSENT:
         case PRISTINE:
+            // logStateTransition(State.INVALIDATED_MODIFIED);
             state = State.INVALIDATED_MODIFIED;
             break;
         case INVALIDATED_MODIFIED:
@@ -391,7 +414,7 @@ public abstract class Fragment implements Serializable {
         case MODIFIED:
         case DELETED:
             // incoherent with the pristine map
-            throw new AssertionError(this);
+            throw new RuntimeException(this.toString());
         }
     }
 
@@ -404,6 +427,7 @@ public abstract class Fragment implements Serializable {
         case ABSENT:
         case PRISTINE:
         case INVALIDATED_MODIFIED:
+            // logStateTransition(State.INVALIDATED_DELETED);
             state = State.INVALIDATED_DELETED;
             break;
         case INVALIDATED_DELETED:
@@ -413,7 +437,7 @@ public abstract class Fragment implements Serializable {
         case MODIFIED:
         case DELETED:
             // incoherent with the pristine map
-            throw new AssertionError(this);
+            throw new RuntimeException(this.toString());
         }
     }
 
@@ -454,8 +478,8 @@ class FragmentGroup {
 
     @Override
     public String toString() {
-        return getClass().getSimpleName() + '(' + hier + ", " + main + ", " +
-                fragments + ')';
+        return getClass().getSimpleName() + '(' + hier + ", " + main + ", "
+                + fragments + ')';
     }
 
 }

@@ -19,15 +19,17 @@
 
 package org.nuxeo.ecm.core.storage.sql.db;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
-import org.nuxeo.common.utils.StringUtils;
 import org.nuxeo.ecm.core.storage.sql.Model;
-import org.nuxeo.ecm.core.storage.sql.PropertyType;
+import org.nuxeo.ecm.core.storage.sql.db.dialect.Dialect;
 
 /**
  * The basic implementation of a SQL table.
@@ -50,6 +52,9 @@ public class TableImpl implements Table {
     /** Logical names of indexed columns. */
     private final List<String[]> indexedColumns;
 
+    /** Those of the indexed columns that concern fulltext. */
+    private final Map<String[], String> fulltextIndexedColumns;
+
     /**
      * Creates a new empty table.
      */
@@ -60,6 +65,15 @@ public class TableImpl implements Table {
         // we use a LinkedHashMap to have deterministic ordering
         columns = new LinkedHashMap<String, Column>();
         indexedColumns = new LinkedList<String[]>();
+        fulltextIndexedColumns = new HashMap<String[], String>();
+    }
+
+    public boolean isAlias() {
+        return false;
+    }
+
+    public Table getRealTable() {
+        return this;
     }
 
     public Dialect getDialect() {
@@ -86,21 +100,17 @@ public class TableImpl implements Table {
         return columns.values();
     }
 
-    /**
-     * Adds a {@link Column} to the table.
-     */
-    public Column addColumn(String name, PropertyType type, int sqlType,
-    		String sqlTypeString,  String key, Model model) {
+    public Column addColumn(String name, ColumnType type, String key,
+            Model model) {
         String physicalName = database.getColumnPhysicalName(name);
         if (columns.containsKey(physicalName)) {
-            throw new IllegalArgumentException("duplicate column " +
-                    physicalName);
+            throw new IllegalArgumentException("duplicate column "
+                    + physicalName);
         }
-        Column column = new Column(this, physicalName, type, sqlType, sqlTypeString,
-        		key,
-                model);
+        Column column = new Column(this, physicalName, type, key, model);
         columns.put(name, column);
         return column;
+
     }
 
     /**
@@ -110,6 +120,15 @@ public class TableImpl implements Table {
      */
     public void addIndex(String... columnNames) {
         indexedColumns.add(columnNames);
+    }
+
+    public void addFulltextIndex(String indexName, String... columnNames) {
+        indexedColumns.add(columnNames);
+        fulltextIndexedColumns.put(columnNames, indexName);
+    }
+
+    public boolean hasFulltextIndex() {
+        return !fulltextIndexedColumns.isEmpty();
     }
 
     /**
@@ -131,7 +150,7 @@ public class TableImpl implements Table {
         // unique
         // check
         buf.append(')');
-        buf.append(dialect.getTableTypeString());
+        buf.append(dialect.getTableTypeString(this));
         return buf.toString();
     }
 
@@ -160,11 +179,7 @@ public class TableImpl implements Table {
         buf.append(column.getQuotedName());
         buf.append(' ');
         if (column.isIdentity()) {
-            if (dialect.hasDataTypeInIdentityColumn()) {
-                buf.append(column.getSqlTypeString());
-                buf.append(' ');
-            }
-            buf.append(dialect.getIdentityColumnString(column.getSqlType()));
+            throw new UnsupportedOperationException();
         } else {
             buf.append(column.getSqlTypeString());
             String defaultValue = column.getDefaultValue();
@@ -190,19 +205,18 @@ public class TableImpl implements Table {
      */
     public List<String> getPostCreateSqls() {
         List<String> sqls = new LinkedList<String>();
+        Model model = null;
         for (Column column : columns.values()) {
+            model = column.getModel();
             if (column.isPrimary()) {
                 StringBuilder buf = new StringBuilder();
-                String constraintName = dialect.openQuote() + name +
-                        (dialect.storesUpperCaseIdentifiers() ? "_PK" : "_pk") +
-                        dialect.closeQuote();
+                String constraintName = dialect.openQuote()
+                        + name
+                        + (dialect.storesUpperCaseIdentifiers() ? "_PK" : "_pk")
+                        + dialect.closeQuote();
                 buf.append("ALTER TABLE ");
                 buf.append(getQuotedName());
-                String s = dialect.getAddPrimaryKeyConstraintString(constraintName);
-                // cosmetic
-                s = s.replace(" add constraint ", " ADD CONSTRAINT ");
-                s = s.replace(" primary key ", " PRIMARY KEY ");
-                buf.append(s);
+                buf.append(dialect.getAddPrimaryKeyConstraintString(constraintName));
                 buf.append('(');
                 buf.append(column.getQuotedName());
                 buf.append(')');
@@ -211,52 +225,53 @@ public class TableImpl implements Table {
             Table ft = column.getForeignTable();
             if (ft != null) {
                 Column fc = ft.getColumn(column.getForeignKey());
-                String constraintName = dialect.openQuote() + name + "_" +
-                        column.getPhysicalName() + "_" + ft.getName() +
-                        (dialect.storesUpperCaseIdentifiers() ? "_FK" : "_fk") +
-                        dialect.closeQuote();
+                String constraintName = dialect.openQuote()
+                        + dialect.getForeignKeyConstraintName(name,
+                                column.getPhysicalName(), ft.getName())
+                        + dialect.closeQuote();
                 StringBuilder buf = new StringBuilder();
                 buf.append("ALTER TABLE ");
                 buf.append(getQuotedName());
-                String s = dialect.getAddForeignKeyConstraintString(
+                buf.append(dialect.getAddForeignKeyConstraintString(
                         constraintName,
                         new String[] { column.getQuotedName() },
                         ft.getQuotedName(),
-                        new String[] { fc.getQuotedName() }, true);
-                // cosmetic
-                s = s.replace(" add constraint ", " ADD CONSTRAINT ");
-                s = s.replace(" foreign key ", " FOREIGN KEY ");
-                s = s.replace(" references ", " REFERENCES ");
-                buf.append(s);
-                // if (dialect.supportsCascadeDelete())
-                buf.append(" ON DELETE CASCADE");
+                        new String[] { fc.getQuotedName() }, true));
+                if (dialect.supportsCircularCascadeDeleteConstraints()
+                        || (Model.MAIN_KEY.equals(fc.getPhysicalName()) && Model.MAIN_KEY.equals(column.getPhysicalName()))) {
+                    // MS SQL Server can't have circular ON DELETE CASCADE.
+                    // Use a trigger INSTEAD OF DELETE to cascade deletes
+                    // recursively for:
+                    // - hierarchy.parentid
+                    // - versions.versionableid
+                    // - proxies.versionableid
+                    buf.append(" ON DELETE CASCADE");
+                }
                 sqls.add(buf.toString());
             }
         }
         for (String[] columnNames : indexedColumns) {
-            List<String> qcols = new LinkedList<String>();
-            List<String> pcols = new LinkedList<String>();
+            List<Column> cols = new ArrayList<Column>(columnNames.length);
+            List<String> qcols = new ArrayList<String>(columnNames.length);
+            List<String> pcols = new ArrayList<String>(columnNames.length);
             for (String name : columnNames) {
                 Column col = getColumn(name);
+                cols.add(col);
                 qcols.add(col.getQuotedName());
                 pcols.add(col.getPhysicalName());
             }
-            String indexName = dialect.openQuote() +
-                    (dialect.qualifyIndexName() ? name + "_" : "") +
-                    StringUtils.join(pcols, '_') +
-                    (dialect.storesUpperCaseIdentifiers() ? "_IDX" : "_idx") +
-                    dialect.closeQuote();
-            StringBuilder buf = new StringBuilder();
-            buf.append("CREATE");
-            // buf.append(unique ? " UNIQUE" : "");
-            buf.append(" INDEX ");
-            buf.append(indexName);
-            buf.append(" ON ");
-            buf.append(getQuotedName());
-            buf.append(" (");
-            buf.append(StringUtils.join(qcols, ", "));
-            buf.append(')');
-            sqls.add(buf.toString());
+            String quotedIndexName = dialect.openQuote()
+                    + dialect.getIndexName(name, pcols) + dialect.closeQuote();
+            String createIndexSql;
+            String indexName = fulltextIndexedColumns.get(columnNames);
+            if (indexName != null) {
+                createIndexSql = dialect.getCreateFulltextIndexSql(indexName,
+                        quotedIndexName, this, cols, model);
+            } else {
+                createIndexSql = dialect.getCreateIndexSql(quotedIndexName,
+                        getQuotedName(), qcols);
+            }
+            sqls.add(createIndexSql);
         }
         return sqls;
     }
@@ -275,7 +290,7 @@ public class TableImpl implements Table {
             buf.append("IF EXISTS ");
         }
         buf.append(getQuotedName());
-        buf.append(dialect.getCascadeConstraintsString());
+        buf.append(dialect.getCascadeDropConstraintsString());
         if (dialect.supportsIfExistsAfterTableName()) {
             buf.append(" IF EXISTS");
         }

@@ -23,6 +23,7 @@ import java.util.List;
 
 import org.nuxeo.ecm.core.storage.sql.Model;
 import org.nuxeo.ecm.core.storage.sql.PropertyType;
+import org.nuxeo.ecm.core.storage.sql.db.dialect.Dialect;
 
 /**
  * A SQL table.
@@ -30,6 +31,10 @@ import org.nuxeo.ecm.core.storage.sql.PropertyType;
  * @author Florent Guillaume
  */
 public interface Table extends Serializable {
+
+    boolean isAlias();
+
+    Table getRealTable();
 
     Dialect getDialect();
 
@@ -46,8 +51,7 @@ public interface Table extends Serializable {
     /**
      * Adds a {@link Column} to the table.
      */
-    Column addColumn(String name, PropertyType type, int sqlType,
-            String sqlTypeString, String key, Model model);
+    Column addColumn(String name, ColumnType type, String key, Model model);
 
     /**
      * Adds an index on one or several columns.
@@ -55,6 +59,21 @@ public interface Table extends Serializable {
      * @param columnNames the column names
      */
     void addIndex(String... columnNames);
+
+    /**
+     * Adds a named fulltext index on one or several columns.
+     *
+     * @param indexName the index name
+     * @param columnNames the column names
+     */
+    void addFulltextIndex(String indexName, String... columnNames);
+
+    /**
+     * Checks if the table has some fulltext indexes.
+     *
+     * @return {@code true} if the table has some fulltext indexes
+     */
+    boolean hasFulltextIndex();
 
     /**
      * Computes the SQL statement to create the table.

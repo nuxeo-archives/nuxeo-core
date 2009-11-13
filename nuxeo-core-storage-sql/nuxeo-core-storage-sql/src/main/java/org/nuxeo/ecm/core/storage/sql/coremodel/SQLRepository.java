@@ -117,7 +117,7 @@ public class SQLRepository implements Repository {
         return schemaManager;
     }
 
-    public SecurityManager getSecurityManager() {
+    public SecurityManager getNuxeoSecurityManager() {
         return securityManager;
     }
 
@@ -156,6 +156,10 @@ public class SQLRepository implements Repository {
 
     public int getActiveSessionsCount() {
         return 0;
+    }
+
+    public boolean supportsTags() {
+        return true;
     }
 
     /*

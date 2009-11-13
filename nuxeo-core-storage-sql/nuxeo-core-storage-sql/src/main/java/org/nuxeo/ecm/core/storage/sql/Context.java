@@ -18,12 +18,19 @@
 package org.nuxeo.ecm.core.storage.sql;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.collections.map.ReferenceMap;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.nuxeo.ecm.core.storage.StorageException;
 import org.nuxeo.ecm.core.storage.sql.Fragment.State;
 
@@ -49,7 +56,12 @@ import org.nuxeo.ecm.core.storage.sql.Fragment.State;
  */
 public class Context {
 
+    private static final Log log = LogFactory.getLog(Context.class);
+
     private final String tableName;
+
+    /** Number of columns in table. */
+    private final int tableSize;
 
     // also accessed by Fragment
     protected final Mapper mapper;
@@ -106,7 +118,7 @@ public class Context {
     protected final boolean isCollection;
 
     @SuppressWarnings("unchecked")
-    Context(String tableName, Mapper mapper,
+    public Context(String tableName, Mapper mapper,
             PersistenceContext persistenceContext) {
         this.tableName = tableName;
         this.mapper = mapper;
@@ -121,6 +133,7 @@ public class Context {
         deletedInvalidations = new HashSet<Serializable>();
 
         isCollection = model.isCollectionFragment(tableName);
+        tableSize = mapper.getTableSize(tableName);
     }
 
     @Override
@@ -130,6 +143,10 @@ public class Context {
 
     public String getTableName() {
         return tableName;
+    }
+
+    public int getTableSize() {
+        return tableSize;
     }
 
     /**
@@ -206,6 +223,64 @@ public class Context {
     }
 
     /**
+     * Gets a list of fragments.
+     * <p>
+     * If it's not in the context, fetch it from the mapper. If it's not in the
+     * database, returns {@code null} or an absent fragment.
+     *
+     * @param id the fragment id
+     * @param allowAbsent {@code true} to return an absent fragment as an object
+     *            instead of {@code null}
+     * @return the fragment, or {@code null} if none is found and {@value
+     *         allowAbsent} was {@code false}
+     * @throws StorageException
+     */
+    public List<Fragment> getMulti(List<Serializable> ids, boolean allowAbsent)
+            throws StorageException {
+        if (ids.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // find ids we don't have in cache
+        List<Fragment> held = new ArrayList<Fragment>(ids.size());
+        List<Serializable> fetchIds = new ArrayList<Serializable>(ids.size());
+        for (Serializable id : ids) {
+            Fragment fragment = getIfPresent(id);
+            if (fragment == null) {
+                fetchIds.add(id);
+            } else {
+                held.add(fragment); // held to avoid GC
+            }
+        }
+
+        // fetch missing ones, and hold in list to avoid GC
+        List<Fragment> fetched = getFromMapper(fetchIds, allowAbsent);
+
+        // did we just fetch everything?
+        if (fetched.size() == ids.size()) {
+            return fetched;
+        }
+
+        // now they're all in cache
+        List<Fragment> fragments = new ArrayList<Fragment>(ids.size());
+        for (Serializable id : ids) {
+            Fragment fragment = getIfPresent(id);
+            if (fragment != null && fragment.getState() == State.DELETED) {
+                fragment = null;
+            }
+            fragments.add(fragment);
+        }
+
+        // reference the lists up to here, for GC
+        held.set(0, null);
+        if (fetched.size() != 0) {
+            fetched.set(0, null);
+        }
+
+        return fragments;
+    }
+
+    /**
      * Gets a fragment from the mapper.
      */
     protected Fragment getFromMapper(Serializable id, boolean allowAbsent)
@@ -232,6 +307,73 @@ public class Context {
                 return new SimpleFragment(id, State.PRISTINE, this, map);
             }
         }
+    }
+
+    /**
+     * Gets a list of fragments from the mapper.
+     */
+    protected List<Fragment> getFromMapper(List<Serializable> ids,
+            boolean allowAbsent) throws StorageException {
+
+        // find fragments we really want to fetch
+        List<Serializable> fetchIds = new ArrayList<Serializable>(ids.size());
+        for (Serializable id : ids) {
+            if (!persistenceContext.isIdNew(id)) {
+                fetchIds.add(id);
+            }
+        }
+
+        // fetch these fragments in bulk
+        List<Fragment> fetchFragments = new ArrayList<Fragment>(fetchIds.size());
+        if (isCollection) {
+            Map<Serializable, Serializable[]> arrays = mapper.readCollectionsArrays(
+                    fetchIds, this);
+            for (Serializable id : fetchIds) {
+                Serializable[] array = arrays.get(id);
+                Fragment fragment = model.newCollectionFragment(id, array, this);
+                fetchFragments.add(fragment);
+            }
+        } else {
+            Map<Serializable, Map<String, Serializable>> maps = mapper.readMultipleRowMaps(
+                    tableName, fetchIds, this);
+            for (Serializable id : fetchIds) {
+                Map<String, Serializable> map = maps.get(id);
+                Fragment fragment;
+                if (map == null) {
+                    fragment = allowAbsent ? new SimpleFragment(id,
+                            State.ABSENT, this, null) : null;
+                } else {
+                    fragment = new SimpleFragment(id, State.PRISTINE, this, map);
+                }
+                fetchFragments.add(fragment);
+            }
+        }
+
+        // that's all if we had no created fragment
+        if (fetchIds.size() == ids.size()) {
+            return fetchFragments;
+        }
+
+        // add empty (created) fragments
+        List<Fragment> fragments = new ArrayList<Fragment>(ids.size());
+        Iterator<Fragment> it = fetchFragments.iterator();
+        for (Serializable id : ids) {
+            Fragment fragment;
+            if (persistenceContext.isIdNew(id)) {
+                // the id has not been saved, so nothing exists yet in the
+                // database
+                if (isCollection) {
+                    fragment = model.newEmptyCollectionFragment(id, this);
+                } else {
+                    fragment = allowAbsent ? new SimpleFragment(id,
+                            State.ABSENT, this, null) : null;
+                }
+            } else {
+                fragment = it.next();
+            }
+            fragments.add(fragment);
+        }
+        return fragments;
     }
 
     /**
@@ -292,6 +434,52 @@ public class Context {
     }
 
     /**
+     * Finds the documents having dirty text or dirty binaries that have to be
+     * reindexed as fulltext.
+     *
+     * @param dirtyStrings set of ids, updated by this method
+     * @param dirtyBinaries set of ids, updated by this method
+     * @throws StorageException
+     */
+    public void findDirtyDocuments(Set<Serializable> dirtyStrings,
+            Set<Serializable> dirtyBinaries) throws StorageException {
+        for (Fragment fragment : modified.values()) {
+            Serializable docId = null;
+            switch (fragment.getState()) {
+            case CREATED:
+                docId = persistenceContext.getContainingDocument(fragment.getId());
+                dirtyStrings.add(docId);
+                dirtyBinaries.add(docId);
+                break;
+            case MODIFIED:
+                Collection<String> dirty;
+                if (isCollection) {
+                    dirty = Collections.singleton(null);
+                } else {
+                    dirty = ((SimpleFragment) fragment).getDirty();
+                }
+                for (String key : dirty) {
+                    PropertyType type = model.getFulltextFieldType(tableName,
+                            key);
+                    if (type == null) {
+                        continue;
+                    }
+                    if (docId == null) {
+                        docId = persistenceContext.getContainingDocument(fragment.getId());
+                    }
+                    if (type == PropertyType.STRING) {
+                        dirtyStrings.add(docId);
+                    } else if (type == PropertyType.BINARY) {
+                        dirtyBinaries.add(docId);
+                    }
+                }
+                break;
+            default:
+            }
+        }
+    }
+
+    /**
      * Saves all the created, modified or deleted rows, except for the created
      * main rows which have already been done.
      *
@@ -345,8 +533,13 @@ public class Context {
                 // modified map cleared at end of loop
                 deletedInTransaction.add(id);
                 break;
+            case PRISTINE:
+                // cannot happen, but has been observed :(
+                log.error("Found PRISTINE fragment in modified map: "
+                        + fragment);
+                break;
             default:
-                throw new AssertionError(fragment);
+                throw new RuntimeException(fragment.toString());
             }
         }
         modified.clear();

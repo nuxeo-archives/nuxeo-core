@@ -5,10 +5,21 @@
     <repository name="default"
       factory="org.nuxeo.ecm.core.storage.sql.coremodel.SQLRepositoryFactory">
       <repository name="default">
-       <!-- uncomment this to enable clustering
-            delay is in milliseconds, default is 0 (no delay before processing invalidations)
+        <!-- uncomment this to enable clustering
+             delay is in milliseconds, default is 0 (no delay before processing invalidations)
         <clustering enabled="true" delay="1000" />
         -->
+        <indexing>
+          <!-- example configuration for H2
+          <fulltext analyzer="org.apache.lucene.analysis.fr.FrenchAnalyzer"/>
+          -->
+          <!-- example configuration for PostgreSQL
+          <fulltext analyzer="french"/>
+          -->
+          <!-- example configuration for Microsoft SQL Server
+          <fulltext catalog="nuxeo" analyzer="french"/>
+          -->
+        </indexing>
       </repository>
     </repository>
   </extension>

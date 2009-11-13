@@ -15,7 +15,7 @@
  *     Florent Guillaume
  */
 
-package org.nuxeo.ecm.core.storage.sql.mbean;
+package org.nuxeo.ecm.core.storage.sql.management;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -31,7 +31,7 @@ import org.nuxeo.ecm.core.storage.sql.RepositoryManagement;
 
 /**
  * An MBean to manage SQL storage repositories.
- * 
+ *
  * @author Florent Guillaume
  */
 public class RepositoryStatus implements RepositoryStatusMBean {
@@ -40,7 +40,7 @@ public class RepositoryStatus implements RepositoryStatusMBean {
 
     protected List<RepositoryManagement> getRepositories()
             throws NamingException {
-        LinkedList<RepositoryManagement> list = new LinkedList<RepositoryManagement>();
+        List<RepositoryManagement> list = new LinkedList<RepositoryManagement>();
         InitialContext context = new InitialContext();
         // we search both JBoss-like and Glassfish-like prefixes
         // @see NXCore#getRepository
@@ -85,6 +85,20 @@ public class RepositoryStatus implements RepositoryStatusMBean {
         return buf.toString();
     }
 
+    public int getActiveSessionsCount() {
+        List<RepositoryManagement> repositories;
+        try {
+            repositories = getRepositories();
+        } catch (NamingException e) {
+            throw new IllegalStateException("Cannot get repositories", e);
+        }
+        int count = 0;
+        for (RepositoryManagement repository : repositories) {
+            count += repository.getActiveSessionsCount();
+        }
+        return count;
+    }
+
     public String clearCaches() {
         List<RepositoryManagement> repositories;
         try {
@@ -99,23 +113,6 @@ public class RepositoryStatus implements RepositoryStatusMBean {
             buf.append("<b>").append(repository.getName()).append("</b>: ");
             buf.append(repository.clearCaches());
             buf.append("<br />");
-        }
-        return buf.toString();
-    }
-
-    public String markForCacheClearing() {
-        List<RepositoryManagement> repositories;
-        try {
-            repositories = getRepositories();
-        } catch (NamingException e) {
-            log.error("Error getting repositories", e);
-            return "Error!";
-        }
-        StringBuilder buf = new StringBuilder();
-        buf.append("Caches asked for clear for SQL repositories:<br />");
-        for (RepositoryManagement repository : repositories) {
-            buf.append("<b>").append(repository.getName()).append("</b>");
-            repository.markForCacheClearing();
         }
         return buf.toString();
     }

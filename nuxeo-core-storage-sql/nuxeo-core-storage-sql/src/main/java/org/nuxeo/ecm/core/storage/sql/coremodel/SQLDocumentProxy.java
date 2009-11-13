@@ -17,10 +17,15 @@
 
 package org.nuxeo.ecm.core.storage.sql.coremodel;
 
+import java.util.Iterator;
+import java.util.List;
+
 import org.nuxeo.ecm.core.api.DocumentException;
 import org.nuxeo.ecm.core.model.Document;
 import org.nuxeo.ecm.core.model.DocumentVersionProxy;
 import org.nuxeo.ecm.core.schema.types.ComplexType;
+import org.nuxeo.ecm.core.storage.StorageException;
+import org.nuxeo.ecm.core.storage.sql.Model;
 import org.nuxeo.ecm.core.storage.sql.Node;
 import org.nuxeo.ecm.core.versioning.DocumentVersion;
 
@@ -34,12 +39,13 @@ public class SQLDocumentProxy extends SQLDocumentVersion implements
 
     private final Node proxyNode;
 
-    private final SQLDocumentVersion version;
+    private SQLDocumentVersion version;
 
     protected SQLDocumentProxy(Node proxyNode, Node versionNode,
-            ComplexType type, SQLSession session) throws DocumentException {
-        super(versionNode, type, session);
-        version = new SQLDocumentVersion(versionNode, type, session);
+            ComplexType type, SQLSession session, boolean readonly)
+            throws DocumentException {
+        super(versionNode, type, session, readonly);
+        version = new SQLDocumentVersion(versionNode, type, session, true);
         this.proxyNode = proxyNode;
     }
 
@@ -49,6 +55,22 @@ public class SQLDocumentProxy extends SQLDocumentVersion implements
 
     public Document getTargetDocument() {
         return version;
+    }
+
+    public void setTargetDocument(Document document, String label) {
+        try {
+            Node node = ((SQLDocument) document).getHierarchyNode();
+            Document versionDocument = session.getVersionByLabel(node, label);
+            Node versionNode = ((SQLDocument) versionDocument).getHierarchyNode();
+            super.setHierarchyNode(versionNode);
+            version = new SQLDocumentVersion(versionNode, version.getType(), session, true);
+            proxyNode.setSingleProperty(Model.PROXY_TARGET_PROP, versionNode.getId());
+            proxyNode.setSingleProperty(Model.PROXY_VERSIONABLE_PROP, node.getId());
+        } catch (DocumentException e) {
+            throw new UnsupportedOperationException();
+        } catch (StorageException e) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     public DocumentVersion getTargetVersion() {
@@ -92,6 +114,51 @@ public class SQLDocumentProxy extends SQLDocumentVersion implements
     @Override
     public Document getParent() throws DocumentException {
         return session.getParent(proxyNode);
+    }
+
+    /*
+     * ----- folder overrides -----
+     */
+
+    @Override
+    public boolean isFolder() {
+        return _isFolder();
+    }
+
+    @Override
+    public void removeChild(String name) throws DocumentException {
+        _removeChild(name);
+    }
+
+    @Override
+    public Document addChild(String name, String typeName)
+            throws DocumentException {
+        return _addChild(name, typeName);
+    }
+
+    @Override
+    public Document getChild(String name) throws DocumentException {
+        return _getChild(name);
+    }
+
+    @Override
+    public Iterator<Document> getChildren() throws DocumentException {
+        return _getChildren();
+    }
+
+    @Override
+    public List<String> getChildrenIds() throws DocumentException {
+        return _getChildrenIds();
+    }
+
+    @Override
+    public boolean hasChild(String name) throws DocumentException {
+        return _hasChild(name);
+    }
+
+    @Override
+    public boolean hasChildren() throws DocumentException {
+        return _hasChildren();
     }
 
     /*

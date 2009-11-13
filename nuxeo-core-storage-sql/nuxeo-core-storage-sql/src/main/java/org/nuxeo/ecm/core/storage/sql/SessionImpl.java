@@ -20,14 +20,15 @@ package org.nuxeo.ecm.core.storage.sql;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
-import java.security.AccessControlException;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.resource.ResourceException;
 import javax.resource.cci.ConnectionMetaData;
@@ -39,20 +40,19 @@ import javax.transaction.xa.XAResource;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.nuxeo.common.utils.StringUtils;
+import org.nuxeo.ecm.core.api.IterableQueryResult;
 import org.nuxeo.ecm.core.api.security.ACL;
 import org.nuxeo.ecm.core.api.security.SecurityConstants;
 import org.nuxeo.ecm.core.query.QueryFilter;
-import org.nuxeo.ecm.core.query.sql.model.SQLQuery;
 import org.nuxeo.ecm.core.schema.SchemaManager;
 import org.nuxeo.ecm.core.storage.Credentials;
 import org.nuxeo.ecm.core.storage.PartialList;
 import org.nuxeo.ecm.core.storage.StorageException;
-import org.nuxeo.runtime.api.Framework;
 
 /**
  * The session is the main high level access point to data from the underlying
  * database.
- * 
+ *
  * @author Florent Guillaume
  */
 public class SessionImpl implements Session {
@@ -75,9 +75,11 @@ public class SessionImpl implements Session {
 
     private Node rootNode;
 
-    private boolean isMarkedForCacheClearing;
+    private long threadId;
 
-    protected Boolean alwaysGetFragmentsFlag;
+    private boolean readAclsChanged;
+
+    private String threadName;
 
     SessionImpl(RepositoryImpl repository, SchemaManager schemaManager,
             Mapper mapper, Credentials credentials) throws StorageException {
@@ -88,6 +90,7 @@ public class SessionImpl implements Session {
         model = mapper.getModel();
         context = new PersistenceContext(mapper);
         live = true;
+        readAclsChanged = false;
         transactionalSession = new TransactionalSession(this, mapper);
         computeRootNode();
     }
@@ -108,10 +111,34 @@ public class SessionImpl implements Session {
             // avoid potential multi-threaded access to active session
             return 0;
         }
+        int n = context.clearCaches();
+        checkThreadEnd();
+        return n;
+    }
 
-        int cacheNumberCleared = context.clearCaches();
-        isMarkedForCacheClearing = false;
-        return cacheNumberCleared;
+    protected void checkThread() {
+        if (threadId == 0) {
+            return;
+        }
+        long currentThreadId = Thread.currentThread().getId();
+        if (threadId == currentThreadId) {
+            return;
+        }
+        String currentThreadName = Thread.currentThread().getName();
+        String msg = String.format(
+                "Concurrency Error: Session was started in thread %s (%s)"
+                        + " but is being used in thread %s (%s)", threadId,
+                threadName, currentThreadId, currentThreadName);
+        log.debug(msg, new Exception(msg));
+    }
+
+    protected void checkThreadStart() {
+        threadId = Thread.currentThread().getId();
+        threadName = Thread.currentThread().getName();
+    }
+
+    protected void checkThreadEnd() {
+        threadId = 0;
     }
 
     /*
@@ -153,11 +180,16 @@ public class SessionImpl implements Session {
         return live;
     }
 
+    public String getRepositoryName() {
+        return repository.getName();
+    }
+
     public Model getModel() {
         return model;
     }
 
     public Node getRootNode() {
+        checkThread();
         checkLive();
         return rootNode;
     }
@@ -181,8 +213,14 @@ public class SessionImpl implements Session {
         }
     }
 
+    // also called by TransactionalSession#end
     protected void flush() throws StorageException {
+        checkThread();
+        context.updateFulltext(this);
         context.save();
+        if (readAclsChanged) {
+            updateReadAcls();
+        }
     }
 
     /**
@@ -216,6 +254,7 @@ public class SessionImpl implements Session {
     }
 
     public Node getNodeById(Serializable id) throws StorageException {
+        checkThread();
         checkLive();
         if (id == null) {
             throw new IllegalArgumentException("Illegal null id");
@@ -262,23 +301,81 @@ public class SessionImpl implements Session {
         return new Node(this, context, childGroup);
     }
 
-    protected boolean alwaysGetFragments() {
-        if (alwaysGetFragmentsFlag == null) {
-            alwaysGetFragmentsFlag = Boolean.valueOf(Framework.getProperty(
-                    Session.ALWAYS_GET_FRAGMENTS, "false"));
+    public List<Node> getNodesByIds(List<Serializable> ids)
+            throws StorageException {
+        checkThread();
+        checkLive();
+
+        // get main fragments
+        List<Fragment> mainFragments = context.getMulti(model.mainTableName,
+                ids, false);
+
+        // find what type names we have and the associated fragments
+        Set<String> fragmentNames = new HashSet<String>();
+        Set<String> typesDone = new HashSet<String>();
+        List<FragmentsMap> maps = new ArrayList<FragmentsMap>(ids.size());
+        for (Fragment fragment : mainFragments) {
+            if (fragment == null) {
+                maps.add(null);
+                continue;
+            }
+            FragmentsMap fragmentsMap = new FragmentsMap();
+            fragmentsMap.put(model.mainTableName, fragment);
+            maps.add(fragmentsMap);
+
+            String typeName = (String) ((SimpleFragment) fragment).get(model.MAIN_PRIMARY_TYPE_KEY);
+            if (typesDone.add(typeName)) {
+                Set<String> f = model.getTypePrefetchedFragments(typeName);
+                if (f != null) {
+                    fragmentNames.addAll(f);
+                }
+            }
         }
-        return alwaysGetFragmentsFlag.booleanValue();
+        fragmentNames.remove(model.mainTableName);
+
+        // fetch all the fragments, in bulk for each table
+        for (String fragmentName : fragmentNames) {
+            List<Fragment> fragments = context.getMulti(fragmentName, ids, true);
+            Iterator<FragmentsMap> mapsit = maps.iterator();
+            for (Fragment fragment : fragments) {
+                FragmentsMap fragmentsMap = mapsit.next();
+                if (fragment != null && fragmentsMap != null) {
+                    fragmentsMap.put(fragmentName, fragment);
+                }
+            }
+        }
+
+        // assemble nodes from the fragments fetched
+        List<Node> nodes = new ArrayList<Node>(ids.size());
+        Iterator<FragmentsMap> mapsit = maps.iterator();
+        for (Fragment main : mainFragments) {
+            FragmentsMap fragmentsMap = mapsit.next();
+            Node node;
+            if (main == null) {
+                node = null;
+            } else {
+                FragmentGroup childGroup = new FragmentGroup(
+                        (SimpleFragment) main, null, fragmentsMap);
+                node = new Node(this, context, childGroup);
+            }
+            nodes.add(node);
+        }
+
+        return nodes;
     }
 
     protected FragmentsMap getFragments(Serializable id, String typeName,
             Serializable parentId, String name) throws StorageException {
         // TODO get all non-cached fragments at once using join / union
         FragmentsMap fragments = new FragmentsMap();
-        // force lazy fetch
-        if (!alwaysGetFragments()) {
+        Iterable<String> fragmentNames = model.getTypeSimpleFragments(typeName);
+        if (fragmentNames == null) {
+            // don't crash if the database refers to an unknown type
+            log.error(String.format("Node %s (%s) has unknown type: %s", id,
+                    name, typeName));
             return fragments;
         }
-        for (String fragmentName : model.getTypeSimpleFragments(typeName)) {
+        for (String fragmentName : fragmentNames) {
             Fragment fragment = context.get(fragmentName, id, true);
             fragments.put(fragmentName, fragment);
         }
@@ -358,6 +455,12 @@ public class SessionImpl implements Session {
 
     public Node addChildNode(Node parent, String name, Long pos,
             String typeName, boolean complexProp) throws StorageException {
+        return addChildNode(null, parent, name, pos, typeName, complexProp);
+    }
+
+    public Node addChildNode(Serializable id, Node parent, String name,
+            Long pos, String typeName, boolean complexProp)
+            throws StorageException {
         checkLive();
         if (name == null || name.contains("/") || name.equals(".")
                 || name.equals("..")) {
@@ -367,7 +470,9 @@ public class SessionImpl implements Session {
             throw new IllegalArgumentException("Unknown type: " + typeName);
         }
 
-        Serializable id = context.generateNewId();
+        id = context.generateNewId(id);
+        Serializable parentId = parent == null ? null
+                : parent.mainFragment.getId();
 
         // main info
         Map<String, Serializable> mainMap = new HashMap<String, Serializable>();
@@ -381,7 +486,7 @@ public class SessionImpl implements Session {
         } else {
             hierMap = mainMap;
         }
-        hierMap.put(model.HIER_PARENT_KEY, parent.mainFragment.getId());
+        hierMap.put(model.HIER_PARENT_KEY, parentId);
         hierMap.put(model.HIER_CHILD_POS_KEY, pos);
         hierMap.put(model.HIER_CHILD_NAME_KEY, name);
         hierMap.put(model.HIER_CHILD_ISPROPERTY_KEY,
@@ -413,6 +518,8 @@ public class SessionImpl implements Session {
         }
 
         FragmentGroup rowGroup = new FragmentGroup(mainRow, hierRow, fragments);
+
+        requireReadAclsUpdate();
 
         return new Node(this, context, rowGroup);
     }
@@ -503,6 +610,7 @@ public class SessionImpl implements Session {
         checkLive();
         context.save();
         context.move(source, parent.getId(), name);
+        requireReadAclsUpdate();
         return source;
     }
 
@@ -511,6 +619,7 @@ public class SessionImpl implements Session {
         checkLive();
         context.save();
         Serializable id = context.copy(source, parent.getId(), name);
+        requireReadAclsUpdate();
         return getNodeById(id);
     }
 
@@ -525,24 +634,27 @@ public class SessionImpl implements Session {
         checkLive();
         context.save();
         Serializable id = context.checkIn(node, label, description);
+        requireReadAclsUpdate();
         return getNodeById(id);
     }
 
     public void checkOut(Node node) throws StorageException {
         checkLive();
         context.checkOut(node);
+        requireReadAclsUpdate();
     }
 
     public void restoreByLabel(Node node, String label) throws StorageException {
         checkLive();
         // save done inside method
         context.restoreByLabel(node, label);
+        requireReadAclsUpdate();
     }
 
-    public Node getVersionByLabel(Node node, String label)
+    public Node getVersionByLabel(Serializable versionableId, String label)
             throws StorageException {
         checkLive();
-        Serializable id = context.getVersionByLabel(node.getId(), label);
+        Serializable id = context.getVersionByLabel(versionableId, label);
         if (id == null) {
             return null;
         }
@@ -582,14 +694,30 @@ public class SessionImpl implements Session {
         return nodes;
     }
 
-    public PartialList<Serializable> query(SQLQuery query,
+    public PartialList<Serializable> query(String query,
             QueryFilter queryFilter, boolean countTotal)
             throws StorageException {
-        try {
-            return mapper.query(query, queryFilter, countTotal, this);
-        } catch (SQLException e) {
-            throw new StorageException("Invalid query: " + query, e);
-        }
+        return mapper.query(query, queryFilter, countTotal, this);
+    }
+
+    public IterableQueryResult queryAndFetch(String query, String queryType,
+            QueryFilter queryFilter, Object... params) throws StorageException {
+        return mapper.queryAndFetch(query, queryType, queryFilter, true, this,
+                params);
+    }
+
+    public void requireReadAclsUpdate() {
+        readAclsChanged = true;
+    }
+
+    public void updateReadAcls() throws StorageException {
+        mapper.updateReadAcls();
+        readAclsChanged = false;
+    }
+
+    public void rebuildReadAcls() throws StorageException {
+        mapper.rebuildReadAcls();
+        readAclsChanged = false;
     }
 
     // returns context or null if missing
@@ -620,7 +748,8 @@ public class SessionImpl implements Session {
 
     // TODO factor with addChildNode
     private Node addRootNode() throws StorageException {
-        Serializable id = context.generateNewId();
+        requireReadAclsUpdate();
+        Serializable id = context.generateNewId(null);
 
         // main info
         Map<String, Serializable> mainMap = new HashMap<String, Serializable>();
@@ -668,12 +797,13 @@ public class SessionImpl implements Session {
         aclrows[3] = new ACLRow(3, ACL.LOCAL_ACL, true,
                 SecurityConstants.VERSION, SecurityConstants.MEMBERS, null);
         rootNode.setCollectionProperty(Model.ACL_PROP, aclrows);
+        requireReadAclsUpdate();
     }
 
     // public Node newNodeInstance() needed ?
 
     public void checkPermission(String absPath, String actions)
-            throws AccessControlException, StorageException {
+            throws StorageException {
         checkLive();
         // TODO Auto-generated method stub
         throw new RuntimeException("Not implemented");
@@ -683,20 +813,6 @@ public class SessionImpl implements Session {
         checkLive();
         // TODO Auto-generated method stub
         throw new RuntimeException("Not implemented");
-    }
-
-    public void markForCacheClearing() {
-        isMarkedForCacheClearing = true;
-    }
-
-    public int clearCache() {
-        int result = context.clearCaches();
-        isMarkedForCacheClearing = false;
-        return result;
-    }
-
-    public boolean isMarkedForCacheClearing() {
-        return isMarkedForCacheClearing;
     }
 
 }

@@ -20,18 +20,24 @@ package org.nuxeo.ecm.core.storage.sql.coremodel;
 import java.io.InputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.resource.ResourceException;
 import javax.transaction.xa.XAResource;
 
+import org.nuxeo.ecm.core.api.ClientException;
+import org.nuxeo.ecm.core.api.CoreSession;
 import org.nuxeo.ecm.core.api.DocumentException;
+import org.nuxeo.ecm.core.api.IterableQueryResult;
+import org.nuxeo.ecm.core.api.VersionModel;
 import org.nuxeo.ecm.core.model.Document;
 import org.nuxeo.ecm.core.model.NoSuchDocumentException;
 import org.nuxeo.ecm.core.model.NoSuchPropertyException;
@@ -46,18 +52,14 @@ import org.nuxeo.ecm.core.query.QueryParseException;
 import org.nuxeo.ecm.core.query.QueryResult;
 import org.nuxeo.ecm.core.query.UnsupportedQueryTypeException;
 import org.nuxeo.ecm.core.query.sql.NXQL;
-import org.nuxeo.ecm.core.query.sql.SQLQueryParser;
-import org.nuxeo.ecm.core.query.sql.model.OrderByExpr;
-import org.nuxeo.ecm.core.query.sql.model.OrderByList;
-import org.nuxeo.ecm.core.query.sql.model.SQLQuery;
 import org.nuxeo.ecm.core.schema.DocumentType;
 import org.nuxeo.ecm.core.schema.SchemaManager;
+import org.nuxeo.ecm.core.schema.TypeConstants;
 import org.nuxeo.ecm.core.schema.types.ComplexType;
 import org.nuxeo.ecm.core.schema.types.Field;
 import org.nuxeo.ecm.core.schema.types.ListType;
 import org.nuxeo.ecm.core.schema.types.Type;
 import org.nuxeo.ecm.core.security.SecurityManager;
-import org.nuxeo.ecm.core.security.SecurityService;
 import org.nuxeo.ecm.core.storage.PartialList;
 import org.nuxeo.ecm.core.storage.StorageException;
 import org.nuxeo.ecm.core.storage.sql.Binary;
@@ -66,7 +68,6 @@ import org.nuxeo.ecm.core.storage.sql.Model;
 import org.nuxeo.ecm.core.storage.sql.Node;
 import org.nuxeo.ecm.core.storage.sql.SimpleProperty;
 import org.nuxeo.ecm.core.versioning.DocumentVersion;
-import org.nuxeo.runtime.api.Framework;
 
 /**
  * This class is the bridge between the Nuxeo SPI Session and the actual
@@ -85,8 +86,6 @@ public class SQLSession implements Session {
     private SQLDocument root;
 
     private final String userSessionId;
-
-    private final SecurityService securityService;
 
     public SQLSession(org.nuxeo.ecm.core.storage.sql.Session session,
             Repository repository, Map<String, Serializable> context)
@@ -108,7 +107,6 @@ public class SQLSession implements Session {
         root = newDocument(rootNode);
 
         userSessionId = (String) context.get("SESSION_ID");
-        securityService = Framework.getLocalService(SecurityService.class);
     }
 
     /*
@@ -182,7 +180,7 @@ public class SQLSession implements Session {
     }
 
     public SecurityManager getSecurityManager() {
-        return repository.getSecurityManager();
+        return repository.getNuxeoSecurityManager();
     }
 
     public Document getDocumentByUUID(String uuid) throws DocumentException {
@@ -273,18 +271,37 @@ public class SQLSession implements Session {
         }
     }
 
+    public Document getVersion(String versionableId, VersionModel versionModel)
+            throws DocumentException {
+        try {
+            Serializable vid = session.getModel().unHackStringId(versionableId);
+            Node versionNode = session.getVersionByLabel(vid,
+                    versionModel.getLabel());
+            if (versionNode == null) {
+                return null;
+            }
+            versionModel.setDescription(versionNode.getSimpleProperty(
+                    Model.VERSION_DESCRIPTION_PROP).getString());
+            versionModel.setCreated((Calendar) versionNode.getSimpleProperty(
+                    Model.VERSION_CREATED_PROP).getValue());
+            return newDocument(versionNode);
+        } catch (StorageException e) {
+            throw new DocumentException(e);
+        }
+    }
+
     public Document createProxyForVersion(Document parent, Document document,
             String label) throws DocumentException {
         try {
-            Node versionableNode = ((SQLDocument) document).getHierarchyNode();
-            Node versionNode = session.getVersionByLabel(versionableNode, label);
+            Serializable versionableId = ((SQLDocument) document).getHierarchyNode().getId();
+            Node versionNode = session.getVersionByLabel(versionableId, label);
             if (versionNode == null) {
                 throw new DocumentException("Unknown version: " + label);
             }
             Node parentNode = ((SQLDocument) parent).getHierarchyNode();
             String name = findFreeName(parentNode, document.getName());
-            Node proxy = session.addProxy(versionNode.getId(),
-                    versionableNode.getId(), parentNode, name, null);
+            Node proxy = session.addProxy(versionNode.getId(), versionableId,
+                    parentNode, name, null);
             return newDocument(proxy);
         } catch (StorageException e) {
             throw new DocumentException(e);
@@ -315,6 +332,60 @@ public class SQLSession implements Session {
         throw new UnsupportedOperationException();
     }
 
+    // returned document is r/w even if a version or a proxy, so that normal
+    // props can be set
+    public Document importDocument(String uuid, Document parent, String name,
+            String typeName, Map<String, Serializable> properties)
+            throws DocumentException {
+        assert Model.PROXY_TYPE == CoreSession.IMPORT_PROXY_TYPE;
+        boolean isProxy = typeName.equals(Model.PROXY_TYPE);
+        Map<String, Serializable> props = new HashMap<String, Serializable>();
+        Node parentNode;
+        Long pos = null; // TODO pos
+        if (!isProxy) {
+            // version & live document
+            props.put(Model.MISC_LIFECYCLE_POLICY_PROP,
+                    properties.get(CoreSession.IMPORT_LIFECYCLE_POLICY));
+            props.put(Model.MISC_LIFECYCLE_STATE_PROP,
+                    properties.get(CoreSession.IMPORT_LIFECYCLE_STATE));
+            props.put(Model.LOCK_PROP, properties.get(CoreSession.IMPORT_LOCK));
+            props.put(Model.MISC_DIRTY_PROP,
+                    properties.get(CoreSession.IMPORT_DIRTY));
+            props.put(Model.MAIN_MAJOR_VERSION_PROP,
+                    properties.get(CoreSession.IMPORT_VERSION_MAJOR));
+            props.put(Model.MAIN_MINOR_VERSION_PROP,
+                    properties.get(CoreSession.IMPORT_VERSION_MINOR));
+        }
+        if (parent == null) {
+            // version
+            parentNode = null;
+            props.put(Model.VERSION_VERSIONABLE_PROP,
+                    properties.get(CoreSession.IMPORT_VERSION_VERSIONABLE_ID));
+            props.put(Model.VERSION_CREATED_PROP,
+                    properties.get(CoreSession.IMPORT_VERSION_CREATED));
+            props.put(Model.VERSION_LABEL_PROP,
+                    properties.get(CoreSession.IMPORT_VERSION_LABEL));
+            props.put(Model.VERSION_DESCRIPTION_PROP,
+                    properties.get(CoreSession.IMPORT_VERSION_DESCRIPTION));
+        } else {
+            parentNode = ((SQLDocument) parent).getHierarchyNode();
+            if (isProxy) {
+                // proxy
+                props.put(Model.PROXY_TARGET_PROP,
+                        properties.get(CoreSession.IMPORT_PROXY_TARGET_ID));
+                props.put(Model.PROXY_VERSIONABLE_PROP,
+                        properties.get(CoreSession.IMPORT_PROXY_VERSIONABLE_ID));
+            } else {
+                // live document
+                props.put(Model.MAIN_BASE_VERSION_PROP,
+                        properties.get(CoreSession.IMPORT_BASE_VERSION_ID));
+                props.put(Model.MAIN_CHECKED_IN_PROP,
+                        properties.get(CoreSession.IMPORT_CHECKED_IN));
+            }
+        }
+        return importChild(uuid, parentNode, name, pos, typeName, props);
+    }
+
     public Query createQuery(String query, Query.Type qType, String... params)
             throws QueryException {
         if (qType != Query.Type.NXQL) {
@@ -324,58 +395,75 @@ public class SQLSession implements Session {
             throw new QueryException("Parameters not supported");
         }
         try {
-            return new SQLSessionQuery(SQLQueryParser.parse(query));
+            return new SQLSessionQuery(query);
         } catch (QueryParseException e) {
             throw new QueryException(e.getMessage() + ": " + query, e);
         }
     }
 
+    public IterableQueryResult queryAndFetch(String query, String queryType,
+            QueryFilter queryFilter, Object... params) throws QueryException {
+        return new SQLSessionQuery(query, queryType).executeAndFetch(
+                queryFilter, params);
+    }
+
+    protected static final Pattern ORDER_BY_PATH_ASC = Pattern.compile(
+            "(.*)\\s+ORDER\\s+BY\\s+" + NXQL.ECM_PATH + "\\s*$",
+            Pattern.CASE_INSENSITIVE);
+
+    protected static final Pattern ORDER_BY_PATH_DESC = Pattern.compile(
+            "(.*)\\s+ORDER\\s+BY\\s+" + NXQL.ECM_PATH + "\\s+DESC\\s*$",
+            Pattern.CASE_INSENSITIVE);
+
     protected class SQLSessionQuery implements FilterableQuery {
 
-        protected final SQLQuery sqlQuery;
+        protected final String query;
 
-        public SQLSessionQuery(SQLQuery sqlQuery) {
-            this.sqlQuery = sqlQuery;
+        protected final String queryType;
+
+        public SQLSessionQuery(String query) {
+            this.query = query;
+            queryType = "NXQL";
         }
 
-        public void setLimit(long limit) {
-            sqlQuery.setLimit(limit);
-        }
-
-        public void setOffset(long offset) {
-            sqlQuery.setOffset(offset);
+        public SQLSessionQuery(String query, String queryType) {
+            this.query = query;
+            this.queryType = queryType;
         }
 
         public QueryResult execute() throws QueryException {
-            return execute(null, false);
+            return execute(QueryFilter.EMPTY, false);
         }
 
         public QueryResult execute(boolean countTotal) throws QueryException {
-            return execute(null, countTotal);
+            return execute(QueryFilter.EMPTY, countTotal);
         }
 
         public QueryResult execute(QueryFilter queryFilter, boolean countTotal)
                 throws QueryException {
             try {
-                SQLQuery query = sqlQuery;
-                Boolean orderByPath = null;
+                String query = this.query;
+                // do ORDER BY ecm:path by hand in SQLQueryResult as we can't do
+                // it in SQL (and has to do limit/offset as well)
+                Boolean orderByPath;
+                Matcher matcher = ORDER_BY_PATH_ASC.matcher(query);
+                if (matcher.matches()) {
+                    orderByPath = Boolean.TRUE; // ASC
+                } else {
+                    matcher = ORDER_BY_PATH_DESC.matcher(query);
+                    if (matcher.matches()) {
+                        orderByPath = Boolean.FALSE; // DESC
+                    } else {
+                        orderByPath = null;
+                    }
+                }
                 long limit = 0;
                 long offset = 0;
-                if (sqlQuery.orderBy != null) {
-                    OrderByList orderByList = sqlQuery.orderBy.elements;
-                    if (orderByList.size() == 1) {
-                        OrderByExpr orderBy = orderByList.get(0);
-                        if (NXQL.ECM_PATH.equals(orderBy.reference.name)) {
-                            // do ORDER BY ecm:path "by hand"
-                            orderByPath = Boolean.valueOf(!orderBy.isDescending);
-                            query = new SQLQuery(sqlQuery.select,
-                                    sqlQuery.from, sqlQuery.where, null);
-                            query.setLimit(0);
-                            query.setOffset(0);
-                            limit = sqlQuery.getLimit();
-                            offset = sqlQuery.getOffset();
-                        }
-                    }
+                if (orderByPath != null) {
+                    query = matcher.group(1);
+                    limit = queryFilter.getLimit();
+                    offset = queryFilter.getOffset();
+                    queryFilter = QueryFilter.withoutLimitOffset(queryFilter);
                 }
                 PartialList<Serializable> list = session.query(query,
                         queryFilter, countTotal);
@@ -385,6 +473,16 @@ public class SQLSession implements Session {
                 throw new QueryException(e.getMessage(), e);
             }
         }
+
+        public IterableQueryResult executeAndFetch(QueryFilter queryFilter,
+                Object... params) throws QueryException {
+            try {
+                return session.queryAndFetch(query, queryType, queryFilter, params);
+            } catch (StorageException e) {
+                throw new QueryException(e.getMessage(), e);
+            }
+        }
+
     }
 
     /*
@@ -392,6 +490,12 @@ public class SQLSession implements Session {
      */
 
     private SQLDocument newDocument(Node node) throws DocumentException {
+        return newDocument(node, true);
+    }
+
+    // "readonly" meaningful for proxies and versions, used for import
+    private SQLDocument newDocument(Node node, boolean readonly)
+            throws DocumentException {
         if (node == null) {
             // root's parent
             return null;
@@ -419,9 +523,9 @@ public class SQLSession implements Session {
         }
 
         if (node.isProxy()) {
-            return new SQLDocumentProxy(node, versionNode, type, this);
+            return new SQLDocumentProxy(node, versionNode, type, this, readonly);
         } else if (node.isVersion()) {
-            return new SQLDocumentVersion(node, type, this);
+            return new SQLDocumentVersion(node, type, this, readonly);
         } else {
             return new SQLDocument(node, type, this, false);
         }
@@ -436,6 +540,24 @@ public class SQLSession implements Session {
         } catch (StorageException e) {
             throw new DocumentException("Failed to get document: " + id, e);
         }
+    }
+
+    // called by SQLQueryResult iterator
+    protected List<Document> getDocumentsById(List<Serializable> ids)
+            throws DocumentException {
+        List<Document> docs = new ArrayList<Document>(ids.size());
+        try {
+            List<Node> nodes = session.getNodesByIds(ids);
+            for (Node node : nodes) {
+                if (node == null) {
+                    continue;
+                }
+                docs.add(newDocument(node));
+            }
+        } catch (StorageException e) {
+            throw new DocumentException(e.toString(), e);
+        }
+        return docs;
     }
 
     // called by SQLContentProperty
@@ -532,6 +654,22 @@ public class SQLSession implements Session {
         }
     }
 
+    protected Document importChild(String uuid, Node parent, String name,
+            Long pos, String typeName, Map<String, Serializable> props)
+            throws DocumentException {
+        try {
+            Serializable id = session.getModel().unHackStringId(uuid);
+            Node node = session.addChildNode(id, parent, name, pos, typeName,
+                    false);
+            for (Entry<String, Serializable> entry : props.entrySet()) {
+                node.setSingleProperty(entry.getKey(), entry.getValue());
+            }
+            return newDocument(node, false); // not readonly
+        } catch (StorageException e) {
+            throw new DocumentException(e);
+        }
+    }
+
     protected List<Node> getComplexList(Node node, String name)
             throws DocumentException {
         List<Node> nodes;
@@ -580,11 +718,8 @@ public class SQLSession implements Session {
     protected Document getVersionByLabel(Node node, String label)
             throws DocumentException {
         try {
-            Node versionNode = session.getVersionByLabel(node, label);
-            if (versionNode == null) {
-                return null;
-            }
-            return newDocument(versionNode);
+            Node versionNode = session.getVersionByLabel(node.getId(), label);
+            return versionNode == null ? null : newDocument(versionNode);
         } catch (StorageException e) {
             throw new DocumentException(e);
         }
@@ -637,7 +772,7 @@ public class SQLSession implements Session {
         } catch (StorageException e) {
             throw new DocumentException(e);
         }
-        return new SQLCollectionProperty(property, null, false);
+        return new SQLCollectionProperty(this, property, null, false);
     }
 
     /** Make a property. */
@@ -695,7 +830,7 @@ public class SQLSession implements Session {
                 } catch (StorageException e) {
                     throw new DocumentException(e);
                 }
-                property = new SQLCollectionProperty(prop, listType, readonly);
+                property = new SQLCollectionProperty(this, prop, listType, readonly);
             } else {
                 property = new SQLComplexListProperty(node, listType, name,
                         this, readonly);
@@ -742,7 +877,7 @@ public class SQLSession implements Session {
             for (Node childNode : childNodes) {
                 Property property;
                 // TODO use a better switch
-                if (type.getName().equals("content")) {
+                if (TypeConstants.isContentType(type)) {
                     property = new SQLContentProperty(childNode, complexType,
                             this, readonly);
                 } else {
@@ -753,6 +888,15 @@ public class SQLSession implements Session {
             }
             return properties;
         }
+    }
+
+    /**
+     * This method flag the current session, the read ACLs update will be done
+     * automatically at save time.
+     *
+     */
+    public void requireReadAclsUpdate() {
+        session.requireReadAclsUpdate();
     }
 
 }
