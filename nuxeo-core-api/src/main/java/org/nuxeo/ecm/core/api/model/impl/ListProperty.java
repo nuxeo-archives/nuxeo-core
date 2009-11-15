@@ -116,7 +116,6 @@ public class ListProperty extends AbstractProperty implements List<Property> {
         return field.getName().getPrefixedName();
     }
 
-    @SuppressWarnings("unchecked")
     public ListType getType() {
         return (ListType)field.getType();
     }
@@ -177,6 +176,23 @@ public class ListProperty extends AbstractProperty implements List<Property> {
         // end of compatibility code <--------
         return list;
     }
+
+    @Override
+    public Serializable getValueForWrite() throws PropertyException {
+        if (isPhantom() || isRemoved()) {
+            return getDefaultValue();
+        }
+        if (children.isEmpty()) {
+            return new ArrayList<String>();
+        }
+        // noinspection CollectionDeclaredAsConcreteClass
+        ArrayList<Object> list = new ArrayList<Object>(children.size());
+        for (Property property : children) {
+            list.add(property.getValueForWrite());
+        }
+        return list;
+    }
+
 
     @Override
     @SuppressWarnings("unchecked")
@@ -294,6 +310,7 @@ public class ListProperty extends AbstractProperty implements List<Property> {
 
     /** ---------------------------- type conversion ------------------------ */
 
+    @SuppressWarnings("unchecked")
     @Override
     public boolean isNormalized(Object value) {
         return value == null
@@ -312,6 +329,7 @@ public class ListProperty extends AbstractProperty implements List<Property> {
         throw new PropertyConversionException(value.getClass(), List.class);
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public <T> T convertTo(Serializable value, Class<T> toType)
             throws PropertyConversionException {

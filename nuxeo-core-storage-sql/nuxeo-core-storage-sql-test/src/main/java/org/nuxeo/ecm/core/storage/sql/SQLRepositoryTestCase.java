@@ -25,8 +25,6 @@ import org.nuxeo.ecm.core.api.ClientException;
 import org.nuxeo.ecm.core.api.CoreInstance;
 import org.nuxeo.ecm.core.api.CoreSession;
 import org.nuxeo.ecm.core.api.security.SecurityConstants;
-import org.nuxeo.ecm.core.event.EventService;
-import org.nuxeo.runtime.api.Framework;
 import org.nuxeo.runtime.test.NXRuntimeTestCase;
 
 /**
@@ -54,7 +52,6 @@ public abstract class SQLRepositoryTestCase extends NXRuntimeTestCase {
         deployBundle("org.nuxeo.ecm.core.schema");
         deployBundle("org.nuxeo.ecm.core.api");
         deployBundle("org.nuxeo.ecm.core");
-        deployBundle("org.nuxeo.ecm.core.event");
         database.setUp();
         deployContrib("org.nuxeo.ecm.core.storage.sql.test",
                 database.getDeploymentContrib());
@@ -62,7 +59,6 @@ public abstract class SQLRepositoryTestCase extends NXRuntimeTestCase {
 
     @Override
     public void tearDown() throws Exception {
-        Framework.getLocalService(EventService.class).waitForAsyncCompletion();
         super.tearDown();
         database.tearDown();
     }
@@ -78,11 +74,11 @@ public abstract class SQLRepositoryTestCase extends NXRuntimeTestCase {
         return CoreInstance.getInstance().open(REPOSITORY_NAME, context);
     }
 
-    public void closeSession() {
+    public void closeSession() throws ClientException {
         closeSession(session);
     }
 
-    public void closeSession(CoreSession session) {
+    public void closeSession(CoreSession session) throws ClientException {
         CoreInstance.getInstance().close(session);
     }
 

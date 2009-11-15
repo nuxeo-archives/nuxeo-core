@@ -72,9 +72,4 @@ public interface Query {
      * @see {@link FilterableQuery#execute(QueryFilter, boolean)}
      */
     QueryResult execute(boolean countTotal) throws QueryException;
-
-    void setLimit(long limit);
-
-    void setOffset(long offset);
-
 }

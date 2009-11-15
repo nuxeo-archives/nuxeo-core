@@ -97,12 +97,14 @@ import org.nuxeo.runtime.services.streaming.StreamManager;
  * <p>
  * The only aspect not implemented is the session management that should be
  * handled by subclasses.
- *
+ * 
  * @author Bogdan Stefanescu
  * @author Florent Guillaume
  */
 public abstract class AbstractSession implements CoreSession,
         SecurityConstants, Serializable {
+
+    public static final String DOCUMENT_IMPORTED = "documentImported";
 
     public static final NuxeoPrincipal ANONYMOUS = new UserPrincipal(
             "anonymous");
@@ -144,7 +146,7 @@ public abstract class AbstractSession implements CoreSession,
 
     /**
      * Gets the current session based on the client session id.
-     *
+     * 
      * @return the repository session
      * @throws ClientException
      */
@@ -223,13 +225,13 @@ public abstract class AbstractSession implements CoreSession,
      * an unique ID on a running JVM and repository-name is a used to avoid name
      * clashes with sessions on different machines (the repository name should
      * be unique in the system)
-     *
+     * 
      * <ul>
-     * <li> A is the repository name (uniquely identify the repository in the
+     * <li>A is the repository name (uniquely identify the repository in the
      * system)
      * <li>B is the time of the session creation in milliseconds
      * </ul>
-     *
+     * 
      * @return
      */
     protected String createSessionId() {
@@ -242,7 +244,7 @@ public abstract class AbstractSession implements CoreSession,
 
     /**
      * Utility method to generate VersionModel labels.
-     *
+     * 
      * @return the String representation of an auto-incremented counter that not
      *         used in any label of docRef
      * @throws ClientException
@@ -356,7 +358,7 @@ public abstract class AbstractSession implements CoreSession,
      * <p>
      * If no schemas are specified (schemas are null) use the default schemas as
      * configured in the document type manager.
-     *
+     * 
      * @param doc the document
      * @param schemas the schemas if any, null otherwise
      * @return the document model
@@ -373,7 +375,7 @@ public abstract class AbstractSession implements CoreSession,
 
     /**
      * Writes the model as modified by the used in the corresponding document.
-     *
+     * 
      * @param doc the document where to write the changes
      * @param docModel the model containing the changes
      * @returns the newly read document model.
@@ -736,7 +738,7 @@ public abstract class AbstractSession implements CoreSession,
      * <p>
      * If name is null, a name is generated. If name is already used, a random
      * suffix is appended to it.
-     *
+     * 
      * @param parent
      * @param name
      * @return a unique name within given parent's children
@@ -1207,20 +1209,18 @@ public abstract class AbstractSession implements CoreSession,
         try {
             Query compiledQuery = getSession().createQuery(query,
                     Query.Type.NXQL);
-            if (limit != 0) {
-                compiledQuery.setLimit(limit);
-                compiledQuery.setOffset(offset);
-            }
             QueryResult results;
             boolean postFilterPermission;
             boolean postFilterFilter;
             boolean postFilterPolicies;
+            boolean postFilter;
             String permission = BROWSE;
             if (compiledQuery instanceof FilterableQuery) {
                 postFilterPermission = false;
                 postFilterPolicies = !securityService.arePoliciesExpressibleInQuery();
                 postFilterFilter = filter != null
                         && !(filter instanceof FacetFilter);
+                postFilter = postFilterPolicies || postFilterFilter;
                 String[] principals;
                 if (principal.getName().equals("system")) {
                     principals = null; // means: no security check needed
@@ -1232,26 +1232,31 @@ public abstract class AbstractSession implements CoreSession,
                         permissions,
                         filter instanceof FacetFilter ? (FacetFilter) filter
                                 : null,
-                        securityService.getPoliciesQueryTransformers());
+                        securityService.getPoliciesQueryTransformers(),
+                        postFilter ? 0 : limit, postFilter ? 0 : offset);
                 results = ((FilterableQuery) compiledQuery).execute(
-                        queryFilter, countTotal);
+                        queryFilter, countTotal && !postFilter);
             } else {
                 postFilterPermission = true;
                 postFilterPolicies = securityService.arePoliciesRestrictingPermission(permission);
                 postFilterFilter = filter != null;
-                results = compiledQuery.execute(countTotal);
+                postFilter = true;
+                results = compiledQuery.execute();
             }
-            if (!postFilterPermission && !postFilterFilter
-                    && !postFilterPolicies) {
+
+            DocumentModelList dms = results.getDocumentModels();
+
+            if (!postFilter) {
                 // the backend has done all the needed filtering
-                return results.getDocumentModels();
+                return dms;
             }
-            // post-filter the results if the query couldn't do it
-            final DocumentModelList docs = new DocumentModelListImpl(
-                    Collections.<DocumentModel> emptyList(),
-                    results.getTotalSize());
-            int nbr = 0;
-            for (DocumentModel model : results.getDocumentModels()) {
+
+            // post-filter the results "by hand", the backend couldn't do it
+            long start = limit == 0 || offset < 0 ? 0 : offset;
+            long stop = start + (limit == 0 ? dms.size() : limit);
+            int n = 0;
+            DocumentModelListImpl docs = new DocumentModelListImpl();
+            for (DocumentModel model : dms) {
                 if (postFilterPermission || postFilterPolicies) {
                     if (!hasPermission(model.getRef(), permission)) {
                         continue;
@@ -1262,18 +1267,28 @@ public abstract class AbstractSession implements CoreSession,
                         continue;
                     }
                 }
-                docs.add(model);
-                nbr++;
-                if (limit != 0 && nbr >= limit) {
-                    break;
+                if (n < start) {
+                    n++;
+                    continue;
                 }
+                if (n >= stop) {
+                    if (!countTotal) {
+                        // can break early
+                        break;
+                    }
+                    n++;
+                    continue;
+                }
+                n++;
+                docs.add(model);
+            }
+            if (countTotal) {
+                docs.setTotalSize(n);
             }
             return docs;
         } catch (Exception e) {
-            log.error("failed to execute query", e);
-            final String causeErrMsg = tryToExtractMeaningfulErrMsg(e);
-            throw new ClientException(
-                    "Failed to get the root document. Cause: " + causeErrMsg, e);
+            throw new ClientException("Failed to execute query: "
+                    + tryToExtractMeaningfulErrMsg(e), e);
         }
     }
 
@@ -1420,25 +1435,27 @@ public abstract class AbstractSession implements CoreSession,
             Document doc = resolveReference(docRef);
             removeDocument(doc);
         } catch (DocumentException e) {
-            throw new ClientException("Failed to fetch document " + docRef +
-                    " before removal", e);
+            throw new ClientException("Failed to fetch document " + docRef
+                    + " before removal", e);
         }
     }
 
     protected void removeDocument(Document doc) throws ClientException {
         try {
             if (!canRemoveDocument(doc)) {
-                throw new DocumentSecurityException("Permission denied: cannot remove document " + doc.getUUID());
+                throw new DocumentSecurityException(
+                        "Permission denied: cannot remove document "
+                                + doc.getUUID());
             }
             removeNotifyOneDoc(doc);
         } catch (DocumentException e) {
             try {
-                throw new ClientException("Failed to remove document " +
-                        doc.getUUID(), e);
+                throw new ClientException("Failed to remove document "
+                        + doc.getUUID(), e);
             } catch (DocumentException e2) {
                 log.error("Failed to remove doc", e);
-                throw new ClientException("Failed to remove and " +
-                        "even to get UUID " + doc.toString());
+                throw new ClientException("Failed to remove and "
+                        + "even to get UUID " + doc.toString());
             }
         }
     }
@@ -1519,7 +1536,8 @@ public abstract class AbstractSession implements CoreSession,
     public DocumentModel saveDocument(DocumentModel docModel)
             throws ClientException {
 
-        ConflictVersioningDetector cvd = new ConflictVersioningDetector(docModel);
+        ConflictVersioningDetector cvd = new ConflictVersioningDetector(
+                docModel);
 
         try {
             docModel = cvd.deconflictIncrementVersion();
@@ -1547,7 +1565,8 @@ public abstract class AbstractSession implements CoreSession,
                     VersioningDocument.CREATE_SNAPSHOT_ON_SAVE_KEY);
             DocumentModel oldDoc = null;
             // If conflict Detected no snapshot created
-            if (createSnapshot != null && createSnapshot && !cvd.isConflictDetected()) {
+            if (createSnapshot != null && createSnapshot
+                    && !cvd.isConflictDetected()) {
                 // FIXME: remove this - pass the flag as an arg or create
                 // another method!
                 save(); // creating versions fails if the documents involved
@@ -1589,7 +1608,7 @@ public abstract class AbstractSession implements CoreSession,
         } catch (Exception e) {
             throw new ClientException("Failed to save document " + docModel, e);
         } finally {
-            // Inform that the "transaction" is finished 
+            // Inform that the "transaction" is finished
             cvd.setConflictTransactionFinished();
         }
 
@@ -1599,17 +1618,17 @@ public abstract class AbstractSession implements CoreSession,
     /*
      * Recursive method that sends a given eventName for all parents of the
      * document that was modified.
-     *
+     * 
      * @param doc @throws DocumentException
      */
     /*
      * private void notifyAncestors(Document doc, String eventName, Map<String,
      * Object> options) throws DocumentException, ClientException { if (doc !=
      * null) { log.debug("Document notified : " + doc.getName()); Document
-     * parent = doc.getParent(); if (parent != null) { DocumentModel parentModel =
-     * readModel(parent, null); if (options == null) { options = new HashMap<String,
-     * Object>(); } options.put(CoreEventConstants.DOCUMENT, parent);
-     * notifyEvent(eventName, parentModel, options, null, null, true);
+     * parent = doc.getParent(); if (parent != null) { DocumentModel parentModel
+     * = readModel(parent, null); if (options == null) { options = new
+     * HashMap<String, Object>(); } options.put(CoreEventConstants.DOCUMENT,
+     * parent); notifyEvent(eventName, parentModel, options, null, null, true);
      * notifyAncestors(parent, eventName, options); } } }
      */
     public boolean isDirty(DocumentRef docRef) throws ClientException {
@@ -1641,7 +1660,7 @@ public abstract class AbstractSession implements CoreSession,
 
     /**
      * Creates a snapshot (version) for the given DocumentModel.
-     *
+     * 
      * @param doc
      * @return the last version (that was just created)
      * @throws ClientException
@@ -1653,13 +1672,13 @@ public abstract class AbstractSession implements CoreSession,
 
     /**
      * Creates a snapshot (version) for the given DocumentModel.
-     *
+     * 
      * @param docModel
      * @return the last version (that was just created)
      * @throws ClientException
      */
-    private DocumentModel createDocumentSnapshot(DocumentModel docModel, boolean isForPublication)
-            throws ClientException {
+    private DocumentModel createDocumentSnapshot(DocumentModel docModel,
+            boolean isForPublication) throws ClientException {
         DocumentRef docRef = docModel.getRef();
         Document doc = null;
 
@@ -1669,14 +1688,15 @@ public abstract class AbstractSession implements CoreSession,
                 doc = resolveReference(docModel.getRef());
                 DocumentModel oldDoc = readModel(doc, null);
 
-                oldDoc.setPropertyValue("uid:is_version_published", Boolean.TRUE);
+                oldDoc.setPropertyValue("uid:is_version_published",
+                        Boolean.TRUE);
                 writeModel(doc, oldDoc);
             } catch (DocumentException e) {
-                throw new ClientException("Failed to check in document " + docRef,
-                        e);
+                throw new ClientException("Failed to check in document "
+                        + docRef, e);
             }
         }
-        
+
         if (!isDirty(docModel.getRef())) {
             log.debug("Document not dirty -> avoid creating a new version");
             return null;
@@ -1701,21 +1721,21 @@ public abstract class AbstractSession implements CoreSession,
         // TODO we need to make it clearer the fact that this event is
         // about new version snapshot and not about versioning fields change
         // (i.e. major, minor version increment)
-        
+
         // Set current document as un-published
         if (isForPublication) {
             try {
                 doc = resolveReference(docModel.getRef());
                 DocumentModel oldDoc = readModel(doc, null);
 
-                oldDoc.setPropertyValue("uid:is_version_published", Boolean.FALSE);
+                oldDoc.setPropertyValue("uid:is_version_published",
+                        Boolean.FALSE);
                 writeModel(doc, oldDoc);
             } catch (DocumentException e) {
-                throw new ClientException("Failed to check in document " + docRef,
-                        e);
+                throw new ClientException("Failed to check in document "
+                        + docRef, e);
             }
         }
-
 
         DocumentModel oldDoc = getDocumentWithVersion(docRef, newVersion);
 
@@ -1723,7 +1743,7 @@ public abstract class AbstractSession implements CoreSession,
 
         return oldDoc;
     }
-    
+
     public void saveDocuments(DocumentModel[] docModels) throws ClientException {
         // TODO: optimize this - avoid calling at each iteration saveDoc...
         for (DocumentModel docModel : docModels) {
@@ -1866,6 +1886,23 @@ public abstract class AbstractSession implements CoreSession,
         }
 
     }
+    
+    public DocumentModel getVersion(String versionableId,
+            VersionModel versionModel) throws ClientException {
+        if (!isAdministrator()) {
+            throw new DocumentSecurityException(
+                    "Only Administrator can fetch versions directly");
+        }
+        String label = versionModel.getLabel();
+        try {
+            Document doc = getSession().getVersion(versionableId, versionModel);
+            return doc == null ? null : readModel(doc, null);
+        } catch (DocumentException e) {
+            throw new ClientException("Failed to get version " + label
+                    + " for " + versionableId, e);
+        }
+    }
+    
 
     public DocumentModel restoreToVersion(DocumentRef docRef,
             VersionModel version) throws ClientException {
@@ -2337,8 +2374,8 @@ public abstract class AbstractSession implements CoreSession,
                 }
             } catch (LifeCycleException e) {
                 ClientException ce = new ClientException(
-                        "Unable to follow transition <" + transition +
-                                "> for document : " + docRef, e);
+                        "Unable to follow transition <" + transition
+                                + "> for document : " + docRef, e);
                 ce.fillInStackTrace();
                 throw ce;
             }
@@ -2358,8 +2395,8 @@ public abstract class AbstractSession implements CoreSession,
                 allowedStateTransitions = doc.getAllowedStateTransitions();
             } catch (LifeCycleException e) {
                 ClientException ce = new ClientException(
-                        "Unable to get allowed state transitions for document : " +
-                                docRef, e);
+                        "Unable to get allowed state transitions for document : "
+                                + docRef, e);
                 ce.fillInStackTrace();
                 throw ce;
             }
@@ -2579,9 +2616,10 @@ public abstract class AbstractSession implements CoreSession,
         /*
          * -- this cannot resolve unwanted transition 'approved -> project'
          * LifeCycleService lifeCycleService = NXCore.getLifeCycleService();
-         *
+         * 
          * try { String currentLifeCycle =
-         * lifeCycleService.getCurrentLifeCycleState(resolveReference(docToPublish.getRef()));
+         * lifeCycleService.getCurrentLifeCycleState
+         * (resolveReference(docToPublish.getRef()));
          * lifeCycleService.setCurrentLifeCycleState(
          * resolveReference(newProxy.getRef()), currentLifeCycle); } catch
          * (LifeCycleException e) { throw new ClientException(e); } catch
@@ -2737,4 +2775,57 @@ public abstract class AbstractSession implements CoreSession,
         }
     }
 
+    protected static final PathRef EMPTY_PATH = new PathRef("");
+
+    protected void importDocument(DocumentModel docModel)
+            throws DocumentException, ClientException {
+        if (!isAdministrator()) {
+            throw new DocumentSecurityException("Only Administrator can import");
+        }
+        String name = docModel.getName();
+        if (name == null || name.length() == 0) {
+            throw new IllegalArgumentException("Invalid empty name");
+        }
+        String typeName = docModel.getType();
+        if (typeName == null || typeName.length() == 0) {
+            throw new IllegalArgumentException("Invalid empty type");
+        }
+        String id = docModel.getId();
+        if (id == null || id.length() == 0) {
+            throw new IllegalArgumentException("Invalid empty id");
+        }
+        DocumentRef parentRef = docModel.getParentRef();
+        Document parent = parentRef == null || EMPTY_PATH.equals(parentRef) ? null
+                : resolveReference(parentRef);
+        Map<String, Serializable> props = docModel.getContextData().getDefaultScopeValues();
+
+        // create the document
+        Document doc = getSession().importDocument(id, parent, name, typeName,
+                props);
+
+        if (typeName.equals(CoreSession.IMPORT_PROXY_TYPE)) {
+            // just reread the final document
+            docModel = readModel(doc, null);
+        } else {
+            // init document with data from doc model
+            docModel = writeModel(doc, docModel);
+        }
+
+        // send an event about the import
+        notifyEvent(DOCUMENT_IMPORTED, docModel, null, null,
+                null, true);
+    }
+
+    public void importDocuments(List<DocumentModel> docModels)
+            throws ClientException {
+        try {
+            for (DocumentModel docModel : docModels) {
+                importDocument(docModel);
+            }
+        } catch (DocumentException e) {
+            throw new ClientException("Failed to import documents", e);
+        }
+    }
+
+    
 }

@@ -14,21 +14,30 @@
  * Contributors:
  *     Florent Guillaume
  */
-package org.nuxeo.ecm.core.storage.sql.management;
+package org.nuxeo.ecm.core.api;
 
-import org.nuxeo.runtime.management.AbstractResourceFactory;
-import org.nuxeo.runtime.management.ObjectNameFactory;
+import java.io.Serializable;
+import java.util.Map;
 
 /**
+ * An iterable query result.
+ * <p>
+ * The {@link #close()} method MUST be called if the iterator is not consumed
+ * completely, otherwise underlying resources will be leaked.
+ *
  * @author Florent Guillaume
  */
-public class RepositoryStatusFactory extends AbstractResourceFactory {
+public interface IterableQueryResult extends
+        Iterable<Map<String, Serializable>> {
 
-    public void registerResources() {
-        RepositoryStatus instance = new RepositoryStatus();
-        service.registerResource("SQLRepositoryStatus",
-                ObjectNameFactory.formatQualifiedName("SQLStorage"),
-                RepositoryStatusMBean.class, instance);
-    }
+    /**
+     * Closes the underlying resources held by the iterator.
+     */
+    void close();
+
+    /**
+     * Skips to a given point in the iterator.
+     */
+    void skipTo(long skipCount);
 
 }

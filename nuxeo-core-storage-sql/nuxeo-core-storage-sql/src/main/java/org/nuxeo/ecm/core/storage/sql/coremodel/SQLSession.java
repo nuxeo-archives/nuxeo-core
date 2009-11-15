@@ -33,7 +33,6 @@ import java.util.regex.Pattern;
 import javax.resource.ResourceException;
 import javax.transaction.xa.XAResource;
 
-import org.nuxeo.ecm.core.api.ClientException;
 import org.nuxeo.ecm.core.api.CoreSession;
 import org.nuxeo.ecm.core.api.DocumentException;
 import org.nuxeo.ecm.core.api.IterableQueryResult;
@@ -877,7 +876,7 @@ public class SQLSession implements Session {
             for (Node childNode : childNodes) {
                 Property property;
                 // TODO use a better switch
-                if (TypeConstants.isContentType(type)) {
+                if (type != null && type.getName().equals(TypeConstants.CONTENT)) {
                     property = new SQLContentProperty(childNode, complexType,
                             this, readonly);
                 } else {

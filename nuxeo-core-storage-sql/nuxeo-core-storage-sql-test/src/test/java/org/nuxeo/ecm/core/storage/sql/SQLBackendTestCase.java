@@ -19,7 +19,6 @@ package org.nuxeo.ecm.core.storage.sql;
 
 import java.util.Arrays;
 
-import org.nuxeo.ecm.core.event.EventService;
 import org.nuxeo.ecm.core.schema.SchemaManager;
 import org.nuxeo.ecm.core.storage.sql.RepositoryDescriptor.FieldDescriptor;
 import org.nuxeo.runtime.api.Framework;
@@ -59,7 +58,6 @@ public abstract class SQLBackendTestCase extends NXRuntimeTestCase {
 
     @Override
     public void tearDown() throws Exception {
-        Framework.getLocalService(EventService.class).waitForAsyncCompletion();
         if (repository != null) {
             repository.close();
         }

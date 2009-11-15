@@ -82,6 +82,7 @@ public abstract class ComplexProperty extends AbstractProperty implements
 
     public abstract ComplexType getType();
 
+    @SuppressWarnings("unchecked")
     @Override
     public boolean isNormalized(Object value) {
         return value == null || value instanceof Map;
@@ -169,6 +170,19 @@ public abstract class ComplexProperty extends AbstractProperty implements
         }
         return map;
     }
+
+    @Override
+    public Serializable getValueForWrite() throws PropertyException {
+        if (isPhantom() || isRemoved()) {
+            return getDefaultValue();
+        }
+        HashMap<String, Serializable> map = new HashMap<String, Serializable>();
+        for (Property property : getChildren()) {
+            map.put(property.getName(), property.getValueForWrite());
+        }
+        return map;
+    }
+
 
     @Override
     @SuppressWarnings("unchecked")

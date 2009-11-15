@@ -33,15 +33,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.nuxeo.common.utils.StringUtils;
-import org.nuxeo.ecm.core.api.ClientException;
-import org.nuxeo.ecm.core.event.Event;
-import org.nuxeo.ecm.core.event.EventContext;
-import org.nuxeo.ecm.core.event.EventProducer;
-import org.nuxeo.ecm.core.event.impl.EventContextImpl;
 import org.nuxeo.ecm.core.storage.StorageException;
 import org.nuxeo.ecm.core.storage.sql.Model.PropertyInfo;
-import org.nuxeo.ecm.core.storage.sql.coremodel.BinaryTextListener;
-import org.nuxeo.runtime.api.Framework;
 
 /**
  * The persistence context in use by a session.
@@ -66,7 +59,6 @@ public class PersistenceContext {
 
     private final Model model;
 
-    private EventProducer eventProducer;
 
     /**
      * Fragment ids generated but not yet saved. We know that any fragment with
@@ -97,17 +89,6 @@ public class PersistenceContext {
         // are used and need this
         createdIds = new LinkedHashSet<Serializable>();
         oldIdMap = new HashMap<Serializable, Serializable>();
-    }
-
-    protected EventProducer getEventProducer() throws StorageException {
-        if (eventProducer == null) {
-            try {
-                eventProducer = Framework.getService(EventProducer.class);
-            } catch (Exception e) {
-                throw new StorageException("Unable to find EventProducer", e);
-            }
-        }
-        return eventProducer;
     }
 
     /**
@@ -221,17 +202,7 @@ public class PersistenceContext {
         }
 
         if (!dirtyBinaries.isEmpty()) {
-            log.debug("Queued documents for asynchronous fulltext extraction: "
-                    + dirtyBinaries.size());
-            EventContext eventContext = new EventContextImpl(dirtyBinaries,
-                    model.getFulltextInfo());
-            eventContext.setRepositoryName(session.getRepositoryName());
-            Event event = eventContext.newEvent(BinaryTextListener.EVENT_NAME);
-            try {
-                getEventProducer().fireEvent(event);
-            } catch (ClientException e) {
-                throw new StorageException(e);
-            }
+            log.debug("no event sent, full text extraction desactivated (VCS backported from 5.2)");
         }
     }
 

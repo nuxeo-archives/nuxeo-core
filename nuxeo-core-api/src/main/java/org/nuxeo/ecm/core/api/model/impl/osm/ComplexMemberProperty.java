@@ -63,6 +63,7 @@ public class ComplexMemberProperty extends MapProperty implements Adaptable {
     }
 
 
+    @SuppressWarnings("unchecked")
     @Override
     public void setValue(Object value) throws PropertyException {
         if (value instanceof Map) {
@@ -73,6 +74,7 @@ public class ComplexMemberProperty extends MapProperty implements Adaptable {
         }
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public void init(Serializable value) throws PropertyException {
         if (value == null) { // IGNORE null values - properties will be considered PHANTOMS
@@ -99,6 +101,10 @@ public class ComplexMemberProperty extends MapProperty implements Adaptable {
         return (Serializable)adapter.getValue(parent.getValue(), getName());
     }
 
+    @Override
+    public Serializable getValueForWrite() throws PropertyException {
+        return getValue();
+    }
 
     @Override
     protected Property internalGetChild(Field field)

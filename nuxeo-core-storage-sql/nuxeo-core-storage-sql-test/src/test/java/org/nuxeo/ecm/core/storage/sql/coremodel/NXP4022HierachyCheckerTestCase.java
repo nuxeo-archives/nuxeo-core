@@ -62,12 +62,6 @@ public class NXP4022HierachyCheckerTestCase extends SQLRepositoryTestCase {
         session.save();
     }
 
-    public void testExist() throws ClientException {
-        assertTrue("file does not exist",
-                BinaryTextListener.existsWithItsHierarchy(session, rootRef,
-                        fileRef));
-    }
-
     public void testOrphan() throws ClientException {
         CoreSession otherSession = openSessionAs(SecurityConstants.ADMINISTRATOR);
         otherSession.getDocument(fileRef);

@@ -30,6 +30,8 @@ import org.nuxeo.ecm.core.schema.types.Field;
 import org.nuxeo.ecm.core.schema.types.Schema;
 import org.nuxeo.ecm.core.schema.types.Type;
 
+import com.sun.xml.internal.bind.v2.TODO;
+
 /**
  * A document property.
  * <p>
@@ -422,6 +424,17 @@ public interface Property extends Cloneable, Serializable, Iterable<Property> {
      *         true
      */
     Serializable getValue() throws PropertyException;
+
+    /**
+     * Gets the property normalized value for write.
+     * <p>
+     * Can be different fropm {@link #getValue()} in cases where the property
+     * adapts the value it is given to store.
+     *
+     * @return the property value to use for write, which may be null
+     * @since 5.2.1 (backported)
+     */
+    Serializable getValueForWrite() throws PropertyException;
 
     /**
      * Gets the property value as the given type.

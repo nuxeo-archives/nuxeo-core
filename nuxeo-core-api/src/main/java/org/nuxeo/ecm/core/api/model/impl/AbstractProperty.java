@@ -114,7 +114,6 @@ public abstract class AbstractProperty implements Property {
         return getChildren().iterator();
     }
 
-    @SuppressWarnings("unchecked")
     public Serializable remove() throws PropertyException {
         Serializable value = getValue();
         if (parent != null && parent.isList()) { // remove from list is handled separatelly
@@ -339,6 +338,10 @@ public abstract class AbstractProperty implements Property {
             return getDefaultValue();
         }
         return internalGetValue();
+    }
+
+    public Serializable getValueForWrite() throws PropertyException {
+        return getValue();
     }
 
     protected Serializable getDefaultValue() {
