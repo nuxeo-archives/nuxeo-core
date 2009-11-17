@@ -18,13 +18,9 @@
 package org.nuxeo.ecm.core.storage.sql;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -32,9 +28,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.nuxeo.common.utils.StringUtils;
 import org.nuxeo.ecm.core.storage.StorageException;
-import org.nuxeo.ecm.core.storage.sql.Model.PropertyInfo;
 
 /**
  * The persistence context in use by a session.
@@ -160,118 +154,7 @@ public class PersistenceContext {
      * Update fulltext.
      */
     protected void updateFulltext(Session session) throws StorageException {
-        Set<Serializable> dirtyStrings = new HashSet<Serializable>();
-        Set<Serializable> dirtyBinaries = new HashSet<Serializable>();
-        for (Context context : contexts.values()) {
-            context.findDirtyDocuments(dirtyStrings, dirtyBinaries);
-        }
-        if (dirtyStrings.isEmpty() && dirtyBinaries.isEmpty()) {
-            return;
-        }
-
-        // update simpletext on documents with dirty strings
-        for (Serializable docId : dirtyStrings) {
-            if (docId == null) {
-                // cannot happen, but has been observed :(
-                log.error("Got null doc id in fulltext update, cannot happen");
-                continue;
-            }
-            Node document = session.getNodeById(docId);
-            if (document == null) {
-                // cannot happen
-                continue;
-            }
-
-            for (String indexName : model.getFulltextInfo().indexNames) {
-                Set<String> paths;
-                if (model.getFulltextInfo().indexesAllSimple.contains(indexName)) {
-                    // index all string fields, minus excluded ones
-                    // TODO XXX excluded ones...
-                    paths = model.getTypeSimpleTextPropertyPaths(document.getPrimaryType());
-                } else {
-                    // index configured fields
-                    paths = model.getFulltextInfo().propPathsByIndexSimple.get(indexName);
-                }
-                String strings = findFulltext(session, document, paths);
-                // Set the computed full text
-                // On INSERT/UPDATE a trigger will change the actual fulltext
-                String propName = model.FULLTEXT_SIMPLETEXT_PROP
-                        + model.getFulltextIndexSuffix(indexName);
-                document.setSingleProperty(propName, strings);
-            }
-        }
-
-        if (!dirtyBinaries.isEmpty()) {
-            log.debug("no event sent, full text extraction desactivated (VCS backported from 5.2)");
-        }
-    }
-
-    private String findFulltext(Session session, Node document,
-            Set<String> paths) throws StorageException {
-        if (paths == null) {
-            return "";
-        }
-
-        String documentType = document.getPrimaryType();
-        List<String> strings = new LinkedList<String>();
-
-        for (String path : paths) {
-            PropertyInfo pi = model.getPathPropertyInfo(documentType, path);
-            if (pi == null) {
-                continue; // doc type doesn't have this property
-            }
-            if (pi.propertyType != PropertyType.STRING
-                    && pi.propertyType != PropertyType.ARRAY_STRING) {
-                continue;
-            }
-            List<Node> nodes = new ArrayList<Node>(
-                    Collections.singleton(document));
-            String[] names = path.split("/");
-            for (int i = 0; i < names.length; i++) {
-                String name = names[i];
-                List<Node> newNodes;
-                if (i + 1 < names.length && "*".equals(names[i + 1])) {
-                    // traverse complex list
-                    i++;
-                    newNodes = new ArrayList<Node>();
-                    for (Node node : nodes) {
-                        newNodes.addAll(session.getChildren(node, name, true));
-                    }
-                } else {
-                    if (i == names.length - 1) {
-                        // last path component: get value
-                        for (Node node : nodes) {
-                            if (pi.propertyType == PropertyType.STRING) {
-                                String v = node.getSimpleProperty(name).getString();
-                                if (v != null) {
-                                    strings.add(v);
-                                }
-                            } else /* ARRAY_STRING */{
-                                for (Serializable v : node.getCollectionProperty(
-                                        name).getValue()) {
-                                    if (v != null) {
-                                        strings.add((String) v);
-                                    }
-                                }
-                            }
-                        }
-                        newNodes = Collections.emptyList();
-                    } else {
-                        // traverse
-                        newNodes = new ArrayList<Node>(nodes.size());
-                        for (Node node : nodes) {
-                            node = session.getChildNode(node, name, true);
-                            if (node != null) {
-                                newNodes.add(node);
-                            }
-                        }
-                    }
-                }
-                nodes = newNodes;
-            }
-
-        }
-        return StringUtils.join(strings, " ");
+        log.info("No Fulltext indexation (backport form 5.3 branch)");
     }
 
     /**
@@ -319,7 +202,7 @@ public class PersistenceContext {
     protected Invalidations gatherInvalidations() {
         Invalidations invalidations = new Invalidations();
         for (Context context : contexts.values()) {
-            if (context.getTableName().equals(model.FULLTEXT_TABLE_NAME)) {
+            if (context.getTableName().equals(Model.FULLTEXT_TABLE_NAME)) {
                 // hack to avoid gathering invalidations for a write-only table
                 continue;
             }
@@ -495,7 +378,7 @@ public class PersistenceContext {
      */
     public Serializable checkIn(Node node, String label, String description)
             throws StorageException {
-        Boolean checkedIn = (Boolean) node.mainFragment.get(model.MAIN_CHECKED_IN_KEY);
+        Boolean checkedIn = (Boolean) node.mainFragment.get(Model.MAIN_CHECKED_IN_KEY);
         if (Boolean.TRUE.equals(checkedIn)) {
             throw new StorageException("Already checked in");
         }
@@ -512,17 +395,17 @@ public class PersistenceContext {
          * Create a "version" row for our new version.
          */
         Map<String, Serializable> map = new HashMap<String, Serializable>();
-        map.put(model.VERSION_VERSIONABLE_KEY, id);
-        map.put(model.VERSION_CREATED_KEY, new GregorianCalendar()); // now
-        map.put(model.VERSION_LABEL_KEY, label);
-        map.put(model.VERSION_DESCRIPTION_KEY, description);
-        SimpleFragment versionRow = createSimpleFragment(
-                model.VERSION_TABLE_NAME, newId, map);
+        map.put(Model.VERSION_VERSIONABLE_KEY, id);
+        map.put(Model.VERSION_CREATED_KEY, new GregorianCalendar()); // now
+        map.put(Model.VERSION_LABEL_KEY, label);
+        map.put(Model.VERSION_DESCRIPTION_KEY, description);
+        createSimpleFragment(
+                Model.VERSION_TABLE_NAME, newId, map);
         /*
          * Update the original node to reflect that it's checked in.
          */
-        node.mainFragment.put(model.MAIN_CHECKED_IN_KEY, Boolean.TRUE);
-        node.mainFragment.put(model.MAIN_BASE_VERSION_KEY, newId);
+        node.mainFragment.put(Model.MAIN_CHECKED_IN_KEY, Boolean.TRUE);
+        node.mainFragment.put(Model.MAIN_BASE_VERSION_KEY, newId);
         /*
          * Save to reflect changes immediately in database.
          */
@@ -537,14 +420,14 @@ public class PersistenceContext {
      * @throws StorageException
      */
     public void checkOut(Node node) throws StorageException {
-        Boolean checkedIn = (Boolean) node.mainFragment.get(model.MAIN_CHECKED_IN_KEY);
+        Boolean checkedIn = (Boolean) node.mainFragment.get(Model.MAIN_CHECKED_IN_KEY);
         if (!Boolean.TRUE.equals(checkedIn)) {
             throw new StorageException("Already checked out");
         }
         /*
          * Update the node to reflect that it's checked out.
          */
-        node.mainFragment.put(model.MAIN_CHECKED_IN_KEY, Boolean.FALSE);
+        node.mainFragment.put(Model.MAIN_CHECKED_IN_KEY, Boolean.FALSE);
     }
 
     /**
@@ -562,7 +445,7 @@ public class PersistenceContext {
          * Find the version.
          */
         Serializable versionableId = node.getId();
-        Context versionsContext = getContext(model.VERSION_TABLE_NAME);
+        Context versionsContext = getContext(Model.VERSION_TABLE_NAME);
         Serializable versionId = mapper.getVersionByLabel(versionableId, label,
                 versionsContext);
         if (versionId == null) {
@@ -584,19 +467,19 @@ public class PersistenceContext {
         SimpleFragment versionHier = (SimpleFragment) hierContext.get(
                 versionId, false);
         for (String key : model.getFragmentKeysType(model.hierTableName).keySet()) {
-            if (key.equals(model.HIER_PARENT_KEY)
-                    || key.equals(model.HIER_CHILD_NAME_KEY)
-                    || key.equals(model.HIER_CHILD_POS_KEY)
-                    || key.equals(model.HIER_CHILD_ISPROPERTY_KEY)
-                    || key.equals(model.MAIN_PRIMARY_TYPE_KEY)
-                    || key.equals(model.MAIN_CHECKED_IN_KEY)
-                    || key.equals(model.MAIN_BASE_VERSION_KEY)) {
+            if (key.equals(Model.HIER_PARENT_KEY)
+                    || key.equals(Model.HIER_CHILD_NAME_KEY)
+                    || key.equals(Model.HIER_CHILD_POS_KEY)
+                    || key.equals(Model.HIER_CHILD_ISPROPERTY_KEY)
+                    || key.equals(Model.MAIN_PRIMARY_TYPE_KEY)
+                    || key.equals(Model.MAIN_CHECKED_IN_KEY)
+                    || key.equals(Model.MAIN_BASE_VERSION_KEY)) {
                 continue;
             }
             overwriteMap.put(key, versionHier.get(key));
         }
-        overwriteMap.put(model.MAIN_CHECKED_IN_KEY, Boolean.TRUE);
-        overwriteMap.put(model.MAIN_BASE_VERSION_KEY, versionId);
+        overwriteMap.put(Model.MAIN_CHECKED_IN_KEY, Boolean.TRUE);
+        overwriteMap.put(Model.MAIN_BASE_VERSION_KEY, versionId);
         mapper.copyHierarchy(versionId, typeName, node.getParentId(), null,
                 versionableId, overwriteMap, this);
     }
@@ -611,7 +494,7 @@ public class PersistenceContext {
      */
     public Serializable getVersionByLabel(Serializable versionableId,
             String label) throws StorageException {
-        Context versionsContext = getContext(model.VERSION_TABLE_NAME);
+        Context versionsContext = getContext(Model.VERSION_TABLE_NAME);
         return mapper.getVersionByLabel(versionableId, label, versionsContext);
     }
 
@@ -624,7 +507,7 @@ public class PersistenceContext {
      */
     public Serializable getLastVersion(Serializable versionableId)
             throws StorageException {
-        Context versionsContext = getContext(model.VERSION_TABLE_NAME);
+        Context versionsContext = getContext(Model.VERSION_TABLE_NAME);
 
         SimpleFragment result = mapper.getLastVersion(versionableId,
                 versionsContext);
@@ -640,7 +523,7 @@ public class PersistenceContext {
      */
     public List<SimpleFragment> getVersions(Serializable versionableId)
             throws StorageException {
-        Context versionsContext = getContext(model.VERSION_TABLE_NAME);
+        Context versionsContext = getContext(Model.VERSION_TABLE_NAME);
         return mapper.getVersions(versionableId, versionsContext);
     }
 
@@ -673,7 +556,7 @@ public class PersistenceContext {
             byTarget = false;
             if (document.isProxy()) {
                 searchId = document.getSimpleProperty(
-                        model.PROXY_VERSIONABLE_PROP).getString();
+                        Model.PROXY_VERSIONABLE_PROP).getString();
             } else {
                 searchId = document.getId();
             }
@@ -684,7 +567,7 @@ public class PersistenceContext {
         } else {
             parentId = parent.getId();
         }
-        Context proxiesContext = getContext(model.PROXY_TABLE_NAME);
+        Context proxiesContext = getContext(Model.PROXY_TABLE_NAME);
         return mapper.getProxies(searchId, byTarget, parentId, proxiesContext);
     }
 

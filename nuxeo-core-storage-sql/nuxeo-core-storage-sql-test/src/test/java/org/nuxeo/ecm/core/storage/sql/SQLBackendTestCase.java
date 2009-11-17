@@ -37,7 +37,6 @@ public abstract class SQLBackendTestCase extends NXRuntimeTestCase {
     public void setUp() throws Exception {
         super.setUp();
         deployBundle("org.nuxeo.ecm.core.schema");
-        deployBundle("org.nuxeo.ecm.core.event");
         DatabaseHelper.DATABASE.setUp();
         repository = newRepository(-1);
     }

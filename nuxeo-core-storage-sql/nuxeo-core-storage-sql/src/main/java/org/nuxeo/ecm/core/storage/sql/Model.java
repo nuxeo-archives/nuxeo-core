@@ -43,7 +43,6 @@ import org.nuxeo.ecm.core.schema.types.ComplexType;
 import org.nuxeo.ecm.core.schema.types.Field;
 import org.nuxeo.ecm.core.schema.types.ListType;
 import org.nuxeo.ecm.core.schema.types.Schema;
-import org.nuxeo.ecm.core.schema.types.SchemaImpl;
 import org.nuxeo.ecm.core.schema.types.Type;
 import org.nuxeo.ecm.core.schema.types.primitives.BooleanType;
 import org.nuxeo.ecm.core.schema.types.primitives.DateType;
@@ -285,7 +284,6 @@ public class Model {
                     && !fragmentName.equals(MAIN_TABLE_NAME)
                     && !fragmentName.equals(VERSION_TABLE_NAME)
                     && !fragmentName.equals(PROXY_TABLE_NAME)
-                    && !fragmentName.equals(FULLTEXT_TABLE_NAME)
                     && !fragmentName.equals(LOCK_TABLE_NAME)
                     && !fragmentName.equals(UID_SCHEMA_NAME)
                     && !fragmentName.equals(MISC_TABLE_NAME);
@@ -932,6 +930,10 @@ public class Model {
     }
 
     protected void addTypeSimpleFragment(String typeName, String fragmentName) {
+        if ("fulltext".equals(fragmentName)) {
+            return;
+        }
+        
         Set<String> fragments = typeSimpleFragments.get(typeName);
         if (fragments == null) {
             fragments = new HashSet<String>();
@@ -1244,23 +1246,23 @@ public class Model {
      * Special model for the fulltext table.
      */
     private void initFullTextModel() {
-        for (String indexName : fulltextInfo.indexNames) {
-            String suffix = getFulltextIndexSuffix(indexName);
-            if (dialect.getMaterializeFulltextSyntheticColumn()) {
-                addPropertyInfo(null, FULLTEXT_FULLTEXT_PROP + suffix,
-                        PropertyType.STRING, FULLTEXT_TABLE_NAME,
-                        FULLTEXT_FULLTEXT_KEY + suffix, false,
-                        StringType.INSTANCE, ColumnType.FTINDEXED);
-            }
-            addPropertyInfo(null, FULLTEXT_SIMPLETEXT_PROP + suffix,
-                    PropertyType.STRING, FULLTEXT_TABLE_NAME,
-                    FULLTEXT_SIMPLETEXT_KEY + suffix, false,
-                    StringType.INSTANCE, ColumnType.FTSTORED);
-            addPropertyInfo(null, FULLTEXT_BINARYTEXT_PROP + suffix,
-                    PropertyType.STRING, FULLTEXT_TABLE_NAME,
-                    FULLTEXT_BINARYTEXT_KEY + suffix, false,
-                    StringType.INSTANCE, ColumnType.FTSTORED);
-        }
+//        for (String indexName : fulltextInfo.indexNames) {
+//            String suffix = getFulltextIndexSuffix(indexName);
+//            if (dialect.getMaterializeFulltextSyntheticColumn()) {
+//                addPropertyInfo(null, FULLTEXT_FULLTEXT_PROP + suffix,
+//                        PropertyType.STRING, FULLTEXT_TABLE_NAME,
+//                        FULLTEXT_FULLTEXT_KEY + suffix, false,
+//                        StringType.INSTANCE, ColumnType.FTINDEXED);
+//            }
+//            addPropertyInfo(null, FULLTEXT_SIMPLETEXT_PROP + suffix,
+//                    PropertyType.STRING, FULLTEXT_TABLE_NAME,
+//                    FULLTEXT_SIMPLETEXT_KEY + suffix, false,
+//                    StringType.INSTANCE, ColumnType.FTSTORED);
+//            addPropertyInfo(null, FULLTEXT_BINARYTEXT_PROP + suffix,
+//                    PropertyType.STRING, FULLTEXT_TABLE_NAME,
+//                    FULLTEXT_BINARYTEXT_KEY + suffix, false,
+//                    StringType.INSTANCE, ColumnType.FTSTORED);
+//        }
     }
 
     public String getFulltextIndexSuffix(String indexName) {

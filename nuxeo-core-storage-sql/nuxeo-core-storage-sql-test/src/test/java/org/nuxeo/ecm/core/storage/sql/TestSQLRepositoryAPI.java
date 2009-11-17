@@ -1400,24 +1400,29 @@ public class TestSQLRepositoryAPI extends SQLRepositoryTestCase {
         String name = "folder#" + generateUnique();
         DocumentModel childFolder = new DocumentModelImpl(
                 root.getPathAsString(), name, "Folder");
+        childFolder.setPropertyValue("dc:modified", Calendar.getInstance());
         // careless removing this one after the folder would fail
         String name2 = "file#" + generateUnique();
         DocumentModel folderChildFile = new DocumentModelImpl(
                 childFolder.getPathAsString(), name2, "File");
+        folderChildFile.setPropertyValue("dc:modified", Calendar.getInstance());
         // one more File object, whose path is greater than the folder's
         String name3 = "file#" + generateUnique();
         DocumentModel folderChildFile2 = new DocumentModelImpl(
                 childFolder.getPathAsString(), name3, "File");
+        folderChildFile2.setPropertyValue("dc:modified", Calendar.getInstance());
         // one more File object at the root,
         // whose path is greater than the folder's
         String name4 = "file#" + generateUnique();
         DocumentModel childFile = new DocumentModelImpl(root.getPathAsString(),
                 name4, "File");
+        childFile.setPropertyValue("dc:modified", Calendar.getInstance());
         // one more File object at the root, whose path is greater than the
         // folder's and with name conflict resolved by core directly, see
         // NXP-3240
         DocumentModel childFile2 = new DocumentModelImpl(
                 root.getPathAsString(), name4, "File");
+        childFile2.setPropertyValue("dc:modified", Calendar.getInstance());
 
         List<DocumentModel> childDocs = new ArrayList<DocumentModel>();
         childDocs.add(childFolder);
@@ -2896,10 +2901,12 @@ public class TestSQLRepositoryAPI extends SQLRepositoryTestCase {
         session.save();
         assertTrue(proxy2.isProxy());
         assertEquals(1, session.getChildrenRefs(folder.getRef(), null).size());
-        assertEquals(proxy.getId(), proxy2.getId());
+        // in this version of the core, republishing a proxy change the id of the proxy
+        // assertEquals(proxy.getId(), proxy2.getId());
     }
 
-    public void testImport() throws Exception {
+    // import not backported
+    public void xxxtestImport() throws Exception {
         DocumentModel folder = new DocumentModelImpl("/", "folder", "Folder");
         folder.setProperty("dublincore", "title", "the title");
         folder = session.createDocument(folder);
@@ -2926,7 +2933,6 @@ public class TestSQLRepositoryAPI extends SQLRepositoryTestCase {
         ver.setProperty("dublincore", "title", "Ver title");
         Calendar mod = new GregorianCalendar(2008, Calendar.JULY, 14, 12, 34,
                 56);
-        ver.setProperty("dublincore", "modified", mod);
         session.importDocuments(Collections.singletonList(ver));
         session.save();
         closeSession();

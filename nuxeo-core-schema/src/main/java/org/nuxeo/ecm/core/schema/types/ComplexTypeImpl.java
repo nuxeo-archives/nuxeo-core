@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.nuxeo.ecm.core.schema.Namespace;
+import org.nuxeo.ecm.core.schema.TypeConstants;
 import org.nuxeo.ecm.core.schema.TypeRef;
 
 /**
@@ -192,7 +193,13 @@ public class ComplexTypeImpl extends AbstractType implements ComplexType {
 
     @Override
     public Map<String, Object> newInstance() {
-        // XXX AT: should return null for a blob, see NXP-912
+        if (TypeConstants.CONTENT.equals(getName())) {
+            // NXP-912: should return null for a blob. Since there is no
+            // pluggable adapter mechanism on types, and since document model
+            // properties consider that every complex property named "content"
+            // should be dealt with a BlobProperty, this is hardcoded here.
+            return null;
+        }
         Map<String, Object> map = new HashMap<String, Object>();
         for (Field field : fields.values()) {
             Object value;

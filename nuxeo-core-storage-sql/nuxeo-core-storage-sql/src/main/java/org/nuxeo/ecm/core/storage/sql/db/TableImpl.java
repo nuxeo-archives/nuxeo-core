@@ -19,7 +19,6 @@
 
 package org.nuxeo.ecm.core.storage.sql.db;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -123,12 +122,10 @@ public class TableImpl implements Table {
     }
 
     public void addFulltextIndex(String indexName, String... columnNames) {
-        indexedColumns.add(columnNames);
-        fulltextIndexedColumns.put(columnNames, indexName);
     }
 
     public boolean hasFulltextIndex() {
-        return !fulltextIndexedColumns.isEmpty();
+        return false;
     }
 
     /**
@@ -250,29 +247,7 @@ public class TableImpl implements Table {
                 sqls.add(buf.toString());
             }
         }
-        for (String[] columnNames : indexedColumns) {
-            List<Column> cols = new ArrayList<Column>(columnNames.length);
-            List<String> qcols = new ArrayList<String>(columnNames.length);
-            List<String> pcols = new ArrayList<String>(columnNames.length);
-            for (String name : columnNames) {
-                Column col = getColumn(name);
-                cols.add(col);
-                qcols.add(col.getQuotedName());
-                pcols.add(col.getPhysicalName());
-            }
-            String quotedIndexName = dialect.openQuote()
-                    + dialect.getIndexName(name, pcols) + dialect.closeQuote();
-            String createIndexSql;
-            String indexName = fulltextIndexedColumns.get(columnNames);
-            if (indexName != null) {
-                createIndexSql = dialect.getCreateFulltextIndexSql(indexName,
-                        quotedIndexName, this, cols, model);
-            } else {
-                createIndexSql = dialect.getCreateIndexSql(quotedIndexName,
-                        getQuotedName(), qcols);
-            }
-            sqls.add(createIndexSql);
-        }
+
         return sqls;
     }
 

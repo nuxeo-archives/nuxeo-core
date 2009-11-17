@@ -18,6 +18,7 @@
 package org.nuxeo.ecm.core.storage.sql;
 
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -87,10 +88,12 @@ public class TestSQLRepositoryVersioning extends SQLRepositoryTestCase {
 
         DocumentModel folder = new DocumentModelImpl(root.getPathAsString(),
                 "folder#1", "Folder");
+        folder.setPropertyValue("dc:modified", Calendar.getInstance());
         folder = session.createDocument(folder);
 
         DocumentModel file = new DocumentModelImpl(folder.getPathAsString(),
                 "file#1", "File");
+        file.setPropertyValue("dc:modified", Calendar.getInstance());
         file = session.createDocument(file);
 
         checkVersions(file);
@@ -120,10 +123,12 @@ public class TestSQLRepositoryVersioning extends SQLRepositoryTestCase {
 
         DocumentModel folder = new DocumentModelImpl(root.getPathAsString(),
                 "folder#1", "Folder");
+        folder.setPropertyValue("dc:modified", Calendar.getInstance());
         folder = session.createDocument(folder);
 
         DocumentModel file = new DocumentModelImpl(folder.getPathAsString(),
                 "file#1", "File");
+        file.setPropertyValue("dc:modified", Calendar.getInstance());
         file = session.createDocument(file);
 
         createTrioVersions(file);
@@ -149,10 +154,12 @@ public class TestSQLRepositoryVersioning extends SQLRepositoryTestCase {
 
         DocumentModel folder = new DocumentModelImpl(root.getPathAsString(),
                 "folder#1", "Folder");
+        folder.setPropertyValue("dc:modified", Calendar.getInstance());
         folder = session.createDocument(folder);
 
         DocumentModel file = new DocumentModelImpl(folder.getPathAsString(),
                 "file#1", "File");
+        file.setPropertyValue("dc:modified", Calendar.getInstance());
         file = session.createDocument(file);
 
         createTrioVersions(file);
@@ -177,10 +184,12 @@ public class TestSQLRepositoryVersioning extends SQLRepositoryTestCase {
 
         DocumentModel folder = new DocumentModelImpl(root.getPathAsString(),
                 "folder#1", "Folder");
+        folder.setPropertyValue("dc:modified", Calendar.getInstance());
         folder = session.createDocument(folder);
 
         DocumentModel file = new DocumentModelImpl(folder.getPathAsString(),
                 "file#1", "File");
+        file.setPropertyValue("dc:modified", Calendar.getInstance());
         file = session.createDocument(file);
 
         createTrioVersions(file);
@@ -202,6 +211,7 @@ public class TestSQLRepositoryVersioning extends SQLRepositoryTestCase {
     public void testSnapshottingCreateDocument() throws Exception {
         DocumentModel file = new DocumentModelImpl("/", "file", "File");
         file.setProperty("file", "filename", "A");
+        file.setPropertyValue("dc:modified", Calendar.getInstance());
         file = session.createDocument(file);
         // no version yet
         checkVersions(file);
@@ -220,6 +230,7 @@ public class TestSQLRepositoryVersioning extends SQLRepositoryTestCase {
     public void testSnapshotting() throws Exception {
         DocumentModel file = new DocumentModelImpl("/", "file", "File");
         file.setProperty("file", "filename", "A");
+        file.setPropertyValue("dc:modified", Calendar.getInstance());
         file = session.createDocument(file);
         session.save();
         // no version yet

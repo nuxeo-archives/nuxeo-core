@@ -29,7 +29,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
-import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.GregorianCalendar;
@@ -41,7 +40,6 @@ import org.nuxeo.ecm.core.storage.StorageException;
 import org.nuxeo.ecm.core.storage.sql.Binary;
 import org.nuxeo.ecm.core.storage.sql.Model;
 import org.nuxeo.ecm.core.storage.sql.RepositoryDescriptor;
-import org.nuxeo.ecm.core.storage.sql.Model.FulltextInfo;
 import org.nuxeo.ecm.core.storage.sql.db.Column;
 import org.nuxeo.ecm.core.storage.sql.db.ColumnType;
 import org.nuxeo.ecm.core.storage.sql.db.Database;
@@ -457,32 +455,6 @@ public class DialectOracle extends Dialect {
                                 + "  RETURN 0; " //
                                 + "END;" //
                         , idType, declaredType)));
-
-        Table ft = database.getTable(model.FULLTEXT_TABLE_NAME);
-        FulltextInfo fti = model.getFulltextInfo();
-        List<String> lines = new ArrayList<String>(fti.indexNames.size());
-        for (String indexName : fti.indexNames) {
-            String suffix = model.getFulltextIndexSuffix(indexName);
-            Column ftft = ft.getColumn(model.FULLTEXT_FULLTEXT_KEY + suffix);
-            Column ftst = ft.getColumn(model.FULLTEXT_SIMPLETEXT_KEY + suffix);
-            Column ftbt = ft.getColumn(model.FULLTEXT_BINARYTEXT_KEY + suffix);
-            String line = String.format("  :NEW.%s := :NEW.%s || :NEW.%s; ",
-                    ftft.getQuotedName(), ftst.getQuotedName(),
-                    ftbt.getQuotedName());
-            lines.add(line);
-        }
-        statements.add(new ConditionalStatement( //
-                false, // late
-                Boolean.FALSE, // no drop
-                null, //
-                null, //
-                "CREATE OR REPLACE TRIGGER NX_TRIG_FT_UPDATE " //
-                        + "BEFORE INSERT OR UPDATE ON \"FULLTEXT\" "
-                        + "FOR EACH ROW " //
-                        + "BEGIN" //
-                        + StringUtils.join(lines, "") //
-                        + "END;" //
-        ));
 
         return statements;
     }

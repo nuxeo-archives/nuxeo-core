@@ -274,6 +274,9 @@ public abstract class AbstractSession implements CoreSession,
 
     protected final void checkPermission(Document doc, String permission)
             throws DocumentSecurityException, DocumentException {
+        if (isAdministrator()) {
+            return;
+        }
         if (!hasPermission(doc, permission)) {
             throw new DocumentSecurityException("Privilege '" + permission
                     + "' is not granted to '" + getPrincipal().getName() + "'");
@@ -1512,7 +1515,7 @@ public abstract class AbstractSession implements CoreSession,
             }
             String latestRemoved = null;
             for (int i = 0; i < docs.length; i++) {
-                if (i == 0 || !paths[i].startsWith(latestRemoved)) {
+                if (i == 0 || !paths[i].startsWith(latestRemoved + "/")) {
                     removeDocument(docs[i]);
                     latestRemoved = paths[i];
                 }
@@ -1535,12 +1538,11 @@ public abstract class AbstractSession implements CoreSession,
 
     public DocumentModel saveDocument(DocumentModel docModel)
             throws ClientException {
-
-        ConflictVersioningDetector cvd = new ConflictVersioningDetector(
-                docModel);
+//        ConflictVersioningDetector cvd = new ConflictVersioningDetector(
+//                docModel);
 
         try {
-            docModel = cvd.deconflictIncrementVersion();
+//            docModel = cvd.deconflictIncrementVersion();
 
             if (docModel.getRef() == null) {
                 throw new ClientException(String.format(
@@ -1566,7 +1568,8 @@ public abstract class AbstractSession implements CoreSession,
             DocumentModel oldDoc = null;
             // If conflict Detected no snapshot created
             if (createSnapshot != null && createSnapshot
-                    && !cvd.isConflictDetected()) {
+//                    && !cvd.isConflictDetected()) {
+                    ) {
                 // FIXME: remove this - pass the flag as an arg or create
                 // another method!
                 save(); // creating versions fails if the documents involved
@@ -1609,7 +1612,7 @@ public abstract class AbstractSession implements CoreSession,
             throw new ClientException("Failed to save document " + docModel, e);
         } finally {
             // Inform that the "transaction" is finished
-            cvd.setConflictTransactionFinished();
+//            cvd.setConflictTransactionFinished();
         }
 
         return docModel;

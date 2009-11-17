@@ -529,21 +529,21 @@ public class SQLInfo {
                 new String[] { model.PROXY_TARGET_KEY }, hierTable,
                 new String[] { model.HIER_PARENT_KEY });
 
-        /*
-         * fulltext
-         */
-        table = database.getTable(model.FULLTEXT_TABLE_NAME);
-        for (String indexName : model.getFulltextInfo().indexNames) {
-            String suffix = model.getFulltextIndexSuffix(indexName);
-            int ftic = dialect.getFulltextIndexedColumns();
-            if (ftic == 1) {
-                table.addFulltextIndex(indexName, model.FULLTEXT_FULLTEXT_KEY
-                        + suffix);
-            } else if (ftic == 2) {
-                table.addFulltextIndex(indexName, model.FULLTEXT_SIMPLETEXT_KEY
-                        + suffix, model.FULLTEXT_BINARYTEXT_KEY + suffix);
-            }
-        }
+//        /*
+//         * fulltext
+//         */
+//        table = database.getTable(model.FULLTEXT_TABLE_NAME);
+//        for (String indexName : model.getFulltextInfo().indexNames) {
+//            String suffix = model.getFulltextIndexSuffix(indexName);
+//            int ftic = dialect.getFulltextIndexedColumns();
+//            if (ftic == 1) {
+//                table.addFulltextIndex(indexName, model.FULLTEXT_FULLTEXT_KEY
+//                        + suffix);
+//            } else if (ftic == 2) {
+//                table.addFulltextIndex(indexName, model.FULLTEXT_SIMPLETEXT_KEY
+//                        + suffix, model.FULLTEXT_BINARYTEXT_KEY + suffix);
+//            }
+//        }
     }
 
     protected void initClusterSQL() throws StorageException {

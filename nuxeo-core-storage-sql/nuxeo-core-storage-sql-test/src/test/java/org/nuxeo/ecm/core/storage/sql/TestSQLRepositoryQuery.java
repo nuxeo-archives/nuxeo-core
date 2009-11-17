@@ -29,7 +29,7 @@ public class TestSQLRepositoryQuery extends QueryTestCase {
         DatabaseHelper.DATABASE.setUp();
         deployContrib("org.nuxeo.ecm.core.storage.sql.test",
                 DatabaseHelper.DATABASE.getDeploymentContrib());
-        deployBundle("org.nuxeo.ecm.core.event");
+//        deployBundle("org.nuxeo.ecm.core.event");
     }
 
     @Override

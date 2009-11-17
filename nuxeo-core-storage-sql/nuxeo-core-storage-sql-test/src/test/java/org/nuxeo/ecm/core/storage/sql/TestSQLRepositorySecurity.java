@@ -17,6 +17,7 @@
 
 package org.nuxeo.ecm.core.storage.sql;
 
+import java.util.Calendar;
 import java.util.List;
 
 import junit.framework.Assert;
@@ -325,7 +326,7 @@ public class TestSQLRepositorySecurity extends SQLRepositoryTestCase {
 
     // copied from TestAPI in nuxeo-core-facade
 
-    public void testPermissionChecks() throws Throwable {
+    public void testPermissionChecks1() throws Throwable {
 
         CoreSession joeReaderSession = null;
         CoreSession joeContributorSession = null;
@@ -340,21 +341,153 @@ public class TestSQLRepositorySecurity extends SQLRepositoryTestCase {
             try {
                 joeReaderSession.saveDocument(joeReaderDoc);
                 fail("should have raised a security exception");
-            } catch (DocumentSecurityException e) {
+            } catch (ClientException e) {
             }
+        } finally {
+            Throwable rethrow = null;
+            if (joeReaderSession != null) {
+                try {
+                    closeSession(joeReaderSession);
+                } catch (Throwable t) {
+                    rethrow = t;
+                }
+            }
+            if (joeContributorSession != null) {
+                try {
+                    closeSession(joeContributorSession);
+                } catch (Throwable t) {
+                    if (rethrow == null) {
+                        rethrow = t;
+                    }
+                }
+            }
+            if (joeLocalManagerSession != null) {
+                try {
+                    closeSession(joeLocalManagerSession);
+                } catch (Throwable t) {
+                    if (rethrow == null) {
+                        rethrow = t;
+                    }
+                }
+            }
+            if (rethrow != null) {
+                throw rethrow;
+            }
+        }
+    }
 
-            try {
-                joeReaderSession.createDocument(new DocumentModelImpl(
-                        joeReaderDoc.getPathAsString(), "child", "File"));
-                fail("should have raised a security exception");
-            } catch (DocumentSecurityException e) {
+    public void testPermissionChecks2() throws Throwable {
+
+        CoreSession joeReaderSession = null;
+        CoreSession joeContributorSession = null;
+        CoreSession joeLocalManagerSession = null;
+
+        DocumentRef ref = createDocumentModelWithSamplePermissions("docWithPerms");
+
+        try {
+            joeReaderSession = openSessionAs("joe_reader");
+            DocumentModel joeReaderDoc = joeReaderSession.getDocument(ref);
+
+            joeReaderSession.createDocument(new DocumentModelImpl(
+                    joeReaderDoc.getPathAsString(), "child", "File"));
+            fail("should have raised a security exception");
+        } catch (ClientException e) {
+        } finally {
+            Throwable rethrow = null;
+            if (joeReaderSession != null) {
+                try {
+                    closeSession(joeReaderSession);
+                } catch (Throwable t) {
+                    rethrow = t;
+                }
             }
+            if (joeContributorSession != null) {
+                try {
+                    closeSession(joeContributorSession);
+                } catch (Throwable t) {
+                    if (rethrow == null) {
+                        rethrow = t;
+                    }
+                }
+            }
+            if (joeLocalManagerSession != null) {
+                try {
+                    closeSession(joeLocalManagerSession);
+                } catch (Throwable t) {
+                    if (rethrow == null) {
+                        rethrow = t;
+                    }
+                }
+            }
+            if (rethrow != null) {
+                throw rethrow;
+            }
+        }
+    }
+    
+    public void testPermissionChecks3() throws Throwable {
+
+        CoreSession joeReaderSession = null;
+        CoreSession joeContributorSession = null;
+        CoreSession joeLocalManagerSession = null;
+
+        DocumentRef ref = createDocumentModelWithSamplePermissions("docWithPerms");
+
+        try {
+            joeReaderSession = openSessionAs("joe_reader");
+            DocumentModel joeReaderDoc = joeReaderSession.getDocument(ref);
+
 
             try {
                 joeReaderSession.removeDocument(ref);
                 fail("should have raised a security exception");
-            } catch (DocumentSecurityException e) {
+            } catch (ClientException e) {}
+            
+        } finally {
+            Throwable rethrow = null;
+            if (joeReaderSession != null) {
+                try {
+                    closeSession(joeReaderSession);
+                } catch (Throwable t) {
+                    rethrow = t;
+                }
             }
+            if (joeContributorSession != null) {
+                try {
+                    closeSession(joeContributorSession);
+                } catch (Throwable t) {
+                    if (rethrow == null) {
+                        rethrow = t;
+                    }
+                }
+            }
+            if (joeLocalManagerSession != null) {
+                try {
+                    closeSession(joeLocalManagerSession);
+                } catch (Throwable t) {
+                    if (rethrow == null) {
+                        rethrow = t;
+                    }
+                }
+            }
+            if (rethrow != null) {
+                throw rethrow;
+            }
+        }
+    }
+    
+    public void testPermissionChecks4() throws Throwable {
+
+        CoreSession joeReaderSession = null;
+        CoreSession joeContributorSession = null;
+        CoreSession joeLocalManagerSession = null;
+
+        DocumentRef ref = createDocumentModelWithSamplePermissions("docWithPerms");
+
+        try {
+            joeReaderSession = openSessionAs("joe_reader");
+            DocumentModel joeReaderDoc = joeReaderSession.getDocument(ref);
+
             joeReaderSession.save();
 
             // contributor only has the right to write the properties of
@@ -376,17 +509,190 @@ public class TestSQLRepositorySecurity extends SQLRepositoryTestCase {
             try {
                 joeContributorSession.move(childRef, ref, "child_move");
                 fail("should have raised a security exception");
-            } catch (DocumentSecurityException e) {
+            } catch (ClientException e) {
+            }        } catch (ClientException e) {
+        } finally {
+            Throwable rethrow = null;
+            if (joeReaderSession != null) {
+                try {
+                    closeSession(joeReaderSession);
+                } catch (Throwable t) {
+                    rethrow = t;
+                }
+            }
+            if (joeContributorSession != null) {
+                try {
+                    closeSession(joeContributorSession);
+                } catch (Throwable t) {
+                    if (rethrow == null) {
+                        rethrow = t;
+                    }
+                }
+            }
+            if (joeLocalManagerSession != null) {
+                try {
+                    closeSession(joeLocalManagerSession);
+                } catch (Throwable t) {
+                    if (rethrow == null) {
+                        rethrow = t;
+                    }
+                }
+            }
+            if (rethrow != null) {
+                throw rethrow;
+            }
+        }
+    }
+
+
+    public void testPermissionChecks5() throws Throwable {
+
+        CoreSession joeReaderSession = null;
+        CoreSession joeContributorSession = null;
+        CoreSession joeLocalManagerSession = null;
+
+        DocumentRef ref = createDocumentModelWithSamplePermissions("docWithPerms");
+
+        try {
+            joeReaderSession = openSessionAs("joe_reader");
+            DocumentModel joeReaderDoc = joeReaderSession.getDocument(ref);
+
+
+            joeReaderSession.save();
+
+            // contributor only has the right to write the properties of
+            // document
+            joeContributorSession = openSessionAs("joe_contributor");
+            DocumentModel joeContributorDoc = joeContributorSession.getDocument(ref);
+
+            joeContributorSession.saveDocument(joeContributorDoc);
+
+            DocumentRef childRef = joeContributorSession.createDocument(
+                    new DocumentModelImpl(joeContributorDoc.getPathAsString(),
+                            "child", "File")).getRef();
+            joeContributorSession.save();
+
+            // joe contributor can copy the newly created doc
+            joeContributorSession.copy(childRef, ref, "child_copy");
+
+            // joe contributor cannot move the doc
+            try {
+                joeContributorSession.move(childRef, ref, "child_move");
+                fail("should have raised a security exception");
+            } catch (ClientException e) {
             }
 
             // joe contributor cannot remove the folder either
             try {
                 joeContributorSession.removeDocument(ref);
                 fail("should have raised a security exception");
-            } catch (DocumentSecurityException e) {
+            } catch (ClientException e) {
             }
+        } catch (ClientException e) {
+        } finally {
+            Throwable rethrow = null;
+            if (joeReaderSession != null) {
+                try {
+                    closeSession(joeReaderSession);
+                } catch (Throwable t) {
+                    rethrow = t;
+                }
+            }
+            if (joeContributorSession != null) {
+                try {
+                    closeSession(joeContributorSession);
+                } catch (Throwable t) {
+                    if (rethrow == null) {
+                        rethrow = t;
+                    }
+                }
+            }
+            if (joeLocalManagerSession != null) {
+                try {
+                    closeSession(joeLocalManagerSession);
+                } catch (Throwable t) {
+                    if (rethrow == null) {
+                        rethrow = t;
+                    }
+                }
+            }
+            if (rethrow != null) {
+                throw rethrow;
+            }
+        }
+    }
+    
+    public void testPermissionChecks6() throws Throwable {
+
+        CoreSession joeReaderSession = null;
+        CoreSession joeContributorSession = null;
+        CoreSession joeLocalManagerSession = null;
+
+        DocumentRef ref = createDocumentModelWithSamplePermissions("docWithPerms");
+
+        try {
+            joeReaderSession = openSessionAs("joe_reader");
+
+            joeReaderSession.save();
+
+            // contributor only has the right to write the properties of
+            // document
+            joeContributorSession = openSessionAs("joe_contributor");
+            DocumentModel joeContributorDoc = joeContributorSession.getDocument(ref);
+
+            joeContributorSession.saveDocument(joeContributorDoc);
+
+            DocumentRef childRef = joeContributorSession.createDocument(
+                    new DocumentModelImpl(joeContributorDoc.getPathAsString(),
+                            "child", "File")).getRef();
+            joeContributorSession.save();
+
+            // joe contributor can copy the newly created doc
+            joeContributorSession.copy(childRef, ref, "child_copy");
 
             joeContributorSession.save();
+
+        } finally {
+            Throwable rethrow = null;
+            if (joeReaderSession != null) {
+                try {
+                    closeSession(joeReaderSession);
+                } catch (Throwable t) {
+                    rethrow = t;
+                }
+            }
+            if (joeContributorSession != null) {
+                try {
+                    closeSession(joeContributorSession);
+                } catch (Throwable t) {
+                    if (rethrow == null) {
+                        rethrow = t;
+                    }
+                }
+            }
+            if (joeLocalManagerSession != null) {
+                try {
+                    closeSession(joeLocalManagerSession);
+                } catch (Throwable t) {
+                    if (rethrow == null) {
+                        rethrow = t;
+                    }
+                }
+            }
+            if (rethrow != null) {
+                throw rethrow;
+            }
+        }
+    }
+    public void testPermissionChecks7() throws Throwable {
+
+        CoreSession joeReaderSession = null;
+        CoreSession joeContributorSession = null;
+        CoreSession joeLocalManagerSession = null;
+
+        DocumentRef ref = createDocumentModelWithSamplePermissions("docWithPerms");
+
+        try {
 
             // local manager can read, write, create and remove
             joeLocalManagerSession = openSessionAs("joe_localmanager");
@@ -394,7 +700,7 @@ public class TestSQLRepositorySecurity extends SQLRepositoryTestCase {
 
             joeLocalManagerSession.saveDocument(joeLocalManagerDoc);
 
-            childRef = joeLocalManagerSession.createDocument(
+            DocumentRef childRef = joeLocalManagerSession.createDocument(
                     new DocumentModelImpl(joeLocalManagerDoc.getPathAsString(),
                             "child2", "File")).getRef();
             joeLocalManagerSession.save();
@@ -407,7 +713,6 @@ public class TestSQLRepositorySecurity extends SQLRepositoryTestCase {
 
             joeLocalManagerSession.removeDocument(ref);
             joeLocalManagerSession.save();
-
         } finally {
             Throwable rethrow = null;
             if (joeReaderSession != null) {
@@ -446,6 +751,7 @@ public class TestSQLRepositorySecurity extends SQLRepositoryTestCase {
         DocumentModel root = session.getRootDocument();
         DocumentModel doc = new DocumentModelImpl(root.getPathAsString(), name,
                 "Folder");
+        doc.setPropertyValue("dc:modified", Calendar.getInstance());
         doc = session.createDocument(doc);
 
         ACP acp = doc.getACP();

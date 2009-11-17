@@ -429,14 +429,7 @@ public class DialectH2 extends Dialect {
         statements.add(makeFunction("NX_INIT_DESCENDANTS", //
                 "initDescendants"));
 
-        statements.add(new ConditionalStatement( //
-                true, // early
-                Boolean.FALSE, // no drop
-                null, //
-                null, //
-                String.format(
-                        "CREATE ALIAS IF NOT EXISTS NXFT_INIT FOR \"%s.init\"; "
-                                + "CALL NXFT_INIT()", h2Fulltext)));
+        // fulltext desactivation
 
         statements.add(makeTrigger("NX_TRIG_DESC", ht.getQuotedName(),
                 h2TrigDesc));
