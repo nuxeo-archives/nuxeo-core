@@ -41,6 +41,8 @@ public class FileBlob extends DefaultStreamBlob implements Serializable {
     private static final long serialVersionUID = 373720300515677319L;
 
     protected transient File file;
+    
+    protected String format;
 
     public FileBlob(File file) {
         this(file, null, null);
@@ -65,16 +67,22 @@ public class FileBlob extends DefaultStreamBlob implements Serializable {
     public FileBlob(InputStream in) throws IOException {
         this(in, null, null);
     }
+    
     public FileBlob(InputStream in, String ctype) throws IOException {
         this(in, ctype, null);
     }
 
     public FileBlob(InputStream in, String mimeType, String encoding) throws IOException {
+        this(in, mimeType, encoding, null);
+    }
+    
+    public FileBlob(InputStream in, String mimeType, String encoding, String format) throws IOException {
         this.mimeType = mimeType;
         this.encoding = encoding;
+        this.format = format;
         OutputStream out = null;
         try {
-            file = File.createTempFile("NXCore-FileBlob-", ".tmp");
+            file = File.createTempFile("NXCore-FileBlob-", "." + (format != null ? format : "tmp"));
             file.deleteOnExit();
             out = new FileOutputStream(file);
             copy(in, out);
@@ -87,7 +95,7 @@ public class FileBlob extends DefaultStreamBlob implements Serializable {
                 out.close();
             }
         }
-    }
+    }    
 
     public File getFile() {
         return file;
@@ -115,7 +123,7 @@ public class FileBlob extends DefaultStreamBlob implements Serializable {
         // always perform the default de-serialization first
         in.defaultReadObject();
         // create a temp file where we will put the blob content
-        file = File.createTempFile("NXCore-FileBlob-", ".tmp");
+        file = File.createTempFile("NXCore-FileBlob-",  "." + (format != null ? format : "tmp"));
         file.deleteOnExit();
         OutputStream out = null;
         try {
@@ -162,7 +170,7 @@ public class FileBlob extends DefaultStreamBlob implements Serializable {
     protected void finalize() throws Throwable {
         if (file != null) {
             String name = file.getName();
-            if (name.startsWith("NXCore-FileBlob-") && name.endsWith(".tmp")) {
+            if (name.startsWith("NXCore-FileBlob-") && name.endsWith( "." + (format != null ? format : "tmp"))) {
                 file.delete();
             }
         }
