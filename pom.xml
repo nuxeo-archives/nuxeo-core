@@ -21,6 +21,8 @@
     <nuxeo.runtime.version>1.4.3</nuxeo.runtime.version>
     <nuxeo.common.version>1.4.3</nuxeo.common.version>
     <nuxeo.core.version>1.4.3.2-SNAPSHOT</nuxeo.core.version>
+    <nuxeo.core.jcr.version>1.4.3</nuxeo.core.jcr.version>
+
     <jackrabbit.version>1.3.3</jackrabbit.version>
   </properties>
 
@@ -70,7 +72,7 @@
       <!--dependency>
         <groupId>org.nuxeo.ecm.core</groupId>
         <artifactId>nuxeo-core-jcr-connector</artifactId>
-        <version>${nuxeo.core.version}</version>
+        <version>${nuxeo.core.jcr.version}</version>
       </dependency-->
       <dependency>
         <groupId>org.nuxeo.ecm.core</groupId>
@@ -95,7 +97,7 @@
       <!--dependency>
         <groupId>org.nuxeo.ecm.core</groupId>
         <artifactId>nuxeo-core-jcr-connector</artifactId>
-        <version>${nuxeo.core.version}</version>
+        <version>${nuxeo.core.jcr.version}</version>
       </dependency-->
       <dependency>
         <groupId>org.nuxeo.ecm.core</groupId>
@@ -187,7 +189,7 @@
         <groupId>org.nuxeo.ecm.core</groupId>
         <artifactId>nuxeo-core-jcr-connector-test</artifactId>
         <scope>test</scope>
-        <version>${nuxeo.core.version}</version>
+        <version>${nuxeo.core.jcr.version}</version>
       </dependency>
 
       <dependency>

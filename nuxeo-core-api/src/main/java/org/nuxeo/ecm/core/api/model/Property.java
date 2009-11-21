@@ -30,8 +30,6 @@ import org.nuxeo.ecm.core.schema.types.Field;
 import org.nuxeo.ecm.core.schema.types.Schema;
 import org.nuxeo.ecm.core.schema.types.Type;
 
-import com.sun.xml.internal.bind.v2.TODO;
-
 /**
  * A document property.
  * <p>
