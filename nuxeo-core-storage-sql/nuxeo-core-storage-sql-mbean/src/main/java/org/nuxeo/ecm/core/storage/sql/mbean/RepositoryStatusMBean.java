@@ -15,38 +15,26 @@
  *     Florent Guillaume
  */
 
-package org.nuxeo.ecm.core.storage.sql;
+package org.nuxeo.ecm.core.storage.sql.mbean;
 
 /**
  * @author Florent Guillaume
  */
-public interface RepositoryManagement {
+public interface RepositoryStatusMBean {
 
     /**
-     * Gets the repository name.
+     * Lists the opened sessions.
      */
-    String getName();
+    String listActiveSessions();
 
     /**
-     * Gets the number of active sessions.
+     * Clears the caches.
      */
-    int getActiveSessionsCount();
+    String clearCaches();
 
     /**
-     * Clears all the caches.
-     *
-     * @return an indicative count of objects removed
+     * Ask to clear Core Caches
      */
-    int clearCaches();
-
-    /**
-     * Makes sure that the next transaction will process cluster invalidations.
-     */
-    void processClusterInvalidationsNext();
-    
-    /**
-     * Ask to clear cache of each context after the next
-     */
-    int markForCacheClearing();
+    String markForCacheClearing();
 
 }

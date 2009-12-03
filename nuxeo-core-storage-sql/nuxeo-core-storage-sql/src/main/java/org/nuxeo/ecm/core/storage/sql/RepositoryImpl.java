@@ -221,6 +221,13 @@ public class RepositoryImpl implements Repository {
         return n;
     }
 
+    public int markForCacheClearing() {
+        for (SessionImpl session : sessions) {
+            session.markForCacheClearing();
+        }
+        return sessions.size();
+    }
+
     public void processClusterInvalidationsNext() {
         clusterLastInvalidationTimeMillis = System.currentTimeMillis()
                 - repositoryDescriptor.clusteringDelay - 1;

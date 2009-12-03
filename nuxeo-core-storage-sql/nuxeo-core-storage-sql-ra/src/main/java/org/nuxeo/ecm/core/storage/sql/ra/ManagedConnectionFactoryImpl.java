@@ -322,4 +322,8 @@ public class ManagedConnectionFactoryImpl implements ManagedConnectionFactory,
         return props;
     }
 
+    public int markForCacheClearing() {
+        return repository.markForCacheClearing();
+    }
+    
 }

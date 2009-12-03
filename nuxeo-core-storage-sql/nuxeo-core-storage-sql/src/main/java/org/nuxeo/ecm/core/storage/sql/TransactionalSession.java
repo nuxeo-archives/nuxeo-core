@@ -23,6 +23,7 @@ import javax.transaction.xa.Xid;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.nuxeo.ecm.core.storage.StorageException;
 
 /**
  * The transactional session is an {@link XAResource} for this session.
@@ -103,15 +104,14 @@ public class TransactionalSession implements XAResource {
             mapper.commit(xid, onePhase);
         } finally {
             inTransaction = false;
-            try {
+            if (session.isMarkedForCacheClearing()) {
+                session.clearCache();
+            } else {
                 try {
                     session.sendInvalidationsToOthers();
-                } finally {
-                    session.checkThreadEnd();
+                } catch (StorageException e) {
+                    throw (XAException) new XAException(XAException.XAER_RMERR).initCause(e);
                 }
-            } catch (Exception e) {
-                log.error("Could not commit transaction", e);
-                throw (XAException) new XAException(XAException.XAER_RMERR).initCause(e);
             }
         }
     }

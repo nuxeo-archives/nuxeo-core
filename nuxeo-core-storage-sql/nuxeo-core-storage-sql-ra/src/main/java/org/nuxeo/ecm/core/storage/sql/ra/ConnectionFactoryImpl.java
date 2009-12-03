@@ -297,6 +297,10 @@ public class ConnectionFactoryImpl implements Repository,
         managedConnectionFactory.processClusterInvalidationsNext();
     }
 
+    public int markForCacheClearing() {
+        return managedConnectionFactory.markForCacheClearing();
+    }
+
     public boolean supportsTags() {
         return true;
     }

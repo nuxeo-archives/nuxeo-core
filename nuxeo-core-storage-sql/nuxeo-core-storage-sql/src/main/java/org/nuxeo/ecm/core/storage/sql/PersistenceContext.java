@@ -583,4 +583,7 @@ public class PersistenceContext {
         return hierContext.getContainingDocument(id);
     }
 
+    public boolean isMarkedForCacheClearing() {
+        return false;
+    }
 }

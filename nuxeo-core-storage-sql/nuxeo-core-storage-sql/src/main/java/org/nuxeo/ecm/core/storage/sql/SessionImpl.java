@@ -74,6 +74,8 @@ public class SessionImpl implements Session {
     private final TransactionalSession transactionalSession;
 
     private Node rootNode;
+    
+    protected boolean isMarkedForCacheClearing;
 
     private long threadId;
 
@@ -111,9 +113,11 @@ public class SessionImpl implements Session {
             // avoid potential multi-threaded access to active session
             return 0;
         }
-        int n = context.clearCaches();
+        
+        int cacheNumberCleared = context.clearCaches();
         checkThreadEnd();
-        return n;
+        isMarkedForCacheClearing = false;
+        return cacheNumberCleared;
     }
 
     protected void checkThread() {
@@ -812,6 +816,20 @@ public class SessionImpl implements Session {
         checkLive();
         // TODO Auto-generated method stub
         throw new RuntimeException("Not implemented");
+    }
+    
+    public void markForCacheClearing() {
+        isMarkedForCacheClearing = true;
+    }
+
+    public int clearCache() {
+        int result = context.clearCaches();
+        isMarkedForCacheClearing = false;
+        return result;
+    }
+
+    public boolean isMarkedForCacheClearing() {
+        return isMarkedForCacheClearing;
     }
 
 }
