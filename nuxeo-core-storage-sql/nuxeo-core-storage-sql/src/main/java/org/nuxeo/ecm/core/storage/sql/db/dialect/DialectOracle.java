@@ -52,6 +52,12 @@ public class DialectOracle extends Dialect {
     }
 
     @Override
+    /* Avoid DRG-11439: index name length exceeds maximum of 25 bytes */
+    protected int getMaxIndexNameSize() {
+        return 25;
+    }
+
+    @Override
     public String getTypeName(int sqlType, int length, int precision, int scale) {
         if (sqlType == Column.ExtendedTypes.FULLTEXT) {
             return "CLOB";
