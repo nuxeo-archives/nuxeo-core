@@ -517,7 +517,7 @@ public class NXQLQueryMaker implements QueryMaker {
             select.setWhat(hier.getColumn(model.MAIN_KEY).getQuotedName());
             String from = '(' + StringUtils.join(statements, " UNION ALL ") + ')';
             if (dialect.needsAliasForDerivedTable()) {
-                from += " AS _T";
+                from += " AS " + dialect.openQuote() + "_T" + dialect.closeQuote();
             }
             select.setFrom(from);
         }

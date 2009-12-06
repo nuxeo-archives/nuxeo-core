@@ -90,6 +90,11 @@ public class DialectDerby extends Dialect {
     }
 
     @Override
+    public boolean needsAliasForDerivedTable() {
+        return true;
+    }
+
+    @Override
     public String getClobCast(boolean inOrderBy) {
         return "CAST(%s AS VARCHAR(%d))";
     }
