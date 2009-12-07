@@ -17,7 +17,14 @@
 
 package org.nuxeo.ecm.core.storage.sql.coremodel;
 
+import java.util.Collection;
+import java.util.Collections;
+
+import org.nuxeo.ecm.core.NXCore;
 import org.nuxeo.ecm.core.api.DocumentException;
+import org.nuxeo.ecm.core.lifecycle.LifeCycle;
+import org.nuxeo.ecm.core.lifecycle.LifeCycleException;
+import org.nuxeo.ecm.core.lifecycle.LifeCycleService;
 import org.nuxeo.ecm.core.model.Document;
 import org.nuxeo.ecm.core.model.DocumentVersionProxy;
 import org.nuxeo.ecm.core.schema.types.ComplexType;
@@ -77,6 +84,23 @@ public class SQLDocumentProxy extends SQLDocumentVersion implements
     // API unused
     public void updateToBaseVersion() {
         throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Collection<String> getAllowedStateTransitions() {
+        try {
+            LifeCycleService service = NXCore.getLifeCycleService();
+            if (service == null) {
+                throw new LifeCycleException("LifeCycleService not available");
+            }
+            LifeCycle lifeCycle = service.getLifeCycleFor(this);
+            if (lifeCycle == null) {
+                return Collections.emptyList();
+            }
+            return lifeCycle.getAllowedStateTransitionsFrom(getCurrentLifeCycleState());
+        } catch (LifeCycleException e) {
+            return super.getAllowedStateTransitions();
+        }
     }
 
     /*

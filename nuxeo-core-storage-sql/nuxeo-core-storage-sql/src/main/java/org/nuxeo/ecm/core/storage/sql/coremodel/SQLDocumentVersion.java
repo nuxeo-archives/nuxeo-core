@@ -240,7 +240,7 @@ public class SQLDocumentVersion extends SQLDocument implements DocumentVersion {
     @Override
     public void setPropertyValue(String name, Object value)
             throws DocumentException {
-        if (readonly) {
+        if (readonly && !Model.MISC_LIFECYCLE_STATE_PROP.equals(name)) {
             throw new UnsupportedOperationException();
         } else {
             // import
@@ -249,8 +249,12 @@ public class SQLDocumentVersion extends SQLDocument implements DocumentVersion {
     }
 
     @Override
-    public void setString(String name, String value) {
-        throw new UnsupportedOperationException();
+    public void setString(String name, String value) throws DocumentException {
+        if (Model.MISC_LIFECYCLE_STATE_PROP.equals(name)) {
+            super.setString(name, value);
+        } else {
+            throw new UnsupportedOperationException();
+        }
     }
 
     @Override
@@ -300,7 +304,7 @@ public class SQLDocumentVersion extends SQLDocument implements DocumentVersion {
     @Override
     public boolean followTransition(String transition)
             throws LifeCycleException {
-        throw new LifeCycleException("Cannot follow lifecycle transitions");
+        return super.followTransition(transition);
     }
 
     /*
