@@ -24,6 +24,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 import org.hibernate.dialect.H2Dialect;
+import org.nuxeo.common.utils.StringUtils;
 import org.nuxeo.ecm.core.storage.StorageException;
 import org.nuxeo.ecm.core.storage.sql.Model;
 import org.nuxeo.ecm.core.storage.sql.RepositoryDescriptor;
@@ -52,7 +53,11 @@ public class DialectH2 extends Dialect {
     @Override
     public String getCreateFulltextIndexSql(String indexName, String tableName,
             List<String> columnNames) {
-        return null; // no SQL index for H2
+        // Get rid of quoted names while building this SQL query
+        return String.format(
+                "CALL NXFT_CREATE_INDEX('PUBLIC', '%s', (%s), '%s')",
+                tableName.replaceAll("\"", ""), StringUtils.join(columnNames,
+                        ", ").replaceAll("\"", "'"), fulltextAnalyzer);
     }
 
     @Override
@@ -66,7 +71,7 @@ public class DialectH2 extends Dialect {
 
     @Override
     public int getFulltextIndexedColumns() {
-        return 0;
+        return 2;
     }
 
     @Override
@@ -125,9 +130,6 @@ public class DialectH2 extends Dialect {
         default:
             throw new AssertionError(model.idGenPolicy);
         }
-        Table ft = database.getTable(model.FULLTEXT_TABLE_NAME);
-        Column ftst = ft.getColumn(model.FULLTEXT_SIMPLETEXT_KEY);
-        Column ftbt = ft.getColumn(model.FULLTEXT_BINARYTEXT_KEY);
 
         List<ConditionalStatement> statements = new LinkedList<ConditionalStatement>();
 
@@ -144,23 +146,13 @@ public class DialectH2 extends Dialect {
                 "getClusterInvalidations" + methodSuffix));
 
         statements.add(new ConditionalStatement( //
-                false, // late
+                true, // early
                 Boolean.FALSE, // no drop
                 null, //
                 null, //
                 String.format(
                         "CREATE ALIAS IF NOT EXISTS NXFT_INIT FOR \"%s.init\"; "
                                 + "CALL NXFT_INIT()", h2Fulltext)));
-
-        statements.add(new ConditionalStatement(
-                false, // late
-                Boolean.FALSE, // no drop
-                null, //
-                null, //
-                String.format(
-                        "CALL NXFT_CREATE_INDEX('PUBLIC', '%s', ('%s', '%s'), '%s')",
-                        ft.getName(), ftst.getPhysicalName(),
-                        ftbt.getPhysicalName(), fulltextAnalyzer)));
 
         return statements;
     }
