@@ -8,6 +8,7 @@
     <version>1.5.1-I20090930_0116</version>
   </parent>
 
+  <version>1.5.1-I20090930_0116-NXP-4770</version>
   <artifactId>nuxeo-core-event-compat</artifactId>
   <name>Nuxeo Core Event Compatibility</name>
   <description>DEPRECATED - Compatibility Bundle with nuxeo core event model
