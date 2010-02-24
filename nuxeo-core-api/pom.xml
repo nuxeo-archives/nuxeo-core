@@ -7,7 +7,7 @@
     <version>1.5.1-I20090930_0116</version>
   </parent>
 
-  <version>1.5.1-I20090930_0116-NXP-4770-4774_2</version>
+  <version>1.5.1-I20090930_0116-NXP-4770-4774_3</version>
 
   <artifactId>nuxeo-core-api</artifactId>
   <name>Nuxeo Core API</name>
