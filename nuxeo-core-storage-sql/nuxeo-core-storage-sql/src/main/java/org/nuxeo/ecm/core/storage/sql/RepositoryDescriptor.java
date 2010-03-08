@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2007-2008 Nuxeo SAS (http://nuxeo.com/) and contributors.
+ * (C) Copyright 2007-2010 Nuxeo SA (http://nuxeo.com/) and contributors.
  *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the GNU Lesser General Public License
@@ -42,6 +42,15 @@ public class RepositoryDescriptor {
     @XNode("@name")
     public String name;
 
+    @XNode("binaryManager@class")
+    public Class<? extends BinaryManager> binaryManagerClass;
+
+    @XNode("binaryManager@key")
+    public String binaryManagerKey;
+
+    @XNode("binaryStore@path")
+    public String binaryStorePath;
+
     @XNode("clustering@enabled")
     public boolean clusteringEnabled;
 
@@ -64,6 +73,9 @@ public class RepositoryDescriptor {
         fulltextAnalyzer = other.fulltextAnalyzer;
         fulltextCatalog = other.fulltextCatalog;
         queryMakerClasses = other.queryMakerClasses;
+        binaryStorePath = other.binaryStorePath;
+        binaryManagerClass = other.binaryManagerClass;
+        binaryManagerKey = other.binaryManagerKey;
     }
 
     @XNode("xa-datasource")

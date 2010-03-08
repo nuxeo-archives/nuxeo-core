@@ -37,16 +37,23 @@ public abstract class SQLBackendTestCase extends NXRuntimeTestCase {
         deployBundle("org.nuxeo.ecm.core.schema");
         deployBundle("org.nuxeo.ecm.core.event");
         DatabaseHelper.DATABASE.setUp();
-        repository = newRepository(-1);
+        repository = newRepository(-1, false);
     }
 
-    protected Repository newRepository(long clusteringDelay) throws Exception {
+    protected Repository newRepository(long clusteringDelay, boolean fulltextDisabled) throws Exception {
         SchemaManager schemaManager = Framework.getService(SchemaManager.class);
         assertNotNull(schemaManager);
+        RepositoryDescriptor descriptor = newDescriptor(clusteringDelay,
+                fulltextDisabled);
+        return new RepositoryImpl(descriptor, schemaManager);
+    }
+
+    protected RepositoryDescriptor newDescriptor(long clusteringDelay,
+            boolean fulltextDisabled) {
         RepositoryDescriptor descriptor = DatabaseHelper.DATABASE.getRepositoryDescriptor();
         descriptor.clusteringEnabled = clusteringDelay != -1;
         descriptor.clusteringDelay = clusteringDelay;
-        return new RepositoryImpl(descriptor, schemaManager);
+        return descriptor;
     }
 
     @Override

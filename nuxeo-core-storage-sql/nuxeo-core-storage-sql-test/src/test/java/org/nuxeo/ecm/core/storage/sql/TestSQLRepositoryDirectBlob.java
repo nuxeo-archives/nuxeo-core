@@ -98,7 +98,7 @@ public class TestSQLRepositoryDirectBlob extends SQLRepositoryTestCase {
         /*
          * 2. Later, create and use the blob for this digest.
          */
-        BinaryManager binaryManager = new BinaryManager(null);
+        BinaryManager binaryManager = new DefaultBinaryManager(new RepositoryDescriptor());
         Binary binary = binaryManager.getBinary(digest);
         if (binary == null) {
             throw new RuntimeException("Missing file for digest: " + digest);
@@ -126,10 +126,10 @@ public class TestSQLRepositoryDirectBlob extends SQLRepositoryTestCase {
         /*
          * remove attached file
          */
-       file.setProperty("file", "content", null);
-       file = session.saveDocument(file);
-       session.save();
-       assertNull(file.getProperty("file", "content"));
+        file.setProperty("file", "content", null);
+        file = session.saveDocument(file);
+        session.save();
+        assertNull(file.getProperty("file", "content"));
 
     }
 
@@ -143,7 +143,8 @@ public class TestSQLRepositoryDirectBlob extends SQLRepositoryTestCase {
         // create a binary instance pointing to some content stored on the
         // filesystem
         String digest = createFile();
-        BinaryManager binaryManager = new BinaryManager(null);
+        BinaryManager binaryManager = new DefaultBinaryManager(
+                new RepositoryDescriptor());
         Binary binary = binaryManager.getBinary(digest);
         if (binary == null) {
             throw new RuntimeException("Missing file for digest: " + digest);
@@ -153,7 +154,8 @@ public class TestSQLRepositoryDirectBlob extends SQLRepositoryTestCase {
         byte[] observedContent = new byte[expected.length()];
         assertEquals(digest, binary.getDigest());
         assertEquals(expected.length(), binary.getLength());
-        assertEquals(expected.length(), binary.getStream().read(observedContent));
+        assertEquals(expected.length(),
+                binary.getStream().read(observedContent));
         assertEquals(expected, new String(observedContent));
 
         // serialize and deserialize the binary instance
@@ -165,14 +167,15 @@ public class TestSQLRepositoryDirectBlob extends SQLRepositoryTestCase {
 
         // Make an input stream from the byte array and read
         // a copy of the object back in.
-        ObjectInputStream in = new ObjectInputStream(
-                new ByteArrayInputStream(bos.toByteArray()));
+        ObjectInputStream in = new ObjectInputStream(new ByteArrayInputStream(
+                bos.toByteArray()));
         Binary binaryCopy = (Binary) in.readObject();
 
         observedContent = new byte[expected.length()];
         assertEquals(digest, binaryCopy.getDigest());
         assertEquals(expected.length(), binaryCopy.getLength());
-        assertEquals(expected.length(), binaryCopy.getStream().read(observedContent));
+        assertEquals(expected.length(), binaryCopy.getStream().read(
+                observedContent));
         assertEquals(expected, new String(observedContent));
     }
 }

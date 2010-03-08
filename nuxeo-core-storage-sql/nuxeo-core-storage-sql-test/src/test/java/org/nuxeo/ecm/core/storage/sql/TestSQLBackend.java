@@ -547,8 +547,8 @@ public class TestSQLBackend extends SQLBackendTestCase {
         repository.close();
         // get two clustered repositories
         long DELAY = 500; // ms
-        repository = newRepository(DELAY);
-        repository2 = newRepository(DELAY);
+        repository = newRepository(DELAY, false);
+        repository2 = newRepository(DELAY, false);
 
         Session session1 = repository.getConnection();
         // session1 creates root node and does a save
