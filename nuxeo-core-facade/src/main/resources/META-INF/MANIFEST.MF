@@ -27,5 +27,6 @@ Import-Package: javax.annotation.security,
  org.nuxeo.ecm.core.query.sql.model,
  org.nuxeo.ecm.core.schema,
  org.nuxeo.ecm.core.schema.types,
+ org.nuxeo.osgi,
  org.nuxeo.runtime.api
 Require-Bundle: org.nuxeo.ecm.core
