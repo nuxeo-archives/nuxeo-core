@@ -29,7 +29,6 @@ import org.nuxeo.runtime.api.Framework;
 
 /**
  * @author <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
- *
  */
 @SuppressWarnings({ "SuppressionAnnotation" })
 public abstract class AbstractType implements Type {
@@ -196,25 +195,6 @@ public abstract class AbstractType implements Type {
 
     public Object newInstance() {
         return null;
-    }
-
-    public Object convert(Object object) throws TypeException {
-        if (converter != null) {
-            return converter.convert(object);
-        }
-        return object;
-    }
-
-    public void setConverter(ValueConverter converter) {
-        if (converter == null) {
-            this.converter = this;
-        } else {
-            this.converter = converter;
-        }
-    }
-
-    public ValueConverter getConverter() {
-        return converter;
     }
 
 }

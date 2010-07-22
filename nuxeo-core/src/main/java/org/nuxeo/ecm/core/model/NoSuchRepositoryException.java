@@ -19,18 +19,19 @@
 
 package org.nuxeo.ecm.core.model;
 
-import org.nuxeo.ecm.core.CoreException;
-
 /**
  * @author <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
- *
  */
-public class NoSuchRepositoryException extends CoreException {
+public class NoSuchRepositoryException extends Exception {
 
     private static final long serialVersionUID = -961763618434457798L;
 
     public NoSuchRepositoryException(String name) {
         super("No such repository '" + name + "'");
+    }
+
+    public NoSuchRepositoryException(String name, Throwable t) {
+        super("No such repository '" + name + "'", t);
     }
 
 }

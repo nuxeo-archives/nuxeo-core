@@ -29,9 +29,9 @@ import org.nuxeo.ecm.core.api.model.PropertyException;
 import org.nuxeo.ecm.core.schema.types.Field;
 
 /**
- * @author <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
- *
  * Phantom properties are not stored as children objects.
+ *
+ * @author <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
  */
 public class ObjectProperty extends ComplexMemberProperty {
 
@@ -43,12 +43,13 @@ public class ObjectProperty extends ComplexMemberProperty {
         super(adapter, parent, field);
     }
 
-    public ObjectProperty(ObjectAdapter adapter,  Property parent, Field field, int flags) {
+    public ObjectProperty(ObjectAdapter adapter, Property parent, Field field,
+            int flags) {
         super(adapter, parent, field, flags);
     }
 
     @Override
-    public Serializable internalGetValue() {
+    public Serializable internalGetValue() throws PropertyException {
         return value;
     }
 
@@ -59,13 +60,13 @@ public class ObjectProperty extends ComplexMemberProperty {
 
     @Override
     public Object clone() throws CloneNotSupportedException {
-        ObjectProperty clone = (ObjectProperty)super.clone();
+        ObjectProperty clone = (ObjectProperty) super.clone();
         return clone;
     }
 
     private void readObject(ObjectInputStream in)
             throws ClassNotFoundException, IOException {
-//      always perform the default de-serialization first
+        // always perform the default de-serialization first
         in.defaultReadObject();
         children = new HashMap<String, Property>(); // initialize children
     }

@@ -17,11 +17,14 @@
 
 package org.nuxeo.ecm.core.api;
 
+import java.security.Principal;
+
 import javax.security.auth.login.LoginContext;
 import javax.security.auth.login.LoginException;
 
 import org.nuxeo.ecm.core.api.repository.Repository;
 import org.nuxeo.ecm.core.api.repository.RepositoryManager;
+import org.nuxeo.ecm.core.api.security.SecurityConstants;
 import org.nuxeo.runtime.api.Framework;
 
 /**
@@ -33,6 +36,8 @@ import org.nuxeo.runtime.api.Framework;
  * @author Florent Guillaume
  */
 public abstract class UnrestrictedSessionRunner {
+
+    protected String originatingUsername;
 
     protected CoreSession session;
 
@@ -46,6 +51,8 @@ public abstract class UnrestrictedSessionRunner {
     /**
      * Constructs a {@link UnrestrictedSessionRunner} given an existing session
      * (which may or may not be already unrestricted).
+     * <p>
+     * Originating user is taken on given session.
      *
      * @param session the available session
      */
@@ -53,9 +60,13 @@ public abstract class UnrestrictedSessionRunner {
         this.session = session;
         sessionIsAlreadyUnrestricted = isUnrestricted(session);
         if (sessionIsAlreadyUnrestricted) {
-            this.repositoryName = null;
+            repositoryName = null;
         } else {
-            this.repositoryName = session.getRepositoryName();
+            repositoryName = session.getRepositoryName();
+        }
+        Principal pal = session.getPrincipal();
+        if (pal != null) {
+            originatingUsername = pal.getName();
         }
     }
 
@@ -65,13 +76,36 @@ public abstract class UnrestrictedSessionRunner {
      * @param repositoryName the repository name
      */
     public UnrestrictedSessionRunner(String repositoryName) {
-        this.session = null;
+        session = null;
         sessionIsAlreadyUnrestricted = false;
         this.repositoryName = repositoryName;
     }
 
+    /**
+     * Constructs a {@link UnrestrictedSessionRunner} given a repository name
+     * and an originating user name.
+     *
+     * @param repositoryName the repository name
+     * @param originatingUser the user name behind the system user
+     */
+    public UnrestrictedSessionRunner(String repositoryName,
+            String originatingUser) {
+        session = null;
+        sessionIsAlreadyUnrestricted = false;
+        this.repositoryName = repositoryName;
+    }
+
+    public String getOriginatingUsername() {
+        return originatingUsername;
+    }
+
+    public void setOriginatingUsername(String originatingUsername) {
+        this.originatingUsername = originatingUsername;
+    }
+
     protected boolean isUnrestricted(CoreSession session) {
-        return "system".equals(session.getPrincipal().getName());
+        return SecurityConstants.SYSTEM_USERNAME.equals(session.getPrincipal().getName())
+                || (session.getPrincipal() instanceof NuxeoPrincipal && ((NuxeoPrincipal) session.getPrincipal()).isAdministrator());
     }
 
     /**
@@ -90,7 +124,7 @@ public abstract class UnrestrictedSessionRunner {
 
             LoginContext loginContext;
             try {
-                loginContext = Framework.login();
+                loginContext = Framework.loginAs(originatingUsername);
             } catch (LoginException e) {
                 throw new ClientException(e);
             }
@@ -101,8 +135,8 @@ public abstract class UnrestrictedSessionRunner {
                     repository = Framework.getService(RepositoryManager.class).getRepository(
                             repositoryName);
                     if (repository == null) {
-                        throw new ClientException("Cannot get repository: " +
-                                repositoryName);
+                        throw new ClientException("Cannot get repository: "
+                                + repositoryName);
                     }
                     session = repository.open();
                 } catch (ClientException e) {
@@ -114,18 +148,24 @@ public abstract class UnrestrictedSessionRunner {
                     run();
                 } finally {
                     try {
-                        repository.close(session);
-                    } catch (ClientException e) {
-                        throw e;
+                        Repository.close(session);
                     } catch (Exception e) {
                         throw new ClientException(e);
                     } finally {
                         session = baseSession;
+                        if (session != null
+                                && !session.isStateSharedByAllThreadSessions()) {
+                            // process invalidations from unrestricted session
+                            session.save();
+                        }
                     }
                 }
             } finally {
                 try {
-                    loginContext.logout();
+                    // loginContext may be null in tests
+                    if (loginContext != null) {
+                        loginContext.logout();
+                    }
                 } catch (LoginException e) {
                     throw new ClientException(e);
                 }

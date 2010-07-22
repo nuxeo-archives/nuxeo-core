@@ -36,25 +36,30 @@ import java.io.Writer;
  * <p>
  * The encoding is used to decode Unicode text content that was stored in an
  * encoded form. If not encoding is specified, the default java encoding is
- * used. The encoding is ignored fot binary content.
+ * used. The encoding is ignored for binary content.
  * <p>
  * When retrieving the content from a document, it will be returned as source
  * content instead of returning the content bytes.
  * <p>
  * The same is true when setting the content for a document: you set a content
- * source and not directly the content bytes. Ex: <code><pre>
- * File file = new File(&quot;/tmp/index.html&quot;);
+ * source and not directly the content bytes. Ex:
+ *
+ * <code><pre>
+ * File file = new File("/tmp/index.html");
  * FileBlob fb = new FileBlob(file);
- * fb.setContentType(&quot;text/html&quot;);
- * fb.setEncoding(&quot;UTF-8&quot;); // this specifies that content bytes will be stored as UTF-8
- * document.setContent(fb);
- * </pre></code> Then you may want to retrieve the content as follow: <code><pre>
- * Blob blob = document.getContent();
+ * fb.setMimeType("text/html");
+ * fb.setEncoding("UTF-8"); // this specifies that content bytes will be stored as UTF-8
+ * document.setProperty("file", "content", fb);
+ * </pre></code>
+ *
+ * Then you may want to retrieve the content as follow:
+ *
+ * <code><pre>
+ * Blob blob = document.getProperty("file:content");
  * htmlDoc = blob.getString(); // the content is decoded from UTF-8 into a java string
  * </pre></code>
  *
  * @author <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
- *
  */
 public interface Blob {
 
@@ -96,24 +101,22 @@ public interface Blob {
     void transferTo(File file) throws IOException;
 
     /**
-     * Persist this stream so that getStream() method can be called successfully
-     * several times. The persistence is done in a temp file or in memory - this
-     * is up to the implemention.
+     * Persist this stream so that {@link #getStream()} method can be called
+     * successfully several times. The persistence is done in a temporary file
+     * or in memory - this is up to the implementation.
      * <p>
      * Blobs that are already persistent return themselves.
-     *
      * <p>
      * Persistence should update the internal structure of the Blob to make it
      * persistent whenever possible and hence return itself whenever possible.
      * This behavior cannot be guaranteed by every implementation however.
      *
      * @return a persistent version of the blob
-     * @throws IOException
      */
     Blob persist() throws IOException;
 
     /**
-     * Check whether this blob is persistent. (i.e. getStream() can be
+     * Checks whether this blob is persistent. (i.e. if {@link #getStream()} can be
      * successfully called several times).
      *
      * @return true if persistent, false otherwise

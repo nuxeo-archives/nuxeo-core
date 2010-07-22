@@ -25,7 +25,6 @@ import java.util.NoSuchElementException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.nuxeo.ecm.core.api.ClientException;
 import org.nuxeo.ecm.core.api.DocumentModel;
 import org.nuxeo.ecm.core.api.DocumentModelIterator;
 import org.nuxeo.ecm.core.api.DocumentModelList;
@@ -226,15 +225,15 @@ public class DocumentsPageProvider implements PagedDocumentsProvider {
     /**
      * Nothing can't be done to refresh this provider's pages
      * the whole provider should be instead replaced
-     **/
-    public void refresh() throws ClientException {
+     */
+    public void refresh() {
     }
 
     // TODO stop duplication
     public String getCurrentPageStatus() {
         int total = getNumberOfPages();
         int current = currentPageIndex + 1;
-        if (total == PagedDocumentsProvider.UNKNOWN_SIZE) {
+        if (total == UNKNOWN_SIZE) {
             return String.format("%d", current);
         } else {
             return String.format("%d/%d", current, total);

@@ -28,12 +28,11 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
-import com.sun.org.apache.xml.internal.serialize.OutputFormat;
-import com.sun.org.apache.xml.internal.serialize.XMLSerializer;
+import org.apache.xml.serialize.OutputFormat;
+import org.apache.xml.serialize.XMLSerializer;
 
 /**
  * @author  <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
- *
  */
 public final class XML {
 
@@ -54,9 +53,6 @@ public final class XML {
     // Utility class.
     private XML() {}
 
-    /**
-     * @return the builderFactory
-     */
     public static DocumentBuilderFactory getBuilderFactory() {
         return builderFactory;
     }

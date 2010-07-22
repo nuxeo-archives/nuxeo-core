@@ -23,7 +23,6 @@ import org.nuxeo.ecm.core.schema.types.PrimitiveType;
 
 /**
  * @author <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
- *
  */
 public final class LongType extends PrimitiveType {
 
@@ -43,7 +42,6 @@ public final class LongType extends PrimitiveType {
         return object instanceof Number;
     }
 
-    @Override
     public Object convert(Object value) {
         if (value instanceof Long) {
             return value;

@@ -7,3 +7,10 @@ target
 *~
 *.orig
 derby.log
+*.iml
+*.iws
+*.ipr
+*.idea
+*.bak
+nuxeo-*/META-INF
+nuxeo-*/OSGI-INF

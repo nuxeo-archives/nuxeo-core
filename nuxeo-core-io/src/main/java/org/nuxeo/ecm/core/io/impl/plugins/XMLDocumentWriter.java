@@ -25,6 +25,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.dom4j.io.OutputFormat;
 import org.dom4j.io.XMLWriter;
 import org.nuxeo.ecm.core.api.DocumentLocation;
@@ -43,7 +45,7 @@ import org.nuxeo.ecm.core.io.impl.DocumentTranslationMapImpl;
  * <p>
  * Also blobs are not handled specially. The value existing in the blob data
  * element will be written down. By default blobs are referred as external
- * references, so if their content is not written in the XML document. If you
+ * references, so if their content is not written in the   XML document. If you
  * want to encode blobs as base64 inside the document you must use the
  * {@link InlineBlobTransformer}
  * <p>
@@ -53,6 +55,8 @@ import org.nuxeo.ecm.core.io.impl.DocumentTranslationMapImpl;
  * @author <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
  */
 public class XMLDocumentWriter extends AbstractDocumentWriter {
+
+    private static final Log log = LogFactory.getLog(XMLDocumentWriter.class);
 
     protected final OutputStream out;
 
@@ -94,7 +98,7 @@ public class XMLDocumentWriter extends AbstractDocumentWriter {
             try {
                 out.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                log.error(e);
             }
         }
     }

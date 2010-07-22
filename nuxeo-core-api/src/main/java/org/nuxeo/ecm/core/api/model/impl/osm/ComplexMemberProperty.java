@@ -43,13 +43,15 @@ public class ComplexMemberProperty extends MapProperty implements Adaptable {
 
     protected final ObjectAdapter adapter;
 
-    public ComplexMemberProperty(ObjectAdapter adapter, Property parent, Field field) {
-        super (parent, field);
+    public ComplexMemberProperty(ObjectAdapter adapter, Property parent,
+            Field field) {
+        super(parent, field);
         this.adapter = adapter;
     }
 
-    public ComplexMemberProperty(ObjectAdapter adapter,  Property parent, Field field, int flags) {
-        super (parent, field, flags);
+    public ComplexMemberProperty(ObjectAdapter adapter, Property parent,
+            Field field, int flags) {
+        super(parent, field, flags);
         this.adapter = adapter;
     }
 
@@ -62,53 +64,62 @@ public class ComplexMemberProperty extends MapProperty implements Adaptable {
         return false;
     }
 
-
+    @SuppressWarnings("unchecked")
     @Override
     public void setValue(Object value) throws PropertyException {
         if (value instanceof Map) {
-            adapter.setMap(getValue(), (Map<String, Object>)value);
+            getAdapter().setMap(getValue(), (Map<String, Object>) value);
             setIsModified();
         } else {
             super.setValue(value);
         }
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public void init(Serializable value) throws PropertyException {
-        if (value == null) { // IGNORE null values - properties will be considered PHANTOMS
+        if (value == null) {
+            // IGNORE null values - properties will be
+            // considered PHANTOMS
             return;
         }
         if (value instanceof Map) {
-            internalSetValue((Serializable)adapter.create((Map<String, Object>)value));
+            internalSetValue((Serializable) getAdapter().create(
+                    (Map<String, Object>) value));
         } else {
             internalSetValue(value);
         }
         removePhantomFlag();
     }
 
-
     @Override
     public void internalSetValue(Serializable value) throws PropertyException {
-        ObjectAdapter adapter = ((Adaptable)parent).getAdapter();
+        ObjectAdapter adapter = ((Adaptable) parent).getAdapter();
         adapter.setValue(parent.getValue(), getName(), value);
     }
 
     @Override
     public Serializable internalGetValue() throws PropertyException {
-        ObjectAdapter adapter = ((Adaptable)parent).getAdapter();
-        return (Serializable)adapter.getValue(parent.getValue(), getName());
+        ObjectAdapter adapter = ((Adaptable) parent).getAdapter();
+        return (Serializable) adapter.getValue(parent.getValue(), getName());
     }
 
+    @Override
+    public Serializable getValueForWrite() throws PropertyException {
+        return getValue();
+    }
 
     @Override
-    protected Property internalGetChild(Field field)
-            throws UnsupportedOperationException {
+    protected Property internalGetChild(Field field) {
         try {
-            ObjectAdapter subAdapter = adapter.getAdapter(field.getName().getPrefixedName());
+            ObjectAdapter subAdapter = getAdapter().getAdapter(
+                    field.getName().getPrefixedName());
             if (subAdapter == null) { // a simple property
-                return new ScalarMemberProperty(this, field, isPhantom() ? IS_PHANTOM : 0);
+                return new ScalarMemberProperty(this, field,
+                        isPhantom() ? IS_PHANTOM : 0);
             } else { // a complex property
-                return new ComplexMemberProperty(subAdapter, this, field, isPhantom() ? IS_PHANTOM : 0);
+                return new ComplexMemberProperty(subAdapter, this, field,
+                        isPhantom() ? IS_PHANTOM : 0);
             }
         } catch (PropertyNotFoundException e) {
             log.error(e);
@@ -118,11 +129,7 @@ public class ComplexMemberProperty extends MapProperty implements Adaptable {
 
     @Override
     protected Serializable getDefaultValue() {
-        try {
-            return adapter.getDefaultValue();
-        } catch (PropertyNotFoundException e) {
-            return null;
-        }
+        return getAdapter().getDefaultValue();
     }
 
     @Override
@@ -130,7 +137,7 @@ public class ComplexMemberProperty extends MapProperty implements Adaptable {
         if (property == null) {
             return false;
         }
-        ScalarProperty sp = (ScalarProperty)property;
+        ScalarProperty sp = (ScalarProperty) property;
         Object v1 = getValue();
         Object v2 = sp.getValue();
         if (v1 == null) {

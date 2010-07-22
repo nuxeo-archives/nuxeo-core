@@ -21,6 +21,8 @@ package org.nuxeo.ecm.core.io.impl.plugins;
 
 import java.io.IOException;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.nuxeo.ecm.core.api.ClientException;
 import org.nuxeo.ecm.core.api.CoreSession;
 import org.nuxeo.ecm.core.api.DocumentLocation;
@@ -32,8 +34,8 @@ import org.nuxeo.ecm.core.io.impl.AbstractDocumentModelWriter;
 import org.nuxeo.ecm.core.io.impl.DocumentTranslationMapImpl;
 
 /**
- * A writer that only updates existing docs. The doc ID is used to identity docs
- * The imported tree structure is ignored
+ * A writer that only updates existing documents. The doc ID is used to identity documents.
+ * The imported tree structure is ignored.
  *
  * @author <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
  */
@@ -41,8 +43,9 @@ import org.nuxeo.ecm.core.io.impl.DocumentTranslationMapImpl;
 // modify core session to add a batch create method and use it
 public class DocumentModelUpdater extends AbstractDocumentModelWriter {
 
+    private static final Log log = LogFactory.getLog(DocumentModelUpdater.class);
+
     /**
-     *
      * @param session the session to the repository where to write
      * @param parentPath where to write the tree. this document will be used as
      *            the parent of all top level documents passed as input. Note
@@ -50,7 +53,6 @@ public class DocumentModelUpdater extends AbstractDocumentModelWriter {
      */
     public DocumentModelUpdater(CoreSession session, String parentPath) {
         super(session, parentPath);
-
     }
 
     public DocumentModelUpdater(CoreSession session, String parentPath,
@@ -72,7 +74,7 @@ public class DocumentModelUpdater extends AbstractDocumentModelWriter {
         try {
             doc = session.getDocument(new IdRef(id));
         } catch (Exception e) {
-            System.out.println("Cannot update document. No such document: "
+            log.error("Cannot update document. No such document: "
                     + id);
             return null;
         }
@@ -89,7 +91,7 @@ public class DocumentModelUpdater extends AbstractDocumentModelWriter {
                     "Failed to import document in repository: "
                             + e.getMessage());
             ioe.setStackTrace(e.getStackTrace());
-            e.printStackTrace();
+            log.error(e);
             return null;
         }
     }

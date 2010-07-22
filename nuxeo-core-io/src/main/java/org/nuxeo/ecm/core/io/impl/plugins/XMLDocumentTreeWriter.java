@@ -25,6 +25,8 @@ import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.util.Collection;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.dom4j.io.OutputFormat;
 import org.dom4j.io.XMLWriter;
 import org.nuxeo.ecm.core.api.DocumentLocation;
@@ -34,6 +36,8 @@ import org.nuxeo.ecm.core.io.ExportedDocument;
 import org.nuxeo.ecm.core.io.impl.DocumentTranslationMapImpl;
 
 public class XMLDocumentTreeWriter extends XMLDocumentWriter {
+
+    private static final Log log = LogFactory.getLog(XMLDocumentTreeWriter.class);
 
     private XMLWriter writer;
 
@@ -116,7 +120,7 @@ public class XMLDocumentTreeWriter extends XMLDocumentWriter {
             try {
                 out.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                log.error(e);
             }
         }
     }

@@ -24,18 +24,15 @@ import java.io.Serializable;
 /**
  * A reference to a core document.
  * <p>
- * The following 3 types of references are supported:
- * <ol>
+ * The following two types of references are supported:
+ * <ul>
  * <li> <code>ID</code> references.
  * Refers to the core document by its UUID. See {@link IdRef}.
  * <li> <code>PATH</code> references.
  * Refers to the core document by its path. See {@link PathRef}.
- * <li> <code>INSTANCE</code> references.
- * Refers to the core document directly by its instance.
- * </ol>
+ * </ul>
  *
  * @author  <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
- *
  */
 public interface DocumentRef extends Serializable {
 
@@ -43,8 +40,6 @@ public interface DocumentRef extends Serializable {
     int ID          = 1;
     // the documenmt is specified by its path
     int PATH        = 2;
-    // useful when using the client inside the same JVM as the server
-    int INSTANCE    = 3;
 
     /**
      * Gets the type of the reference.
@@ -56,9 +51,9 @@ public interface DocumentRef extends Serializable {
     /**
      * Gets the reference value.
      * <p>
-     * For an ID reference this is the document UUID.
+     * For an ID reference, this is the document UUID.
      * <p>
-     * For an ID reference this is the document path.
+     * For an ID reference, this is the document path.
      * <p>
      * For an INSTANCE reference this is the document itself.
      *

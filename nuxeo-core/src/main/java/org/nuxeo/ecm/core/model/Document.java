@@ -105,7 +105,6 @@ public interface Document extends DocumentContainer, PropertyContainer,
      */
     void setDirty(boolean value) throws DocumentException;
 
-
     /**
      * Checks if the dirty flag is set on this document.
      *
@@ -113,7 +112,6 @@ public interface Document extends DocumentContainer, PropertyContainer,
      * @throws DocumentException
      */
     boolean isDirty() throws DocumentException;
-
 
     /**
      * Tests whether this document represent a folder or a leaf document.
@@ -152,12 +150,28 @@ public interface Document extends DocumentContainer, PropertyContainer,
     String getCurrentLifeCycleState() throws LifeCycleException;
 
     /**
+     * Sets the lifecycle state of the document.
+     *
+     * @param state the state
+     * @throws LifeCycleException
+     */
+    void setCurrentLifeCycleState(String state) throws LifeCycleException;
+
+    /**
      * Returns the life cycle policy of this document.
      *
      * @return the life cycle policy name of this document as a string
      * @throws LifeCycleException
      */
     String getLifeCyclePolicy() throws LifeCycleException;
+
+    /**
+     * Sets the life cycle policy of this document.
+     *
+     * @param policy the policy
+     * @throws LifeCycleException
+     */
+    void setLifeCyclePolicy(String policy) throws LifeCycleException;
 
     /**
      * Follows a given life cycle transition.
@@ -217,14 +231,16 @@ public interface Document extends DocumentContainer, PropertyContainer,
 
 
     /**
-     * Load document part properties from storage and fill them inside the given document part
+     * Load document part properties from storage and fill them inside the given document part.
+     *
      * @param dp
      * @throws Exception
      */
     void readDocumentPart(DocumentPart dp) throws Exception;
 
     /**
-     * Read modifications in the given document part and write them on storage
+     * Read modifications in the given document part and write them on storage.
+     *
      * @param dp
      * @throws Exception
      */

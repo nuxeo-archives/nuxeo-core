@@ -96,16 +96,12 @@ public class DocumentPipeImpl implements DocumentPipe {
         return DocumentTranslationMapImpl.merge(maps);
     }
 
-    /**
-     * @param maps
-     * @throws IOException
-     */
     private void readAndWriteDocs(List<DocumentTranslationMap> maps)
             throws IOException {
         if (pageSize == 0) {
             // handle single doc case
 
-            ExportedDocument doc = null;
+            ExportedDocument doc;
             while ((doc = reader.read()) != null) {
                 applyTransforms(doc);
                 DocumentTranslationMap map = writer.write(doc);
@@ -114,12 +110,11 @@ public class DocumentPipeImpl implements DocumentPipe {
 
         } else {
             // handle multiple doc case
-            ExportedDocument[] docs = null;
-            DocumentTranslationMap map = null;
+            ExportedDocument[] docs;
             while ((docs = reader.read(pageSize)) != null) {
                 if (docs.length != 0) {
                     applyTransforms(docs);
-                    map = writer.write(docs);
+                    DocumentTranslationMap map = writer.write(docs);
                     if (map != null) {
                         maps.add(map);
                     }

@@ -33,7 +33,6 @@ import org.nuxeo.runtime.model.DefaultComponent;
 
 /**
  * @author  <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
- *
  */
 public class DocumentAdapterService extends DefaultComponent {
 
@@ -52,7 +51,7 @@ public class DocumentAdapterService extends DefaultComponent {
      * if the factory is globally registered on all types having the name "type".
      * In that case the schema that declared the type is not important
      * The lookup is done by first looking for a "schema:type" entry and then
-     * for a global "type" entry
+     * for a global "type" entry.
      */
     protected Map<String, PropertyFactory> factories;
 
@@ -66,7 +65,7 @@ public class DocumentAdapterService extends DefaultComponent {
         log.info("Registered document adapter factory " + dae);
     }
 
-    public  void unregisterAdapterFactory(Class<?> itf) {
+    public void unregisterAdapterFactory(Class<?> itf) {
         DocumentAdapterDescriptor dae = adapters.remove(itf);
         if (dae != null) {
             log.info("Unregistered document adapter factory: " + dae);
@@ -76,18 +75,17 @@ public class DocumentAdapterService extends DefaultComponent {
     public static void registerPropertyFactory(PropertyFactoryDescriptor descriptor) {
         try {
             DefaultPropertyFactory.getInstance().registerFactory(
-                    descriptor.schema, descriptor.type, (PropertyFactory)descriptor.klass.newInstance());
+                    descriptor.schema, descriptor.type,
+                    (PropertyFactory) descriptor.klass.newInstance());
         } catch (Exception e) {
-            log.error(
-                    "Failed to instantiate the prioperty type for "
-                            + descriptor.schema + ':' + descriptor.type);
+            log.error("Failed to instantiate the property type for "
+                    + descriptor.schema + ':' + descriptor.type);
         }
     }
 
     public static void unregisterPropertyFactory(PropertyFactoryDescriptor descriptor) {
         DefaultPropertyFactory.getInstance().unregisterFactory(descriptor.schema, descriptor.type);
     }
-
 
     public PropertyFactory getPropertyFactory(String schema, String type) {
         String key = schema != null && schema.length() > 0 ? schema + ':' + type : type;
@@ -128,7 +126,7 @@ public class DocumentAdapterService extends DefaultComponent {
         } else if (extensionPoint.equals("sessionAdapters")) {
             SessionAdapterDescriptor desc = (SessionAdapterDescriptor) contribution;
             try {
-                SessionAdapterFactory<?> factory = (SessionAdapterFactory<?>)desc.factory.newInstance();
+                SessionAdapterFactory<?> factory = (SessionAdapterFactory<?>) desc.factory.newInstance();
                 SessionAdapterFactory.registerAdapter(desc.itf, factory);
             } catch (Exception e) {
                 log.error("Failed to register session adapter", e);

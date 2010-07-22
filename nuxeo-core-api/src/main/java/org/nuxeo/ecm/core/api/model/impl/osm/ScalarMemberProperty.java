@@ -35,24 +35,27 @@ public class ScalarMemberProperty extends ScalarProperty {
     private static final long serialVersionUID = 1537310098432620929L;
 
     public ScalarMemberProperty(Property parent, Field field) {
-        super (parent, field);
+        super(parent, field);
     }
 
     public ScalarMemberProperty(Property parent, Field field, int flags) {
-        super (parent, field, flags);
+        super(parent, field, flags);
     }
-
 
     @Override
     public void internalSetValue(Serializable value) throws PropertyException {
-        ObjectAdapter adapter = ((Adaptable)parent).getAdapter();
+        ObjectAdapter adapter = ((Adaptable) parent).getAdapter();
         adapter.setValue(parent.getValue(), getName(), value);
     }
 
     @Override
     public Serializable internalGetValue() throws PropertyException {
-        ObjectAdapter adapter = ((Adaptable)parent).getAdapter();
-        return (Serializable)adapter.getValue(parent.getValue(), getName());
+        ObjectAdapter adapter = ((Adaptable) parent).getAdapter();
+        Object value = adapter.getValue(parent.getValue(), getName());
+        if (value != null && !(value instanceof Serializable)) {
+            throw new PropertyException("Non serializable value: " + value);
+        }
+        return (Serializable) value;
     }
 
 }

@@ -20,9 +20,12 @@
     <permission name="ReviewParticipant" />
     <permission name="ReadSecurity" />
 
-    <permission name="Version" />
-    <permission name="ReadVersion">
-      <alias>Version</alias><!-- BBB deprecated old name -->
+    <permission name="ReadVersion"/>
+    <permission name="WriteVersion"/>
+ 
+    <permission name="Version" >
+       <include>ReadVersion</include>
+       <include>WriteVersion</include>
     </permission>
 
     <permission name="Read">
@@ -33,7 +36,6 @@
       <include>ReadLifeCycle</include>
       <include>ReadSecurity</include>
       <include>ReviewParticipant</include>
-      <include>Version</include><!-- use ReadVersion instead once alias works -->
     </permission>
 
     <permission name="AddChildren" />
@@ -42,6 +44,7 @@
     <permission name="Remove" />
     <permission name="ManageWorkflows" />
     <permission name="WriteLifeCycle" />
+    <permission name="Unlock" />
 
     <permission name="Remove">
       <include>RemoveChildren</include>
@@ -58,6 +61,7 @@
       <include>Remove</include>
       <include>ManageWorkflows</include>
       <include>WriteLifeCycle</include>
+      <include>WriteVersion</include>
     </permission>
 
     <permission name="ReadWrite">
@@ -83,6 +87,7 @@
       <item show="true" order="10">Read</item>
       <item show="true" order="50" denyPermission="Write">ReadWrite</item>
       <item show="true" order="60" denyPermission="Remove">ReadRemove</item>
+      <item show="true" order="70" denyPermission="Version">Version</item>
       <item show="true" order="100">Everything</item>
     </visibility>
 

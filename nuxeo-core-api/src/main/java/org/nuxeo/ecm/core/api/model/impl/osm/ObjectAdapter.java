@@ -29,9 +29,9 @@ import org.nuxeo.ecm.core.api.model.PropertyNotFoundException;
  * @author <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
  *
  */
-public interface ObjectAdapter extends java.io.Serializable {
+public interface ObjectAdapter extends Serializable {
 
-    Object create(Map<String, Object> value) throws PropertyException;
+    Object create(Map<String, Object> value);
 
     Map<String, Object> getMap(Object object) throws PropertyException;
 
@@ -43,6 +43,6 @@ public interface ObjectAdapter extends java.io.Serializable {
 
     ObjectAdapter getAdapter(String name) throws PropertyNotFoundException;
 
-    Serializable getDefaultValue() throws PropertyNotFoundException;
+    Serializable getDefaultValue();
 
 }

@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2006-2007 Nuxeo SAS (http://nuxeo.com/) and contributors.
+ * (C) Copyright 2006-2010 Nuxeo SA (http://nuxeo.com/) and contributors.
  *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the GNU Lesser General Public License
@@ -12,9 +12,8 @@
  * Lesser General Public License for more details.
  *
  * Contributors:
- *     Nuxeo - initial API and implementation
- *
- * $Id$
+ *     Bogdan Stefanescu
+ *     Florent Guillaume
  */
 
 package org.nuxeo.ecm.core.api;
@@ -27,18 +26,82 @@ import java.util.Map;
 
 import org.nuxeo.ecm.core.api.event.DocumentEventTypes;
 import org.nuxeo.ecm.core.api.impl.DocsQueryProviderDef;
+import org.nuxeo.ecm.core.api.model.DocumentPart;
 import org.nuxeo.ecm.core.api.operation.Operation;
+import org.nuxeo.ecm.core.api.operation.ProgressMonitor;
 import org.nuxeo.ecm.core.api.security.ACP;
 import org.nuxeo.ecm.core.api.security.SecuritySummaryEntry;
 import org.nuxeo.ecm.core.schema.DocumentType;
 
 /**
+ * A session to the Nuxeo Core.
+ * <p>
+ * The session is opened and closed by a client and gives the client the
+ * possibility to interact with the core.
+ * <p>
+ * The core a session connects to can be located in a separate (remote) JVM or
+ * in the current one.
+ * <p>
+ * To create remote or local sessions, you need to use a specific
+ * {@link CoreSessionFactory} object. These objects are usually specified using
+ * extension points but you can also use them programatically.
  *
+ * @see DocumentModel
+ * @see DocumentRef
  *
- * @author <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
- *
+ * @author Bogdan Stefanescu
+ * @author Florent Guillaume
  */
 public interface CoreSession {
+
+    // used to pass properties to importDocument
+    String IMPORT_VERSION_VERSIONABLE_ID = "ecm:versionableId";
+
+    String IMPORT_VERSION_CREATED = "ecm:versionCreated";
+
+    String IMPORT_VERSION_LABEL = "ecm:versionLabel";
+
+    String IMPORT_VERSION_DESCRIPTION = "ecm:versionDescription";
+
+    String IMPORT_VERSION_MAJOR = "ecm:majorVersion";
+
+    String IMPORT_VERSION_MINOR = "ecm:minorVersion";
+
+    String IMPORT_PROXY_TARGET_ID = "ecm:proxyTargetId";
+
+    String IMPORT_PROXY_VERSIONABLE_ID = "ecm:proxyVersionableId";
+
+    String IMPORT_LIFECYCLE_POLICY = "ecm:lifeCyclePolicy";
+
+    String IMPORT_LIFECYCLE_STATE = "ecm:lifeCycleState";
+
+    String IMPORT_LOCK = "ecm:lock";
+
+    String IMPORT_DIRTY = "ecm:dirty";
+
+    String IMPORT_CHECKED_IN = "ecm:isCheckedIn";
+
+    String IMPORT_BASE_VERSION_ID = "ecm:baseVersion";
+
+    /** The document type to use to create a proxy by import. */
+    String IMPORT_PROXY_TYPE = "ecm:proxy";
+
+    /**
+     * The container calls this when this session sees a transaction begin.
+     */
+    void afterBegin();
+
+    /**
+     * The container calls this when this session is about to see a transaction
+     * completion.
+     */
+    void beforeCompletion();
+
+    /**
+     * The container calls this when this session sees a transaction
+     * commit/rollback.
+     */
+    void afterCompletion(boolean committed);
 
     /**
      * Gets the document type object given its type name.
@@ -112,6 +175,12 @@ public interface CoreSession {
     String getSessionId();
 
     /**
+     * Returns {@code true} if all sessions in the current thread share the same
+     * state.
+     */
+    boolean isStateSharedByAllThreadSessions();
+
+    /**
      * Gets the principal that created the client session.
      *
      * @return the principal
@@ -153,6 +222,7 @@ public interface CoreSession {
      * @throws ClientException
      * @throws SecurityException
      */
+    @NoRollbackOnException
     DocumentModel getDocument(DocumentRef docRef) throws ClientException;
 
     /**
@@ -160,7 +230,7 @@ public interface CoreSession {
      * to use.
      * <p>
      * Same as the previous method with the difference that the default schemas
-     * are overwriten by the given schemas.
+     * are overwritten by the given schemas.
      *
      * @param docRef the document reference
      * @param schemas the initial schemas to use to populate the document model
@@ -168,6 +238,7 @@ public interface CoreSession {
      * @throws ClientException
      * @throws SecurityException
      */
+    @NoRollbackOnException
     DocumentModel getDocument(DocumentRef docRef, String[] schemas)
             throws ClientException;
 
@@ -176,6 +247,7 @@ public interface CoreSession {
      * <p>
      * Documents that are not accessible are skipped.
      */
+    @NoRollbackOnException
     DocumentModelList getDocuments(DocumentRef[] docRefs)
             throws ClientException;
 
@@ -205,10 +277,11 @@ public interface CoreSession {
      *         specified parent document is not a folder
      * @throws ClientException
      */
+    @NoRollbackOnException
     DocumentModelList getChildren(DocumentRef parent) throws ClientException;
 
     /**
-     * Gets the children of the given parent.
+     * Gets an iterator to the children of the given parent.
      *
      * @param parent the parent reference
      * @return iterator over the children collection or null if the specified
@@ -228,9 +301,14 @@ public interface CoreSession {
      *         the parent document is not a folder
      * @throws ClientException
      */
+    @NoRollbackOnException
     DocumentModelList getChildren(DocumentRef parent, String type)
             throws ClientException;
 
+    /**
+     * Gets an iterator to the children of the given parent filtered according
+     * to the given document type.
+     */
     DocumentModelIterator getChildrenIterator(DocumentRef parent, String type)
             throws ClientException;
 
@@ -245,12 +323,13 @@ public interface CoreSession {
      *         the parent document is not a folder
      * @throws ClientException
      */
+    @NoRollbackOnException
     DocumentModelList getChildren(DocumentRef parent, String type, String perm)
             throws ClientException;
 
     /**
-     * Same as the previous method but the result is filtered and then sorted
-     * using the specified filter and sorter.
+     * Same as {@link #getChildren(DocumentRef, String, String)} but the result
+     * is filtered and then sorted using the specified filter and sorter.
      *
      * @param parent the parent reference
      * @param type the wanted type
@@ -261,6 +340,7 @@ public interface CoreSession {
      *         found or null if the given parent is not a folder
      * @throws ClientException
      */
+    @NoRollbackOnException
     DocumentModelList getChildren(DocumentRef parent, String type, String perm,
             Filter filter, Sorter sorter) throws ClientException;
 
@@ -310,7 +390,8 @@ public interface CoreSession {
             String perm, Filter filter) throws ClientException;
 
     /**
-     * Same as the previous method without specific permission filtering.
+     * Same as {@link #getChildren(DocumentRef, String, String, Filter, Sorter)}
+     * without specific permission filtering.
      *
      * @param parent the parent reference
      * @param type the wanted type
@@ -338,16 +419,17 @@ public interface CoreSession {
      * Same as {@link CoreSession#getFolders(DocumentRef)} but returns a lazy
      * loading iterator over the list of children.
      *
-     * @param parent
-     * @return
+     * @param parent the parent reference
+     * @return a list of children if any, an empty one if none or null if the
+     *         given parent is not a folder
      * @throws ClientException
      */
     DocumentModelIterator getFoldersIterator(DocumentRef parent)
             throws ClientException;
 
     /**
-     * Same as the previous method but use an optional filter and sorter on the
-     * result.
+     * Same as {@link CoreSession#getFolders(DocumentRef)} but uses an optional
+     * filter and sorter on the result.
      *
      * @param parent the parent reference
      * @param filter the filter to use or null if none
@@ -360,8 +442,8 @@ public interface CoreSession {
             Sorter sorter) throws ClientException;
 
     /**
-     * Same as {@link CoreSession#getChildren(DocumentRef)} but returns a lazy
-     * loading iterator over the list of children.
+     * Same as {@link CoreSession#getChildren(DocumentRef)} but returns only
+     * non-folder documents.
      *
      * @param parent the parent reference
      * @return a list of children if any, an empty one if none or null if the
@@ -371,8 +453,8 @@ public interface CoreSession {
     DocumentModelList getFiles(DocumentRef parent) throws ClientException;
 
     /**
-     * Same as {@link CoreSession#getFiles(DocumentRef)} but returns only
-     * non-folder documents.
+     * Same as {@link CoreSession#getFiles(DocumentRef)} but returns an
+     * iterator.
      *
      * @param parent
      * @return
@@ -382,7 +464,7 @@ public interface CoreSession {
             throws ClientException;
 
     /**
-     * Same as the previous method but uses an optional filter and sorter on the
+     * Same as {@link #getFiles} but uses an optional filter and sorter on the
      * result.
      *
      * @param parent the parent reference
@@ -423,10 +505,8 @@ public interface CoreSession {
      * <p>
      * This operation makes no difference between non-existence and permission
      * problems.
-     * </p>
      * <p>
      * If the parent is null or its path is null, then root is considered.
-     * </p>
      *
      * @param docRef the reference to the document to test for existence
      * @return true if the referenced document exists, false otherwise
@@ -452,7 +532,6 @@ public interface CoreSession {
      * Creates a document model using type name.
      * <p>
      * Used to fetch initial datamodels from the type definition.
-     *
      * <p>
      * DocumentModel creation notifies a
      * {@link DocumentEventTypes.EMPTY_DOCUMENTMODEL_CREATED} so that core event
@@ -524,28 +603,43 @@ public interface CoreSession {
             throws ClientException;
 
     /**
+     * Low-level import of documents, reserved for the administrator.
+     * <p>
+     * This method is used to import documents with given ids, or directly
+     * import versions and proxies.
+     * <p>
+     * The id, parent, name and typeName must be present in each docModel.
+     * <p>
+     * The context data needs to be filled with values depending on the type of
+     * the document:
+     * <p>
+     * For a proxy (type = {@code "ecm:proxyType"}):
+     * {@link #IMPORT_PROXY_TARGET_ID} and {@link #IMPORT_PROXY_VERSIONABLE_ID}.
+     * <p>
+     * For a version (no parent): {@link #IMPORT_VERSION_VERSIONABLE_ID},
+     * {@link #IMPORT_VERSION_CREATED}, {@link #IMPORT_VERSION_LABEL} and
+     * {@link #IMPORT_VERSION_DESCRIPTION}.
+     * <p>
+     * For a live document: {@link #IMPORT_BASE_VERSION_ID} and
+     * {@link #IMPORT_CHECKED_IN} (Boolean).
+     * <p>
+     * For a live document or a version: {@link #IMPORT_LIFECYCLE_POLICY} ,
+     * {@link #IMPORT_LIFECYCLE_STATE}, {@link #IMPORT_DIRTY} (Boolean),
+     * {@link #IMPORT_VERSION_MAJOR} (Long) and {@link #IMPORT_VERSION_MINOR}
+     * (Long).
+     *
+     * @param docModels the documents to create
+     * @throws ClientException
+     */
+    void importDocuments(List<DocumentModel> docModels) throws ClientException;
+
+    /**
      * Saves changes done on the given document model.
      *
      * @param docModel the document model that needs modified
      * @throws ClientException
      */
     DocumentModel saveDocument(DocumentModel docModel) throws ClientException;
-
-    /**
-     * Performs a checkin-checkout on the current document (not updated) to
-     * create a read-only copy of the previous version and updates the current
-     * version with data from the given DocumentModel.
-     *
-     * @param docModel
-     * @return
-     * @throws ClientException
-     *
-     * @deprecated instead use saveDocument with
-     *             VersioningDocument.CREATE_SNAPSHOT_ON_SAVE_KEY in contextData
-     */
-    @Deprecated
-    DocumentModel saveDocumentAsNewVersion(DocumentModel docModel)
-            throws ClientException;
 
     /**
      * Bulk document saving.
@@ -712,12 +806,12 @@ public interface CoreSession {
      * If the <code>overwrite</code> argument is false, the ACP is merged with
      * the existing one if any. The merge is done as follow:
      * <ul>
-     * <li> If any ACL is that already exists on the document ACp is redefined
+     * <li>If any ACL is that already exists on the document ACp is redefined
      * by the new ACO then it will be replaced by the new one. So if you want to
      * remove an ACl in this mode you need to specify an empty ACL.
-     * <li> If the new ACP contains an ACl that is not defined by the old one
+     * <li>If the new ACP contains an ACl that is not defined by the old one
      * the it will be added to the merged ACP.
-     * <li> If the <code>owners</code> are specified then they will replace
+     * <li>If the <code>owners</code> are specified then they will replace
      * the existing ones if any. Otherwise the old owners are preserved if any.
      * As for the ACL if you want to remove existing owners you need to specify
      * an empty owner array (and not a null one)
@@ -784,21 +878,6 @@ public interface CoreSession {
             String[] fields) throws ClientException;
 
     /**
-     * Gets the full content of the given field in the given document from the
-     * given session.
-     * <p>
-     * This method is supposed to be called from the client to lazy load content
-     * fields data.
-     *
-     * @param docRef the document reference
-     * @param path the path of the content field. Must be the raw path of the
-     *            property (i.e. in the prefixed form)
-     * @return the content data as a byte array content source
-     */
-    byte[] getContentData(DocumentRef docRef, String path)
-            throws ClientException;
-
-    /**
      * Gets the data input stream given its key.
      * <p>
      * The key is implementation-dependent - this can be a property path an ID,
@@ -835,7 +914,7 @@ public interface CoreSession {
     /**
      * Gets the last version of a document.
      *
-     * @param docRef the document reference
+     * @param docRef the reference to the document
      * @return the version
      * @throws ClientException if any error occurs
      */
@@ -845,7 +924,7 @@ public interface CoreSession {
      * Gets the document corresponding to the last version for the given
      * document.
      *
-     * @param docRef
+     * @param docRef the reference to the document
      * @return the document model corresponding to the version
      * @throws ClientException
      */
@@ -855,7 +934,7 @@ public interface CoreSession {
     /**
      * Gets the head (live) document for this document.
      *
-     * @param docRef the document reference
+     * @param docRef the reference to the document
      * @return the version
      * @throws ClientException if any error occurs
      */
@@ -864,7 +943,7 @@ public interface CoreSession {
     /**
      * Gets the references of the versions of the document.
      *
-     * @param docRef the document reference
+     * @param docRef the reference to the document
      * @return a list of version references
      * @throws ClientException
      * @since 1.4.1
@@ -875,7 +954,7 @@ public interface CoreSession {
     /**
      * Retrieves all the versions for a specified document.
      *
-     * @param docRef the ref to the document
+     * @param docRef the reference to the document
      * @return the list of {@see DocumentModel} representing versions, empty
      *         list if none is found.
      * @throws ClientException
@@ -885,7 +964,7 @@ public interface CoreSession {
     /**
      * Retrieves all the versions for a specified document.
      *
-     * @param docRef the ref to the document
+     * @param docRef the reference to the document
      * @return the list of {@see VersionModel} representing versions, empty list
      *         if none is found.
      */
@@ -893,15 +972,43 @@ public interface CoreSession {
             throws ClientException;
 
     /**
+     * Gets a document version, given the versionable id and label.
+     * <p>
+     * The version model contains the label of the version to look for. On
+     * return, it is filled with the version's description and creation date.
+     * <p>
+     * Restricted to administrators.
+     *
+     * @param versionableId the versionable id
+     * @param versionModel the version model holding the label
+     * @return the version, or {@code null} if not found
+     * @throws ClientException
+     */
+    DocumentModel getVersion(String versionableId, VersionModel versionModel)
+            throws ClientException;
+
+    /**
      * Returns a document that represents the specified version of the document.
      *
-     * @param docRef the document reference
+     * @param docRef the reference to the document
      * @param version the version for which we want the corresponding document
      * @return
      * @throws ClientException
      */
     DocumentModel getDocumentWithVersion(DocumentRef docRef,
             VersionModel version) throws ClientException;
+
+    /**
+     * Restores the given document to the specified version permitting to skip
+     * the creation of the snapshot for current document.
+     *
+     * @param docRef the reference to the document
+     * @param version the version to which the document should be restored to -
+     *            only the label is used for the moment
+     * @param skipSnapshotCreation indicates if skipping snapshot creation
+     */
+    DocumentModel restoreToVersion(DocumentRef docRef, VersionModel version,
+            boolean skipSnapshotCreation) throws ClientException;
 
     /**
      * Restores the given document to the specified version.
@@ -916,8 +1023,7 @@ public interface CoreSession {
     /**
      * Checks out a versioned document.
      *
-     * @param docRef the ref to the document
-     * @return the next displayed page
+     * @param docRef the reference to the document
      * @throws ClientException
      */
     void checkOut(DocumentRef docRef) throws ClientException;
@@ -925,9 +1031,8 @@ public interface CoreSession {
     /**
      * Checks in a modified document, creating a new version.
      *
-     * @param docRef the ref to the document
+     * @param docRef the reference to the document
      * @param version the version descriptor
-     * @return the next displayed page
      * @throws ClientException
      */
     void checkIn(DocumentRef docRef, VersionModel version)
@@ -943,9 +1048,18 @@ public interface CoreSession {
     boolean isCheckedOut(DocumentRef docRef) throws ClientException;
 
     /**
+     * Creates a generic proxy to the given document inside the given folder.
+     * <p>
+     * The document may be a version, or a working copy (live document) in which
+     * case the proxy will be a "shortcut".
+     */
+    DocumentModel createProxy(DocumentRef docRef, DocumentRef folderRef)
+            throws ClientException;
+
+    /**
      * Creates a proxy for the given version of the given document.
      *
-     * @param docRef the document
+     * @param docRef the reference to the document
      * @param version the version
      * @return the proxy
      * @throws ClientException if any error occurs
@@ -972,10 +1086,7 @@ public interface CoreSession {
      * @param max number of document to retrieve
      * @return the query result
      * @throws ClientException
-     *
-     * @deprecated use search service
      */
-    @Deprecated
     DocumentModelList query(String query, int max) throws ClientException;
 
     /**
@@ -986,10 +1097,7 @@ public interface CoreSession {
      * @param filter the filter to apply to result
      * @return the query result
      * @throws ClientException
-     *
-     * @deprecated use search service
      */
-    @Deprecated
     DocumentModelList query(String query, Filter filter) throws ClientException;
 
     /**
@@ -1001,30 +1109,52 @@ public interface CoreSession {
      * @param max number of document to retrieve
      * @return the query result
      * @throws ClientException
-     *
-     * @deprecated use search service
      */
-    @Deprecated
     DocumentModelList query(String query, Filter filter, int max)
             throws ClientException;
 
     /**
-     * @deprecated use SearchService instead. See
-     *             {@url http://doc.nuxeo.org/reference/html/search-service.html}
+     * Executes the given NXQL query and returns the result that matches the
+     * filter.
+     *
+     * @param query the query to execute
+     * @param filter the filter to apply to result
+     * @param limit the maximum number of documents to retrieve, or 0 for all of
+     *            them
+     * @param offset the offset (starting at 0) into the list of documents
+     * @param countTotal if {@code true}, return a {@link DocumentModelList}
+     *            that includes a total size of the underlying list (size if
+     *            there was no limit or offset)
+     * @return the query result
+     * @throws ClientException
      */
-    @Deprecated
+    DocumentModelList query(String query, Filter filter, long limit,
+            long offset, boolean countTotal) throws ClientException;
+
+    /**
+     *
+     * @throws ClientException
+     */
+    IterableQueryResult queryAndFetch(String query, String queryType,
+            Object... params) throws ClientException;
+
+    /**
+     * Executes the given NXQL query and returns an iterators of results.
+     *
+     * @param query the query to execute
+     * @param filter the filter to apply to result
+     * @param max number of document to retrieve
+     * @return the query result iterator
+     * @throws ClientException
+     */
     DocumentModelIterator queryIt(String query, Filter filter, int max)
             throws ClientException;
 
     /**
      * Executes a specific FULLTEXT enabled query for the given keywords.
      *
-     * @param keywords
-     * @return
-     * @throws ClientException
-     *
      * @deprecated use SearchService instead. See
-     *             {@url http://doc.nuxeo.org/reference/html/search-service.html}
+     *             {@link http://doc.nuxeo.org/reference/html/search-service.html}
      */
     @Deprecated
     DocumentModelList querySimpleFts(String keywords) throws ClientException;
@@ -1033,13 +1163,8 @@ public interface CoreSession {
      * Executes a specific FULLTEXT enabled query for the given keywords,
      * returning only results that match the specified filter.
      *
-     * @param keywords
-     * @param filter
-     * @return
-     * @throws ClientException
-     *
      * @deprecated use SearchService instead. See
-     *             {@url http://doc.nuxeo.org/reference/html/search-service.html}
+     *             {@link http://doc.nuxeo.org/reference/html/search-service.html}
      */
     @Deprecated
     DocumentModelList querySimpleFts(String keywords, Filter filter)
@@ -1047,7 +1172,7 @@ public interface CoreSession {
 
     /**
      * @deprecated use SearchService instead. See
-     *             {@url http://doc.nuxeo.org/reference/html/search-service.html}
+     *             {@link http://doc.nuxeo.org/reference/html/search-service.html}
      */
     @Deprecated
     DocumentModelIterator querySimpleFtsIt(String query, Filter filter,
@@ -1055,7 +1180,7 @@ public interface CoreSession {
 
     /**
      * @deprecated use SearchService instead. See
-     *             {@url http://doc.nuxeo.org/reference/html/search-service.html}
+     *             {@link http://doc.nuxeo.org/reference/html/search-service.html}
      */
     @Deprecated
     DocumentModelIterator querySimpleFtsIt(String query, String startingPath,
@@ -1224,9 +1349,7 @@ public interface CoreSession {
     /**
      * Publishes the document in a section overwriting any existing proxy to the
      * same document. This is simmilar to publishDocument(docToPublish, section,
-     * true).
-     * <p>
-     * If the document is already a proxy, then it's simply copied.
+     * true);
      *
      * @param docToPublish
      * @param section
@@ -1261,17 +1384,17 @@ public interface CoreSession {
     VersionModel isPublished(DocumentModel document, DocumentModel section);
 
     /**
-     * Gets all proxies to document docRef. If folderRef is not null, the search
-     * will be limited to its children.
+     * Finds the proxies for a document. If the parent is not null, the search
+     * will be limited to its direct children.
      * <p>
      * If the document is a version, then only proxies to that version will be
      * looked up.
      * <p>
      * If the document is a proxy, then all similar proxies (pointing to any
-     * version of the same base document) are retrieved.
+     * version of the same versionable) are retrieved.
      *
      * @param docRef the target document for the proxies
-     * @param folderRef the folder where proxies are located
+     * @param folderRef the folder where proxies are located or {@code null}
      * @return the list of the proxies. An empty list is returned if no proxy
      *         are found
      * @throws ClientException if any error occurs
@@ -1288,8 +1411,9 @@ public interface CoreSession {
      *
      * @param docRef the target document for the proxies
      * @param folderRef the folder where proxies are located
-     * @return an array of the proxy versions. Null is returned if no proxies
-     *         are found the specified folder
+     * @return an array of the proxy versions, with an empty string being used
+     *         for a live proxy. {@code null} is returned if no proxies are
+     *         found the specified folder
      * @throws ClientException if any error occurs
      */
     String[] getProxyVersions(DocumentRef docRef, DocumentRef folderRef)
@@ -1389,6 +1513,82 @@ public interface CoreSession {
      * @return the command result
      * @throws ClientException if any error occurs
      */
-    public <T> T run(Operation<T> cmd) throws ClientException;
+    <T> T run(Operation<T> cmd) throws ClientException;
+
+    /**
+     * Run a command and notify the given monitor about the execution progress
+     *
+     * @param <T>
+     * @param op
+     * @param monitor
+     * @return
+     * @throws ClientException
+     */
+    <T> T run(Operation<T> op, ProgressMonitor monitor) throws ClientException;
+
+    /**
+     * Internal method - it is used internally by
+     * {@link DocumentModel#refresh()}
+     * <p>
+     * Get fresh data from a document given a description of what kind of data
+     * should be refetched.
+     * <p>
+     * The refresh information is specified using a bit mask. See
+     * {@link DocumentModel} for all accepted flags.
+     * <p>
+     * When the flag {@link DocumentModel#REFRESH_CONTENT_IF_LOADED} is
+     * specified a third argument must be passed representing the schema names
+     * for document parts to refresh. This argument is ignored if the flag is
+     * not specified or no schema names are provided
+     * <p>
+     * The result is an array defined as follows:
+     * <ul>
+     * <li>on index 0 - the prefetch data
+     * <li>on index 1 - the lock state info
+     * <li>on index 2 - the life cycle state info
+     * <li>on index 3 - the life cycle policy
+     * <li>on index 4 - the ACP
+     * <li>on index 5 - an array of {@link DocumentPart} objects
+     * </ul>
+     *
+     * @param ref the document reference
+     * @param refreshFlags refresh flags as defined in {@link DocumentModel}
+     * @param schemas the schema names if a partial content refresh is required
+     * @return an array containing the refreshed data - this array will always
+     *         have 5 elements.
+     *
+     * @throws ClientException
+     */
+    Object[] refreshDocument(DocumentRef ref, int refreshFlags, String[] schemas)
+            throws ClientException;
+
+    /**
+     * Provides the full list of all permissions or groups of permissions that
+     * contain the given one (inclusive). It makes the method
+     * {@link org.nuxeo.ecm.core.security.SecurityService#getPermissionsToCheck}
+     * available remote.
+     *
+     * @param permission
+     * @return the list, as an array of strings.
+     */
+    String[] getPermissionsToCheck(String permission);
+
+    /**
+     * Indicates if implementation of the given repositoryName supports Tags
+     * feature
+     *
+     * @param repositoryName the name of the repository to test
+     * @return
+     * @throws ClientException
+     */
+    boolean supportsTags(String repositoryName) throws ClientException;
+
+    /**
+     * Indicates if the current repository implementation supports tags.
+     *
+     * @return true if tags are supported
+     * @throws ClientException
+     */
+    boolean supportsTags() throws ClientException;
 
 }

@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -87,13 +88,14 @@ public class ACPImpl implements ACP {
 
     /**
      * This method must append the ACL and not insert it since it is used to
-     * append the inherited ACL which is the less signifiant ACL.
+     * append the inherited ACL which is the less significant ACL.
      */
     public void addACL(ACL acl) {
+        assert acl != null;
         ACL oldACL = getACL(acl.getName());
-        if (acl != null && !acl.equals(oldACL)) {
+        if (!acl.equals(oldACL)) {
             // replace existing ACL instance different from acl having the same
-            // name if any
+            // name, if any
             if (oldACL != null) {
                 oldACL.clear();
                 oldACL.addAll(acl);
@@ -369,7 +371,7 @@ public class ACPImpl implements ACP {
         for (ACL acl: acls) {
             copy.acls.add((ACL) acl.clone());
         }
-        copy.owners.addAll((ArrayList<String>) owners.clone());
+        copy.owners.addAll((Collection<String>) owners.clone());
         return copy;
     }
 

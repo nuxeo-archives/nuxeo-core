@@ -25,12 +25,12 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 
+import org.junit.BeforeClass;
+import org.junit.Test;
 import org.nuxeo.common.collections.ScopeType;
 import org.nuxeo.common.collections.ScopedMap;
 import org.nuxeo.common.utils.FileUtils;
@@ -45,12 +45,16 @@ import org.nuxeo.ecm.core.api.impl.blob.ByteArrayBlob;
 import org.nuxeo.ecm.core.api.impl.blob.StreamingBlob;
 import org.nuxeo.ecm.core.api.impl.blob.StringBlob;
 import org.nuxeo.ecm.core.api.model.Property;
+import org.nuxeo.runtime.test.NXRuntimeTestCase;
+
+import static org.nuxeo.ecm.core.api.Constants.CORE_BUNDLE;
+import static org.nuxeo.ecm.core.api.Constants.CORE_FACADE_TESTS_BUNDLE;
 
 /**
  * @author Razvan Caraghin
- *
+ * @author Stefane Fermigier
  */
-public abstract class TestAPI extends TestConnection {
+public class TestAPI extends BaseTestCase {
     /*
      * if: java.io.InvalidClassException: javax.resource.ResourceException;
      * local class incompatible: stream classdesc serialVersionUID see
@@ -59,86 +63,43 @@ public abstract class TestAPI extends TestConnection {
      * probably this is because too many opened JCR sessions
      */
 
-    protected final Random random = new Random(new Date().getTime());
+    @BeforeClass
+    public static void startRuntime() throws Exception {
+        runtime = new NXRuntimeTestCase() {};
+        runtime.setUp();
 
-    @Override
-    protected void tearDown() throws Exception {
-        cleanUp(getRootDocument().getRef());
-        closeSession();
-        super.tearDown();
+        runtime.deployContrib(CORE_BUNDLE, "OSGI-INF/CoreService.xml");
+        runtime.deployContrib(CORE_BUNDLE, "OSGI-INF/SecurityService.xml");
+        runtime.deployContrib(CORE_BUNDLE, "OSGI-INF/RepositoryService.xml");
+
+        runtime.deployBundle("org.nuxeo.ecm.core.event");
+
+        runtime.deployContrib(CORE_FACADE_TESTS_BUNDLE, "TypeService.xml");
+        runtime.deployContrib(CORE_FACADE_TESTS_BUNDLE, "permissions-contrib.xml");
+        runtime.deployContrib(CORE_FACADE_TESTS_BUNDLE, "test-CoreExtensions.xml");
+        runtime.deployContrib(CORE_FACADE_TESTS_BUNDLE, "CoreTestExtensions.xml");
+        runtime.deployContrib(CORE_FACADE_TESTS_BUNDLE, "DemoRepository.xml");
+        runtime.deployContrib(CORE_FACADE_TESTS_BUNDLE, "LifeCycleService.xml");
+        runtime.deployContrib(CORE_FACADE_TESTS_BUNDLE, "LifeCycleServiceExtensions.xml");
+        runtime.deployContrib(CORE_FACADE_TESTS_BUNDLE, "DocumentAdapterService.xml");
     }
 
-    protected String generateUnique() {
-        return String.valueOf(random.nextLong());
-    }
+    // Test methods start here
 
-    protected DocumentModel getRootDocument() throws ClientException {
-        DocumentModel root = remote.getRootDocument();
-
-        assertNotNull(root);
-        assertNotNull(root.getId());
-        assertNotNull(root.getRef());
-        assertNotNull(root.getPathAsString());
-
-        return root;
-    }
-
-    protected DocumentModel createChildDocument(DocumentModel childFolder)
-            throws ClientException {
-
-        DocumentModel ret = remote.createDocument(childFolder);
-
-        assertNotNull(ret);
-        assertNotNull(ret.getName());
-        assertNotNull(ret.getId());
-        assertNotNull(ret.getRef());
-        assertNotNull(ret.getPathAsString());
-
-        return ret;
-    }
-
-    protected List<DocumentModel> createChildDocuments(
-            List<DocumentModel> childFolders) throws ClientException {
-        List<DocumentModel> rets = new ArrayList<DocumentModel>();
-        Collections.addAll(
-                rets,
-                remote.createDocument(childFolders.toArray(new DocumentModel[0])));
-
-        assertNotNull(rets);
-        assertEquals(childFolders.size(), rets.size());
-
-        for (DocumentModel createdChild : rets) {
-            assertNotNull(createdChild);
-            assertNotNull(createdChild.getName());
-            assertNotNull(createdChild.getRef());
-            assertNotNull(createdChild.getPathAsString());
-            assertNotNull(createdChild.getId());
-        }
-
-        return rets;
-    }
-
-    protected void cleanUp(DocumentRef ref) throws ClientException {
-        remote.removeChildren(ref);
-        remote.save();
-    }
-
+    @Test
     public void testCancel() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         DocumentModel childFolder = new DocumentModelImpl(
                 root.getPathAsString(), "folder#" + generateUnique(), "Folder");
         childFolder = createChildDocument(childFolder);
 
-        remote.cancel();
+        session.cancel();
 
-        assertFalse(remote.exists(childFolder.getRef()));
+        assertFalse(session.exists(childFolder.getRef()));
     }
 
+    @Test
     public void testCreateDomainDocumentRefDocumentModel()
             throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "domain#" + generateUnique();
         DocumentModel childFolder = new DocumentModelImpl(
                 root.getPathAsString(), name, "Domain");
@@ -148,10 +109,9 @@ public abstract class TestAPI extends TestConnection {
         assertEquals(name, childFolder.getName());
     }
 
+    @Test
     public void testCreateFolderDocumentRefDocumentModel()
             throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "folder#" + generateUnique();
         DocumentModel childFolder = new DocumentModelImpl(
                 root.getPathAsString(), name, "Folder");
@@ -161,9 +121,8 @@ public abstract class TestAPI extends TestConnection {
         assertEquals(name, childFolder.getName());
     }
 
+    @Test
     public void testCreateFileDocumentRefDocumentModel() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "file#" + generateUnique();
         DocumentModel childFile = new DocumentModelImpl(root.getPathAsString(),
                 name, "File");
@@ -174,10 +133,9 @@ public abstract class TestAPI extends TestConnection {
         assertEquals(name, childFile.getName());
     }
 
+    @Test
     public void testCreateFolderDocumentRefDocumentModelArray()
             throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "folder#" + generateUnique();
         DocumentModel childFolder = new DocumentModelImpl(
                 root.getPathAsString(), name, "Folder");
@@ -195,10 +153,9 @@ public abstract class TestAPI extends TestConnection {
         assertEquals(name2, returnedChildFolders.get(1).getName());
     }
 
+    @Test
     public void testCreateFileDocumentRefDocumentModelArray()
             throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "file#" + generateUnique();
         DocumentModel childFile = new DocumentModelImpl(root.getPathAsString(),
                 name, "File");
@@ -216,15 +173,13 @@ public abstract class TestAPI extends TestConnection {
         assertEquals(name2, returnedChildFiles.get(1).getName());
     }
 
+    @Test
     public void testExists() throws ClientException {
-        DocumentModel root = getRootDocument();
-
-        assertTrue(remote.exists(root.getRef()));
+        assertTrue(session.exists(root.getRef()));
     }
 
+    @Test
     public void testGetChild() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "folder#" + generateUnique();
         DocumentModel childFolder = new DocumentModelImpl(
                 root.getPathAsString(), name, "Folder");
@@ -241,7 +196,7 @@ public abstract class TestAPI extends TestConnection {
         assertEquals(name, returnedChildDocs.get(0).getName());
         assertEquals(name2, returnedChildDocs.get(1).getName());
 
-        DocumentModel retrievedChild = remote.getChild(root.getRef(), name);
+        DocumentModel retrievedChild = session.getChild(root.getRef(), name);
 
         assertNotNull(retrievedChild);
         assertNotNull(retrievedChild.getId());
@@ -251,7 +206,7 @@ public abstract class TestAPI extends TestConnection {
 
         assertEquals(name, retrievedChild.getName());
 
-        retrievedChild = remote.getChild(root.getRef(), name2);
+        retrievedChild = session.getChild(root.getRef(), name2);
 
         assertNotNull(retrievedChild);
         assertNotNull(retrievedChild.getId());
@@ -262,25 +217,20 @@ public abstract class TestAPI extends TestConnection {
         assertEquals(name2, retrievedChild.getName());
     }
 
+    @Test
     public void testGetChildrenDocumentRef() throws ClientException {
-        DocumentModel root = getRootDocument();
-
-        List<DocumentModel> docs = remote.getChildren(root.getRef());
-
+        List<DocumentModel> docs = session.getChildren(root.getRef());
         assertEquals(0, docs.size());
     }
 
+    @Test
     public void testGetChildrenDocumentRef2() throws ClientException {
-        DocumentModel root = getRootDocument();
-
-        DocumentModelIterator docs = remote.getChildrenIterator(root.getRef());
-
+        DocumentModelIterator docs = session.getChildrenIterator(root.getRef());
         assertFalse(docs.hasNext());
     }
 
+    @Test
     public void testGetFileChildrenDocumentRefString() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "folder#" + generateUnique();
         DocumentModel childFolder = new DocumentModelImpl(
                 root.getPathAsString(), name, "Folder");
@@ -298,25 +248,24 @@ public abstract class TestAPI extends TestConnection {
         assertEquals(name2, returnedChildDocs.get(1).getName());
 
         // get file childs
-        List<DocumentModel> retrievedChilds = remote.getChildren(root.getRef(),
+        List<DocumentModel> retrievedChildren = session.getChildren(root.getRef(),
                 "File");
 
-        assertNotNull(retrievedChilds);
-        assertEquals(1, retrievedChilds.size());
+        assertNotNull(retrievedChildren);
+        assertEquals(1, retrievedChildren.size());
 
-        assertNotNull(retrievedChilds.get(0));
-        assertNotNull(retrievedChilds.get(0).getId());
-        assertNotNull(retrievedChilds.get(0).getName());
-        assertNotNull(retrievedChilds.get(0).getPathAsString());
-        assertNotNull(retrievedChilds.get(0).getRef());
+        assertNotNull(retrievedChildren.get(0));
+        assertNotNull(retrievedChildren.get(0).getId());
+        assertNotNull(retrievedChildren.get(0).getName());
+        assertNotNull(retrievedChildren.get(0).getPathAsString());
+        assertNotNull(retrievedChildren.get(0).getRef());
 
-        assertEquals(name2, retrievedChilds.get(0).getName());
-        assertEquals("File", retrievedChilds.get(0).getType());
+        assertEquals(name2, retrievedChildren.get(0).getName());
+        assertEquals("File", retrievedChildren.get(0).getType());
     }
 
+    @Test
     public void testGetFileChildrenDocumentRefString2() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "folder#" + generateUnique();
         DocumentModel childFolder = new DocumentModelImpl(
                 root.getPathAsString(), name, "Folder");
@@ -334,7 +283,7 @@ public abstract class TestAPI extends TestConnection {
         assertEquals(name2, returnedChildDocs.get(1).getName());
 
         // get file childs
-        DocumentModelIterator retrievedChilds = remote.getChildrenIterator(
+        DocumentModelIterator retrievedChilds = session.getChildrenIterator(
                 root.getRef(), "File");
 
         assertNotNull(retrievedChilds);
@@ -353,9 +302,8 @@ public abstract class TestAPI extends TestConnection {
         assertEquals("File", doc.getType());
     }
 
+    @Test
     public void testGetFolderChildrenDocumentRefString() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "folder#" + generateUnique();
         DocumentModel childFolder = new DocumentModelImpl(
                 root.getPathAsString(), name, "Folder");
@@ -373,7 +321,7 @@ public abstract class TestAPI extends TestConnection {
         assertEquals(name2, returnedChildDocs.get(1).getName());
 
         // get folder childs
-        List<DocumentModel> retrievedChilds = remote.getChildren(root.getRef(),
+        List<DocumentModel> retrievedChilds = session.getChildren(root.getRef(),
                 "Folder");
 
         assertNotNull(retrievedChilds);
@@ -389,10 +337,9 @@ public abstract class TestAPI extends TestConnection {
         assertEquals("Folder", retrievedChilds.get(0).getType());
     }
 
+    @Test
     public void testGetFolderChildrenDocumentRefString2()
             throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "folder#" + generateUnique();
         DocumentModel childFolder = new DocumentModelImpl(
                 root.getPathAsString(), name, "Folder");
@@ -410,7 +357,7 @@ public abstract class TestAPI extends TestConnection {
         assertEquals(name2, returnedChildDocs.get(1).getName());
 
         // get folder childs
-        DocumentModelIterator retrievedChilds = remote.getChildrenIterator(
+        DocumentModelIterator retrievedChilds = session.getChildrenIterator(
                 root.getRef(), "Folder");
 
         assertNotNull(retrievedChilds);
@@ -429,9 +376,8 @@ public abstract class TestAPI extends TestConnection {
         assertEquals("Folder", doc.getType());
     }
 
+    @Test
     public void testGetChildrenDocumentRefStringFilter() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "folder#" + generateUnique();
         DocumentModel childFolder = new DocumentModelImpl(
                 root.getPathAsString(), name, "Folder");
@@ -451,7 +397,7 @@ public abstract class TestAPI extends TestConnection {
         Filter filter = new NameFilter(name2);
 
         // get folder childs
-        List<DocumentModel> retrievedChilds = remote.getChildren(root.getRef(),
+        List<DocumentModel> retrievedChilds = session.getChildren(root.getRef(),
                 null, null, filter, null);
 
         assertNotNull(retrievedChilds);
@@ -467,10 +413,9 @@ public abstract class TestAPI extends TestConnection {
     }
 
     // FIXME: same as testGetChildrenDocumentRefStringFilter. Remove?
+    @Test
     public void testGetChildrenDocumentRefStringFilter2()
             throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "folder#" + generateUnique();
         DocumentModel childFolder = new DocumentModelImpl(
                 root.getPathAsString(), name, "Folder");
@@ -490,7 +435,7 @@ public abstract class TestAPI extends TestConnection {
         Filter filter = new NameFilter(name2);
 
         // get folder childs
-        DocumentModelIterator retrievedChilds = remote.getChildrenIterator(
+        DocumentModelIterator retrievedChilds = session.getChildrenIterator(
                 root.getRef(), null, null, filter);
 
         assertNotNull(retrievedChilds);
@@ -510,12 +455,9 @@ public abstract class TestAPI extends TestConnection {
 
     /**
      * Test for NXP-741: Search based getChildren.
-     *
-     * @throws ClientException
      */
+    @Test
     public void testGetChildrenInFolderWithSearch() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "folder#" + generateUnique();
         DocumentModel folder = new DocumentModelImpl(root.getPathAsString(),
                 name, "FolderWithSearch");
@@ -541,9 +483,8 @@ public abstract class TestAPI extends TestConnection {
         }
     }
 
+    @Test
     public void testGetDocumentDocumentRef() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "folder#" + generateUnique();
         DocumentModel childFolder = new DocumentModelImpl(
                 root.getPathAsString(), name, "Folder");
@@ -560,7 +501,7 @@ public abstract class TestAPI extends TestConnection {
         assertEquals(name, returnedChildDocs.get(0).getName());
         assertEquals(name2, returnedChildDocs.get(1).getName());
 
-        DocumentModel doc = remote.getDocument(returnedChildDocs.get(0).getRef());
+        DocumentModel doc = session.getDocument(returnedChildDocs.get(0).getRef());
 
         assertNotNull(doc);
         assertNotNull(doc.getRef());
@@ -575,23 +516,21 @@ public abstract class TestAPI extends TestConnection {
     // TODO: fix this test.
     public void XXXtestGetDocumentDocumentRefStringArray()
             throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name2 = "file#" + generateUnique();
         DocumentModel childFile = new DocumentModelImpl(root.getPathAsString(),
                 name2, "File");
         childFile = createChildDocument(childFile);
 
-        remote.save();
+        session.save();
 
         childFile.setProperty("file", "filename", "second name");
         childFile.setProperty("dublincore", "title", "f1");
         childFile.setProperty("dublincore", "description", "desc 1");
 
-        remote.saveDocument(childFile);
-        remote.save();
+        session.saveDocument(childFile);
+        session.save();
 
-        DocumentModel returnedDocument = remote.getDocument(childFile.getRef(),
+        DocumentModel returnedDocument = session.getDocument(childFile.getRef(),
                 new String[] { "common" });
 
         assertNotNull(returnedDocument);
@@ -614,7 +553,7 @@ public abstract class TestAPI extends TestConnection {
                 "description"));
         assertNull(returnedDocument.getProperty("file", "filename"));
 
-        returnedDocument = remote.getDocument(childFile.getRef(), new String[] {
+        returnedDocument = session.getDocument(childFile.getRef(), new String[] {
                 "common", "file" });
 
         assertNotNull(returnedDocument);
@@ -638,9 +577,8 @@ public abstract class TestAPI extends TestConnection {
                 "filename"));
     }
 
+    @Test
     public void testGetFilesDocumentRef() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "folder#" + generateUnique();
         DocumentModel childFolder = new DocumentModelImpl(
                 root.getPathAsString(), name, "Folder");
@@ -658,7 +596,7 @@ public abstract class TestAPI extends TestConnection {
         assertEquals(name2, returnedChildDocs.get(1).getName());
 
         // get file childs
-        List<DocumentModel> retrievedChilds = remote.getFiles(root.getRef());
+        List<DocumentModel> retrievedChilds = session.getFiles(root.getRef());
 
         assertNotNull(retrievedChilds);
         assertEquals(1, retrievedChilds.size());
@@ -673,9 +611,8 @@ public abstract class TestAPI extends TestConnection {
         assertEquals("File", retrievedChilds.get(0).getType());
     }
 
+    @Test
     public void testGetFilesDocumentRef2() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "folder#" + generateUnique();
         DocumentModel childFolder = new DocumentModelImpl(
                 root.getPathAsString(), name, "Folder");
@@ -693,7 +630,7 @@ public abstract class TestAPI extends TestConnection {
         assertEquals(name2, returnedChildDocs.get(1).getName());
 
         // get file childs
-        DocumentModelIterator retrievedChilds = remote.getFilesIterator(root.getRef());
+        DocumentModelIterator retrievedChilds = session.getFilesIterator(root.getRef());
 
         assertNotNull(retrievedChilds);
 
@@ -716,9 +653,8 @@ public abstract class TestAPI extends TestConnection {
     //
     // }
 
+    @Test
     public void testGetFoldersDocumentRef() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "folder#" + generateUnique();
         DocumentModel childFolder = new DocumentModelImpl(
                 root.getPathAsString(), name, "Folder");
@@ -736,7 +672,7 @@ public abstract class TestAPI extends TestConnection {
         assertEquals(name2, returnedChildDocs.get(1).getName());
 
         // get folder childs
-        List<DocumentModel> retrievedChilds = remote.getFolders(root.getRef());
+        List<DocumentModel> retrievedChilds = session.getFolders(root.getRef());
 
         assertNotNull(retrievedChilds);
         assertEquals(1, retrievedChilds.size());
@@ -751,9 +687,8 @@ public abstract class TestAPI extends TestConnection {
         assertEquals("Folder", retrievedChilds.get(0).getType());
     }
 
+    @Test
     public void testGetFoldersDocumentRef2() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "folder#" + generateUnique();
         DocumentModel childFolder = new DocumentModelImpl(
                 root.getPathAsString(), name, "Folder");
@@ -771,7 +706,7 @@ public abstract class TestAPI extends TestConnection {
         assertEquals(name2, returnedChildDocs.get(1).getName());
 
         // get folder childs
-        DocumentModelIterator retrievedChilds = remote.getFoldersIterator(root.getRef());
+        DocumentModelIterator retrievedChilds = session.getFoldersIterator(root.getRef());
 
         assertNotNull(retrievedChilds);
 
@@ -793,9 +728,8 @@ public abstract class TestAPI extends TestConnection {
     // not used at the moment
     // }
 
+    @Test
     public void testGetParentDocument() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "folder#" + generateUnique();
         DocumentModel childFolder = new DocumentModelImpl(
                 root.getPathAsString(), name, "Folder");
@@ -812,26 +746,20 @@ public abstract class TestAPI extends TestConnection {
         assertEquals(name, returnedChildDocs.get(0).getName());
         assertEquals(name2, returnedChildDocs.get(1).getName());
 
-        DocumentModel shouldBeRoot = remote.getParentDocument(returnedChildDocs.get(
+        DocumentModel shouldBeRoot = session.getParentDocument(returnedChildDocs.get(
                 0).getRef());
 
         assertEquals(root.getPathAsString(), shouldBeRoot.getPathAsString());
     }
 
-    public void testGetRootDocument() throws ClientException {
-        getRootDocument();
-    }
-
+    @Test
     public void testHasChildren() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         // the root document at the moment has no children
-        assertFalse(remote.hasChildren(root.getRef()));
+        assertFalse(session.hasChildren(root.getRef()));
     }
 
+    @Test
     public void testRemoveChildren() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "folder#" + generateUnique();
         DocumentModel childFolder = new DocumentModelImpl(
                 root.getPathAsString(), name, "Folder");
@@ -848,15 +776,14 @@ public abstract class TestAPI extends TestConnection {
         assertEquals(name, returnedChildDocs.get(0).getName());
         assertEquals(name2, returnedChildDocs.get(1).getName());
 
-        remote.removeChildren(root.getRef());
+        session.removeChildren(root.getRef());
 
-        assertFalse(remote.exists(returnedChildDocs.get(0).getRef()));
-        assertFalse(remote.exists(returnedChildDocs.get(1).getRef()));
+        assertFalse(session.exists(returnedChildDocs.get(0).getRef()));
+        assertFalse(session.exists(returnedChildDocs.get(1).getRef()));
     }
 
+    @Test
     public void testRemoveDocument() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "folder#" + generateUnique();
         DocumentModel childFolder = new DocumentModelImpl(
                 root.getPathAsString(), name, "Folder");
@@ -873,14 +800,13 @@ public abstract class TestAPI extends TestConnection {
         assertEquals(name, returnedChildDocs.get(0).getName());
         assertEquals(name2, returnedChildDocs.get(1).getName());
 
-        remote.removeDocument(returnedChildDocs.get(0).getRef());
+        session.removeDocument(returnedChildDocs.get(0).getRef());
 
-        assertFalse(remote.exists(returnedChildDocs.get(0).getRef()));
+        assertFalse(session.exists(returnedChildDocs.get(0).getRef()));
     }
 
+    @Test
     public void testQuery() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "folder#" + generateUnique();
         DocumentModel childFolder = new DocumentModelImpl(
                 root.getPathAsString(), name, "Folder");
@@ -905,10 +831,10 @@ public abstract class TestAPI extends TestConnection {
         returnedChildDocs.get(1).setProperty("file", "filename", "f1");
         returnedChildDocs.get(2).setProperty("file", "filename", "f2");
 
-        remote.saveDocuments(returnedChildDocs.toArray(new DocumentModel[0]));
-        remote.save();
+        session.saveDocuments(returnedChildDocs.toArray(new DocumentModel[returnedChildDocs.size()]));
+        session.save();
 
-        DocumentModelList list = remote.query("SELECT name FROM File");
+        DocumentModelList list = session.query("SELECT * FROM File");
         assertEquals(1, list.size());
         DocumentModel docModel = list.get(0);
         List<String> schemas = Arrays.asList(docModel.getDeclaredSchemas());
@@ -920,7 +846,7 @@ public abstract class TestAPI extends TestConnection {
 
         // if we select filename, the returned docModel
         // should have both schemas "file" and "common"
-        list = remote.query("SELECT filename FROM File");
+        list = session.query("SELECT * FROM File");
         assertEquals(1, list.size());
         docModel = list.get(0);
         schemas = Arrays.asList(docModel.getDeclaredSchemas());
@@ -932,7 +858,7 @@ public abstract class TestAPI extends TestConnection {
         // if we select all properties, the returned docModel
         // should have at least the schemas "file" and "common"
         // (it seems to also have "dublincore")
-        list = remote.query("SELECT * FROM File");
+        list = session.query("SELECT * FROM File");
         assertEquals(1, list.size());
         docModel = list.get(0);
         schemas = Arrays.asList(docModel.getDeclaredSchemas());
@@ -943,7 +869,7 @@ public abstract class TestAPI extends TestConnection {
 
         // if we select all files using the filter, we should get only one
         Filter facetFilter = new FacetFilter("HiddenInNavigation", true);
-        list = remote.query("SELECT * FROM HiddenFile", facetFilter);
+        list = session.query("SELECT * FROM HiddenFile", facetFilter);
         assertEquals(1, list.size());
         docModel = list.get(0);
         schemas = Arrays.asList(docModel.getDeclaredSchemas());
@@ -951,7 +877,7 @@ public abstract class TestAPI extends TestConnection {
         assertTrue(schemas.contains("dublincore"));
 
         // if we select all documents, we get the folder and the two files
-        list = remote.query("SELECT * FROM Document");
+        list = session.query("SELECT * FROM Document");
         assertEquals(3, list.size());
         docModel = list.get(0);
         schemas = Arrays.asList(docModel.getDeclaredSchemas());
@@ -959,19 +885,18 @@ public abstract class TestAPI extends TestConnection {
         assertTrue(schemas.contains("common"));
         assertTrue(schemas.contains("dublincore"));
 
-        list = remote.query("SELECT * FROM Document WHERE dc:title = 'abc'");
+        list = session.query("SELECT * FROM Document WHERE dc:title = 'abc'");
         assertEquals(1, list.size());
 
-        list = remote.query("SELECT * FROM Document WHERE dc:title = 'abc' OR dc:title = 'def'");
+        list = session.query("SELECT * FROM Document WHERE dc:title = 'abc' OR dc:title = 'def'");
         assertEquals(2, list.size());
 
-        remote.removeDocument(returnedChildDocs.get(0).getRef());
-        remote.removeDocument(returnedChildDocs.get(1).getRef());
+        session.removeDocument(returnedChildDocs.get(0).getRef());
+        session.removeDocument(returnedChildDocs.get(1).getRef());
     }
 
+    @Test
     public void testQueryAfterEdit() throws ClientException, IOException {
-        DocumentModel root = getRootDocument();
-
         String fname1 = "file1#" + generateUnique();
         DocumentModel childFile1 = new DocumentModelImpl(
                 root.getPathAsString(), fname1, "File");
@@ -992,15 +917,13 @@ public abstract class TestAPI extends TestConnection {
         Blob blob = new ByteArrayBlob(bytes, "text/html");
         childFile1.setProperty("file", "content", blob);
 
-        remote.saveDocument(childFile1);
-        remote.save();
+        session.saveDocument(childFile1);
+        session.save();
 
-        DocumentModelList list;
-        DocumentModel docModel;
-
-        list = remote.query("SELECT * FROM Document");
+        DocumentModelList list = session.query("SELECT * FROM Document");
         assertEquals(1, list.size());
-        docModel = list.get(0);
+
+        DocumentModel docModel = list.get(0);
 
         // read the properties
         docModel.getProperty("dublincore", "title");
@@ -1017,19 +940,18 @@ public abstract class TestAPI extends TestConnection {
         // edit the title without touching the blob
         docModel.setProperty("dublincore", "title", "edited title");
         docModel.setProperty("dublincore", "description", "edited description");
-        remote.saveDocument(docModel);
-        remote.save();
+        session.saveDocument(docModel);
+        session.save();
 
-        list = remote.query("SELECT * FROM Document");
+        list = session.query("SELECT * FROM Document");
         assertEquals(1, list.size());
         docModel = list.get(0);
 
-        remote.removeDocument(docModel.getRef());
+        session.removeDocument(docModel.getRef());
     }
 
+    @Test
     public void testRemoveDocuments() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "folder#" + generateUnique();
         DocumentModel childFolder = new DocumentModelImpl(
                 root.getPathAsString(), name, "Folder");
@@ -1048,20 +970,18 @@ public abstract class TestAPI extends TestConnection {
 
         DocumentRef[] refs = { returnedChildDocs.get(0).getRef(),
                 returnedChildDocs.get(1).getRef() };
-        remote.removeDocuments(refs);
+        session.removeDocuments(refs);
 
-        assertFalse(remote.exists(returnedChildDocs.get(0).getRef()));
-        assertFalse(remote.exists(returnedChildDocs.get(1).getRef()));
-
+        assertFalse(session.exists(returnedChildDocs.get(0).getRef()));
+        assertFalse(session.exists(returnedChildDocs.get(1).getRef()));
     }
 
     /*
      * case where some documents are actually children of other ones from the
      * list
      */
+    @Test
     public void testRemoveDocumentsWithDeps() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "folder#" + generateUnique();
         DocumentModel childFolder = new DocumentModelImpl(
                 root.getPathAsString(), name, "Folder");
@@ -1107,22 +1027,21 @@ public abstract class TestAPI extends TestConnection {
                 returnedChildDocs.get(2).getRef(),
                 returnedChildDocs.get(3).getRef(),
                 returnedChildDocs.get(4).getRef() };
-        remote.removeDocuments(refs);
+        session.removeDocuments(refs);
 
-        assertFalse(remote.exists(returnedChildDocs.get(0).getRef()));
-        assertFalse(remote.exists(returnedChildDocs.get(1).getRef()));
-        assertFalse(remote.exists(returnedChildDocs.get(2).getRef()));
-        assertFalse(remote.exists(returnedChildDocs.get(3).getRef()));
-        assertFalse(remote.exists(returnedChildDocs.get(4).getRef()));
+        assertFalse(session.exists(returnedChildDocs.get(0).getRef()));
+        assertFalse(session.exists(returnedChildDocs.get(1).getRef()));
+        assertFalse(session.exists(returnedChildDocs.get(2).getRef()));
+        assertFalse(session.exists(returnedChildDocs.get(3).getRef()));
+        assertFalse(session.exists(returnedChildDocs.get(4).getRef()));
     }
 
     /*
      * Same as testRemoveDocumentWithDeps with a different given ordering of
      * documents to delete
      */
+    @Test
     public void testRemoveDocumentsWithDeps2() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "folder#" + generateUnique();
         DocumentModel childFolder = new DocumentModelImpl(
                 root.getPathAsString(), name, "Folder");
@@ -1169,18 +1088,17 @@ public abstract class TestAPI extends TestConnection {
                 returnedChildDocs.get(4).getRef(),
                 returnedChildDocs.get(3).getRef(),
                 returnedChildDocs.get(2).getRef() };
-        remote.removeDocuments(refs);
+        session.removeDocuments(refs);
 
-        assertFalse(remote.exists(returnedChildDocs.get(0).getRef()));
-        assertFalse(remote.exists(returnedChildDocs.get(1).getRef()));
-        assertFalse(remote.exists(returnedChildDocs.get(2).getRef()));
-        assertFalse(remote.exists(returnedChildDocs.get(3).getRef()));
-        assertFalse(remote.exists(returnedChildDocs.get(4).getRef()));
+        assertFalse(session.exists(returnedChildDocs.get(0).getRef()));
+        assertFalse(session.exists(returnedChildDocs.get(1).getRef()));
+        assertFalse(session.exists(returnedChildDocs.get(2).getRef()));
+        assertFalse(session.exists(returnedChildDocs.get(3).getRef()));
+        assertFalse(session.exists(returnedChildDocs.get(4).getRef()));
     }
 
+    @Test
     public void testSave() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "folder#" + generateUnique();
         DocumentModel childFolder = new DocumentModelImpl(
                 root.getPathAsString(), name, "Folder");
@@ -1191,16 +1109,15 @@ public abstract class TestAPI extends TestConnection {
                 name2, "File");
         childFile = createChildDocument(childFile);
 
-        remote.save();
+        session.save();
 
         // TODO: this should be tested across sessions - when it can be done
-        assertTrue(remote.exists(childFolder.getRef()));
-        assertTrue(remote.exists(childFile.getRef()));
+        assertTrue(session.exists(childFolder.getRef()));
+        assertTrue(session.exists(childFile.getRef()));
     }
 
+    @Test
     public void testSaveFolder() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "folder#" + generateUnique();
 
         DocumentModel childFolder = new DocumentModelImpl(
@@ -1210,19 +1127,18 @@ public abstract class TestAPI extends TestConnection {
         childFolder.setProperty("dublincore", "title", "f1");
         childFolder.setProperty("dublincore", "description", "desc 1");
 
-        remote.saveDocument(childFolder);
+        session.saveDocument(childFolder);
 
         // TODO: this should be tested across sessions - when it can be done
-        assertTrue(remote.exists(childFolder.getRef()));
+        assertTrue(session.exists(childFolder.getRef()));
 
         assertEquals("f1", childFolder.getProperty("dublincore", "title"));
         assertEquals("desc 1", childFolder.getProperty("dublincore",
                 "description"));
     }
 
+    @Test
     public void testSaveFile() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "file#" + generateUnique();
 
         DocumentModel childFile = new DocumentModelImpl(root.getPathAsString(),
@@ -1237,9 +1153,9 @@ public abstract class TestAPI extends TestConnection {
         // System.out.println(p.getPath());
 
         // TODO: this should be tested across sessions - when it can be done
-        assertTrue(remote.exists(childFile.getRef()));
+        assertTrue(session.exists(childFile.getRef()));
 
-        DocumentModel retrievedFile = remote.getDocument(childFile.getRef());
+        DocumentModel retrievedFile = session.getDocument(childFile.getRef());
 
         assertEquals("f1", retrievedFile.getProperty("dublincore", "title"));
         assertEquals("desc 1", retrievedFile.getProperty("dublincore",
@@ -1247,9 +1163,8 @@ public abstract class TestAPI extends TestConnection {
         assertEquals("filename1", retrievedFile.getProperty("file", "filename"));
     }
 
+    @Test
     public void testSaveDocuments() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "folder#" + generateUnique();
         DocumentModel childFolder = new DocumentModelImpl(
                 root.getPathAsString(), name, "Folder");
@@ -1262,16 +1177,15 @@ public abstract class TestAPI extends TestConnection {
 
         DocumentModel[] docs = { childFolder, childFile };
 
-        remote.saveDocuments(docs);
+        session.saveDocuments(docs);
 
         // TODO: this should be tested across sessions - when it can be done
-        assertTrue(remote.exists(childFolder.getRef()));
-        assertTrue(remote.exists(childFile.getRef()));
+        assertTrue(session.exists(childFolder.getRef()));
+        assertTrue(session.exists(childFile.getRef()));
     }
 
+    @Test
     public void testGetVersionsForDocument() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name2 = "file#" + generateUnique();
         DocumentModel childFile = new DocumentModelImpl(root.getPathAsString(),
                 name2, "File");
@@ -1284,10 +1198,15 @@ public abstract class TestAPI extends TestConnection {
         // Calendar cal = Calendar.getInstance();
         // version.setCreated(cal);
 
-        remote.save();
-        remote.checkIn(childFile.getRef(), version);
+        session.save();
+        session.checkIn(childFile.getRef(), version);
 
-        List<VersionModel> versions = remote.getVersionsForDocument(childFile.getRef());
+        // test direct lookup (as administrator)
+        // not implemented for JCR
+        // DocumentModel ver = session.getVersion(childFile.getId(), version);
+        // assertNotNull(ver);
+
+        List<VersionModel> versions = session.getVersionsForDocument(childFile.getRef());
 
         assertNotNull(versions);
         assertEquals(1, versions.size());
@@ -1300,14 +1219,14 @@ public abstract class TestAPI extends TestConnection {
         // versions.get(0).getCreated().getTime().getTime());
 
         // creating a second version without description
-        remote.checkOut(childFile.getRef());
+        session.checkOut(childFile.getRef());
         VersionModel version2 = new VersionModelImpl();
         version2.setLabel("v2");
 
-        remote.save();
-        remote.checkIn(childFile.getRef(), version2);
+        session.save();
+        session.checkIn(childFile.getRef(), version2);
 
-        List<VersionModel> versions2 = remote.getVersionsForDocument(childFile.getRef());
+        List<VersionModel> versions2 = session.getVersionsForDocument(childFile.getRef());
 
         assertNotNull(versions2);
         assertEquals(2, versions2.size());
@@ -1321,10 +1240,48 @@ public abstract class TestAPI extends TestConnection {
         assertNull(versions2.get(1).getDescription());
     }
 
+    @Test
+    public void testRetrieveVersion() throws ClientException {
+        String name2 = "file#" + generateUnique();
+        DocumentModel childFile = new DocumentModelImpl(root.getPathAsString(),
+                name2, "File");
+        childFile = createChildDocument(childFile);
+
+        VersionModel version = new VersionModelImpl();
+        version.setLabel("v1");
+        version.setDescription("d1");
+
+        session.save();
+        session.checkIn(childFile.getRef(), version);
+
+        session.checkOut(childFile.getRef());
+        VersionModel version2 = new VersionModelImpl();
+        version2.setLabel("v2");
+
+        session.save();
+        session.checkIn(childFile.getRef(), version2);
+
+        //see if you can get version v1
+        VersionModel versionModel = new VersionModelImpl();
+        versionModel.setLabel("v1");
+        DocumentModel versionDoc = session.getDocumentWithVersion(childFile.getRef(), versionModel);
+        assertNotNull("Couldn't find version v1?", versionDoc);
+        versionModel.setLabel("v2");
+        versionDoc = session.getDocumentWithVersion(childFile.getRef(), versionModel);
+        assertNotNull("Couldn't find version v2?", versionDoc);
+        versionModel.setLabel("v3");
+        versionDoc = null;
+        try {
+            versionDoc = session.getDocumentWithVersion(childFile.getRef(), versionModel);
+        } catch (ClientException ce) {
+            //SQL repo returns null as simple as is
+            //JCR repo throws exception
+        }
+        assertNull("Could find version v3?", versionDoc);
+    }
+
     // TODO: fix and reenable SF 2007/05/23
     public void XXXtestRestoreToVersion() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name2 = "file#" + generateUnique();
         DocumentModel childFile = new DocumentModelImpl(root.getPathAsString(),
                 name2, "File");
@@ -1337,10 +1294,10 @@ public abstract class TestAPI extends TestConnection {
         // Calendar cal = Calendar.getInstance();
         // version.setCreated(cal);
 
-        remote.save();
-        remote.checkIn(childFile.getRef(), version);
+        session.save();
+        session.checkIn(childFile.getRef(), version);
 
-        assertFalse(remote.isCheckedOut(childFile.getRef()));
+        assertFalse(session.isCheckedOut(childFile.getRef()));
 
         childFile.setProperty("file", "filename", "second name");
         childFile.setProperty("common", "title", "f1");
@@ -1348,21 +1305,21 @@ public abstract class TestAPI extends TestConnection {
         version = new VersionModelImpl();
         version.setLabel("v2");
 
-        remote.checkOut(childFile.getRef());
+        session.checkOut(childFile.getRef());
 
-        assertTrue(remote.isCheckedOut(childFile.getRef()));
+        assertTrue(session.isCheckedOut(childFile.getRef()));
 
-        remote.saveDocument(childFile);
-        remote.save();
-        remote.checkIn(childFile.getRef(), version);
+        session.saveDocument(childFile);
+        session.save();
+        session.checkIn(childFile.getRef(), version);
 
-        DocumentModel newDoc = remote.getDocument(childFile.getRef());
+        DocumentModel newDoc = session.getDocument(childFile.getRef());
         assertNotNull(newDoc);
         assertNotNull(newDoc.getRef());
         assertEquals("second name", newDoc.getProperty("file", "filename"));
 
         version.setLabel("v1");
-        DocumentModel restoredDoc = remote.restoreToVersion(childFile.getRef(),
+        DocumentModel restoredDoc = session.restoreToVersion(childFile.getRef(),
                 version);
 
         assertNotNull(restoredDoc);
@@ -1370,16 +1327,15 @@ public abstract class TestAPI extends TestConnection {
         assertNull(restoredDoc.getProperty("file", "filename"));
 
         version.setLabel("v2");
-        restoredDoc = remote.restoreToVersion(childFile.getRef(), version);
+        restoredDoc = session.restoreToVersion(childFile.getRef(), version);
 
         assertNotNull(restoredDoc);
         assertNotNull(restoredDoc.getRef());
         assertEquals("second name", restoredDoc.getProperty("file", "filename"));
     }
 
+    @Test
     public void testCheckIn() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name2 = "file#" + generateUnique();
         DocumentModel childFile = new DocumentModelImpl(root.getPathAsString(),
                 name2, "File");
@@ -1390,9 +1346,9 @@ public abstract class TestAPI extends TestConnection {
         // only label is used for the moment
         // version.setCreated(Calendar.getInstance());
 
-        remote.save();
+        session.save();
 
-        remote.checkIn(childFile.getRef(), version);
+        session.checkIn(childFile.getRef(), version);
     }
 
     // TODO: fix and reenable SF 2007/05/23
@@ -1402,9 +1358,8 @@ public abstract class TestAPI extends TestConnection {
         XXXtestRestoreToVersion();
     }
 
+    @Test
     public void testGetCheckedOut() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name2 = "file#" + generateUnique();
         DocumentModel childFile = new DocumentModelImpl(root.getPathAsString(),
                 name2, "File");
@@ -1415,18 +1370,16 @@ public abstract class TestAPI extends TestConnection {
         // only label is used for the moment
         // version.setCreated(Calendar.getInstance());
 
-        remote.save();
+        session.save();
 
-        remote.checkIn(childFile.getRef(), version);
-        assertFalse(remote.isCheckedOut(childFile.getRef()));
-        remote.checkOut(childFile.getRef());
-        assertTrue(remote.isCheckedOut(childFile.getRef()));
+        session.checkIn(childFile.getRef(), version);
+        assertFalse(session.isCheckedOut(childFile.getRef()));
+        session.checkOut(childFile.getRef());
+        assertTrue(session.isCheckedOut(childFile.getRef()));
     }
 
     // TODO: fix and reenable SF 2007/05/23
     public void XXXtestGetDocumentWithVersion() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name2 = "file#" + generateUnique();
         DocumentModel childFile = new DocumentModelImpl(root.getPathAsString(),
                 name2, "File");
@@ -1439,28 +1392,28 @@ public abstract class TestAPI extends TestConnection {
         // Calendar cal = Calendar.getInstance();
         // version.setCreated(cal);
 
-        remote.save();
-        remote.checkIn(childFile.getRef(), version);
+        session.save();
+        session.checkIn(childFile.getRef(), version);
 
         childFile.setProperty("file", "filename", "second name");
-        childFile.setProperty("common", "title", "f1");
-        childFile.setProperty("common", "description", "desc 1");
+        childFile.setProperty("dublincore", "title", "f1");
+        childFile.setProperty("dublincore", "description", "desc 1");
         version = new VersionModelImpl();
         version.setLabel("v2");
 
-        remote.checkOut(childFile.getRef());
-        remote.saveDocument(childFile);
-        remote.save();
-        remote.checkIn(childFile.getRef(), version);
+        session.checkOut(childFile.getRef());
+        session.saveDocument(childFile);
+        session.save();
+        session.checkIn(childFile.getRef(), version);
 
-        DocumentModel newDoc = remote.getDocument(childFile.getRef());
+        DocumentModel newDoc = session.getDocument(childFile.getRef());
         assertNotNull(newDoc);
         assertNotNull(newDoc.getRef());
         assertEquals("second name", newDoc.getProperty("file", "filename"));
 
         version.setLabel("v1");
 
-        DocumentModel restoredDoc = remote.restoreToVersion(childFile.getRef(),
+        DocumentModel restoredDoc = session.restoreToVersion(childFile.getRef(),
                 version);
 
         assertNotNull(restoredDoc);
@@ -1470,7 +1423,7 @@ public abstract class TestAPI extends TestConnection {
         version.setLabel("v2");
         // TODO: this fails as there is a NPE because a document version does
         // not currently have a document type
-        restoredDoc = remote.getDocumentWithVersion(childFile.getRef(), version);
+        restoredDoc = session.getDocumentWithVersion(childFile.getRef(), version);
 
         assertNotNull(restoredDoc);
         assertNotNull(restoredDoc.getRef());
@@ -1478,29 +1431,28 @@ public abstract class TestAPI extends TestConnection {
     }
 
     public void xxxtestGetAvailableSecurityPermissions() throws ClientException {
-        List<String> permissions = remote.getAvailableSecurityPermissions();
+        List<String> permissions = session.getAvailableSecurityPermissions();
 
         // TODO
         assertTrue(permissions.contains("Everything"));
     }
 
+    @Test
     public void testGetDataModel() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name2 = "file#" + generateUnique();
         DocumentModel childFile = new DocumentModelImpl(root.getPathAsString(),
                 name2, "File");
         childFile = createChildDocument(childFile);
 
-        remote.save();
+        session.save();
 
         childFile.setProperty("file", "filename", "second name");
         childFile.setProperty("dublincore", "title", "f1");
         childFile.setProperty("dublincore", "description", "desc 1");
 
-        remote.saveDocument(childFile);
+        session.saveDocument(childFile);
 
-        DataModel dm = remote.getDataModel(childFile.getRef(), "dublincore");
+        DataModel dm = session.getDataModel(childFile.getRef(), "dublincore");
 
         assertNotNull(dm);
         assertNotNull(dm.getMap());
@@ -1509,7 +1461,7 @@ public abstract class TestAPI extends TestConnection {
         assertEquals("f1", dm.getData("title"));
         assertEquals("desc 1", dm.getData("description"));
 
-        dm = remote.getDataModel(childFile.getRef(), "file");
+        dm = session.getDataModel(childFile.getRef(), "file");
 
         assertNotNull(dm);
         assertNotNull(dm.getMap());
@@ -1518,49 +1470,47 @@ public abstract class TestAPI extends TestConnection {
         assertEquals("second name", dm.getData("filename"));
     }
 
+    @Test
     public void testGetDataModelField() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name2 = "file#" + generateUnique();
         DocumentModel childFile = new DocumentModelImpl(root.getPathAsString(),
                 name2, "File");
         childFile = createChildDocument(childFile);
 
-        remote.save();
+        session.save();
 
         childFile.setProperty("file", "filename", "second name");
         childFile.setProperty("dublincore", "title", "f1");
         childFile.setProperty("dublincore", "description", "desc 1");
 
-        remote.saveDocument(childFile);
+        session.saveDocument(childFile);
 
-        assertEquals("f1", remote.getDataModelField(childFile.getRef(),
+        assertEquals("f1", session.getDataModelField(childFile.getRef(),
                 "dublincore", "title"));
-        assertEquals("desc 1", remote.getDataModelField(childFile.getRef(),
+        assertEquals("desc 1", session.getDataModelField(childFile.getRef(),
                 "dublincore", "description"));
-        assertEquals("second name", remote.getDataModelField(
+        assertEquals("second name", session.getDataModelField(
                 childFile.getRef(), "file", "filename"));
     }
 
+    @Test
     public void testGetDataModelFields() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name2 = "file#" + generateUnique();
         DocumentModel childFile = new DocumentModelImpl(root.getPathAsString(),
                 name2, "File");
         childFile = createChildDocument(childFile);
 
-        remote.save();
+        session.save();
 
         childFile.setProperty("file", "filename", "second name");
         childFile.setProperty("dublincore", "title", "f1");
         childFile.setProperty("dublincore", "description", "desc 1");
 
-        remote.saveDocument(childFile);
+        session.saveDocument(childFile);
 
         String[] fields = { "title", "description" };
 
-        Object[] values = remote.getDataModelFields(childFile.getRef(),
+        Object[] values = session.getDataModelFields(childFile.getRef(),
                 "dublincore", fields);
 
         assertNotNull(values);
@@ -1570,51 +1520,16 @@ public abstract class TestAPI extends TestConnection {
 
         String[] fields2 = { "filename" };
 
-        values = remote.getDataModelFields(childFile.getRef(), "file", fields2);
+        values = session.getDataModelFields(childFile.getRef(), "file", fields2);
 
         assertNotNull(values);
         assertEquals(1, values.length);
         assertEquals("second name", values[0]);
     }
 
-    // TODO: Fix this test!
-    public void XXXtestGetContentData() throws ClientException {
-        DocumentModel root = getRootDocument();
-
-        String name2 = "file#" + generateUnique();
-        DocumentModel childFile = new DocumentModelImpl(root.getPathAsString(),
-                name2, "File");
-        childFile = createChildDocument(childFile);
-
-        remote.save();
-
-        childFile.setProperty("dublincore", "title", "f1");
-        childFile.setProperty("dublincore", "description", "desc 1");
-        childFile.setProperty("file", "filename", "second name");
-        childFile.setProperty("file", "content", new StringBlob("the content"));
-
-        remote.saveDocument(childFile);
-
-        /*
-         * this block is commented because the exception it generates makes the
-         * next block fail try { remote.getContentData(childFile.getRef(),
-         * "title"); fail("Content nodes must be of type: content"); } catch
-         * (ClientException e) { // do nothing }
-         */
-
-        byte[] content = remote.getContentData(childFile.getRef(), "content");
-        assertNotNull(content);
-
-        String strContent = String.valueOf(content);
-
-        assertNotNull(strContent);
-        assertEquals("the content", strContent);
-    }
-
+    @Test
     public void testDocumentReferenceEqualityDifferentInstances()
             throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "folder#" + generateUnique();
         DocumentModel childFolder = new DocumentModelImpl(
                 root.getPathAsString(), name, "Folder");
@@ -1631,7 +1546,7 @@ public abstract class TestAPI extends TestConnection {
         assertEquals(name, returnedChildDocs.get(0).getName());
         assertEquals(name2, returnedChildDocs.get(1).getName());
 
-        DocumentModel retrievedChild = remote.getChild(root.getRef(), name);
+        DocumentModel retrievedChild = session.getChild(root.getRef(), name);
 
         assertNotNull(retrievedChild);
         assertNotNull(retrievedChild.getId());
@@ -1642,7 +1557,7 @@ public abstract class TestAPI extends TestConnection {
 
         assertEquals(root.getRef(), retrievedChild.getParentRef());
 
-        retrievedChild = remote.getChild(root.getRef(), name2);
+        retrievedChild = session.getChild(root.getRef(), name2);
 
         assertNotNull(retrievedChild);
         assertNotNull(retrievedChild.getId());
@@ -1655,17 +1570,15 @@ public abstract class TestAPI extends TestConnection {
     }
 
     @SuppressWarnings( { "SimplifiableJUnitAssertion" })
+    @Test
     public void testDocumentReferenceEqualitySameInstance()
             throws ClientException {
-        DocumentModel root = getRootDocument();
-
         assertTrue(root.getRef().equals(root.getRef()));
     }
 
+    @Test
     public void testDocumentReferenceNonEqualityDifferentInstances()
             throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name = "folder#" + generateUnique();
         DocumentModel childFolder = new DocumentModelImpl(
                 root.getPathAsString(), name, "Folder");
@@ -1682,7 +1595,7 @@ public abstract class TestAPI extends TestConnection {
         assertEquals(name, returnedChildDocs.get(0).getName());
         assertEquals(name2, returnedChildDocs.get(1).getName());
 
-        DocumentModel retrievedChild = remote.getChild(root.getRef(), name);
+        DocumentModel retrievedChild = session.getChild(root.getRef(), name);
 
         assertNotNull(retrievedChild);
         assertNotNull(retrievedChild.getId());
@@ -1696,9 +1609,8 @@ public abstract class TestAPI extends TestConnection {
                 retrievedChild.getParentRef()));
     }
 
+    @Test
     public void testFacets() throws Exception {
-        DocumentModel root = getRootDocument();
-
         assertTrue(root.isFolder());
 
         String name = "file#" + generateUnique();
@@ -1724,37 +1636,36 @@ public abstract class TestAPI extends TestConnection {
         assertTrue(returnedChildFiles.get(2).isFolder());
     }
 
+    @Test
     public void testLifeCycleAPI() throws ClientException {
-        DocumentModel root = getRootDocument();
         DocumentModel childFile = new DocumentModelImpl(root.getPathAsString(),
                 "file#" + generateUnique(), "File");
         childFile = createChildDocument(childFile);
 
-        assertEquals("default", remote.getLifeCyclePolicy(childFile.getRef()));
+        assertEquals("default", session.getLifeCyclePolicy(childFile.getRef()));
 
         assertEquals("project",
-                remote.getCurrentLifeCycleState(childFile.getRef()));
+                session.getCurrentLifeCycleState(childFile.getRef()));
 
-        Collection<String> allowedStateTransitions = remote.getAllowedStateTransitions(childFile.getRef());
+        Collection<String> allowedStateTransitions = session.getAllowedStateTransitions(childFile.getRef());
         assertEquals(2, allowedStateTransitions.size());
         assertTrue(allowedStateTransitions.contains("approve"));
         assertTrue(allowedStateTransitions.contains("obsolete"));
 
-        assertTrue(remote.followTransition(childFile.getRef(), "approve"));
+        assertTrue(session.followTransition(childFile.getRef(), "approve"));
         assertEquals("approved",
-                remote.getCurrentLifeCycleState(childFile.getRef()));
-        allowedStateTransitions = remote.getAllowedStateTransitions(childFile.getRef());
+                session.getCurrentLifeCycleState(childFile.getRef()));
+        allowedStateTransitions = session.getAllowedStateTransitions(childFile.getRef());
         assertEquals(0, allowedStateTransitions.size());
 
-        assertEquals("default", remote.getLifeCyclePolicy(childFile.getRef()));
+        assertEquals("default", session.getLifeCyclePolicy(childFile.getRef()));
 
-        remote.cancel();
-        assertFalse(remote.exists(childFile.getRef()));
+        session.cancel();
+        assertFalse(session.exists(childFile.getRef()));
     }
 
-    // TODO: fix and reenable SF 2007/05/23
+    @Test
     public void testDataModelLifeCycleAPI() throws ClientException {
-        DocumentModel root = getRootDocument();
         DocumentModel childFile = new DocumentModelImpl(root.getPathAsString(),
                 "file#" + generateUnique(), "File");
         childFile = createChildDocument(childFile);
@@ -1774,12 +1685,12 @@ public abstract class TestAPI extends TestConnection {
         assertEquals(0, allowedStateTransitions.size());
         assertEquals("default", childFile.getLifeCyclePolicy());
 
-        remote.cancel();
-        assertFalse(remote.exists(childFile.getRef()));
+        session.cancel();
+        assertFalse(session.exists(childFile.getRef()));
     }
 
+    @Test
     public void testCopy() throws Exception {
-        DocumentModel root = getRootDocument();
         DocumentModel folder1 = new DocumentModelImpl(root.getPathAsString(),
                 "folder1", "Folder");
 
@@ -1793,59 +1704,59 @@ public abstract class TestAPI extends TestConnection {
         folder2 = createChildDocument(folder2);
         file = createChildDocument(file);
 
-        remote.save();
+        session.save();
 
-        assertTrue(remote.exists(new PathRef("folder1/file")));
-        assertFalse(remote.exists(new PathRef("folder2/file")));
+        assertTrue(session.exists(new PathRef("folder1/file")));
+        assertFalse(session.exists(new PathRef("folder2/file")));
 
         // copy using orig name
-        DocumentModel copy1 = remote.copy(file.getRef(), folder2.getRef(), null);
+        DocumentModel copy1 = session.copy(file.getRef(), folder2.getRef(), null);
 
-        assertTrue(remote.exists(new PathRef("folder1/file")));
-        assertTrue(remote.exists(new PathRef("folder2/file")));
-        assertFalse(remote.exists(new PathRef("folder2/fileCopy")));
-        assertTrue(remote.getChildren(folder2.getRef()).contains(copy1));
+        assertTrue(session.exists(new PathRef("folder1/file")));
+        assertTrue(session.exists(new PathRef("folder2/file")));
+        assertFalse(session.exists(new PathRef("folder2/fileCopy")));
+        assertTrue(session.getChildren(folder2.getRef()).contains(copy1));
 
         // copy using another name
-        DocumentModel copy2 = remote.copy(file.getRef(), folder2.getRef(),
+        DocumentModel copy2 = session.copy(file.getRef(), folder2.getRef(),
                 "fileCopy");
 
-        assertTrue(remote.exists(new PathRef("folder1/file")));
-        assertTrue(remote.exists(new PathRef("folder2/file")));
-        assertTrue(remote.exists(new PathRef("folder2/fileCopy")));
-        assertTrue(remote.getChildren(folder2.getRef()).contains(copy2));
+        assertTrue(session.exists(new PathRef("folder1/file")));
+        assertTrue(session.exists(new PathRef("folder2/file")));
+        assertTrue(session.exists(new PathRef("folder2/fileCopy")));
+        assertTrue(session.getChildren(folder2.getRef()).contains(copy2));
 
         // copy again to same space
-        DocumentModel copy3 = remote.copy(file.getRef(), folder2.getRef(), null);
+        DocumentModel copy3 = session.copy(file.getRef(), folder2.getRef(), null);
 
-        assertTrue(remote.exists(new PathRef("folder1/file")));
-        assertTrue(remote.exists(new PathRef("folder2/file")));
-        assertTrue(remote.getChildren(folder2.getRef()).contains(copy3));
+        assertTrue(session.exists(new PathRef("folder1/file")));
+        assertTrue(session.exists(new PathRef("folder2/file")));
+        assertTrue(session.getChildren(folder2.getRef()).contains(copy3));
         assertNotSame(copy1.getName(), copy3.getName());
 
         // copy again again to same space
-        DocumentModel copy4 = remote.copy(file.getRef(), folder2.getRef(), null);
+        DocumentModel copy4 = session.copy(file.getRef(), folder2.getRef(), null);
 
-        assertTrue(remote.exists(new PathRef("folder1/file")));
-        assertTrue(remote.exists(new PathRef("folder2/file")));
-        assertTrue(remote.getChildren(folder2.getRef()).contains(copy4));
+        assertTrue(session.exists(new PathRef("folder1/file")));
+        assertTrue(session.exists(new PathRef("folder2/file")));
+        assertTrue(session.getChildren(folder2.getRef()).contains(copy4));
         assertNotSame(copy1.getName(), copy4.getName());
         assertNotSame(copy3.getName(), copy4.getName());
 
         // copy inplace
-        DocumentModel copy5 = remote.copy(file.getRef(), folder1.getRef(), null);
+        DocumentModel copy5 = session.copy(file.getRef(), folder1.getRef(), null);
 
-        assertTrue(remote.exists(new PathRef("folder1/file")));
-        assertTrue(remote.exists(new PathRef("folder2/file")));
-        assertTrue(remote.getChildren(folder1.getRef()).contains(copy5));
+        assertTrue(session.exists(new PathRef("folder1/file")));
+        assertTrue(session.exists(new PathRef("folder2/file")));
+        assertTrue(session.getChildren(folder1.getRef()).contains(copy5));
         assertNotSame(copy1.getName(), copy5.getName());
 
-        remote.cancel();
+        session.cancel();
     }
 
+    @Test
     public void testCopyProxyAsDocument() throws Exception {
         // create a folder tree
-        DocumentModel root = getRootDocument();
         DocumentModel folder1 = new DocumentModelImpl(root.getPathAsString(),
                 "folder1", "Folder");
         DocumentModel folder2 = new DocumentModelImpl(root.getPathAsString(),
@@ -1858,25 +1769,27 @@ public abstract class TestAPI extends TestConnection {
         folder2 = createChildDocument(folder2);
         folder3 = createChildDocument(folder3);
         file = createChildDocument(file);
-        remote.save();
+        session.save();
 
         // create a file in folder 1
         file.setProperty("dublincore", "title", "the title");
-        file = remote.saveDocument(file);
+        file = session.saveDocument(file);
 
         VersionModel version = new VersionModelImpl();
         version.setCreated(Calendar.getInstance());
         version.setLabel("v1");
-        remote.checkIn(file.getRef(), version);
-        remote.save();
+        session.checkIn(file.getRef(), version);
+        session.save();
 
         // create a proxy in folder2
-        DocumentModel proxy = remote.createProxy(folder2.getRef(),
+        DocumentModel proxy = session.createProxy(folder2.getRef(),
                 file.getRef(), version, true);
+        String f = proxy.getTitle();
         assertTrue(proxy.isProxy());
-
+        session.saveDocument(proxy);
+        session.save();
         // copy proxy into folder3
-        DocumentModel copy1 = remote.copyProxyAsDocument(proxy.getRef(),
+        DocumentModel copy1 = session.copyProxyAsDocument(proxy.getRef(),
                 folder3.getRef(), null);
         assertFalse(copy1.isProxy());
         assertEquals(proxy.getName(), copy1.getName());
@@ -1884,28 +1797,29 @@ public abstract class TestAPI extends TestConnection {
                 copy1.getProperty("dublincore", "title"));
 
         // copy proxy using another name
-        DocumentModel copy2 = remote.copyProxyAsDocument(proxy.getRef(),
+        DocumentModel copy2 = session.copyProxyAsDocument(proxy.getRef(),
                 folder3.getRef(), "foo");
         assertFalse(copy2.isProxy());
         assertEquals("foo", copy2.getName());
         assertEquals(file.getProperty("dublincore", "title"),
                 copy2.getProperty("dublincore", "title"));
 
-        remote.cancel();
+        session.cancel();
     }
 
+    @Test
     public void testCopyVersionable() throws Exception {
         DocumentModel note = new DocumentModelImpl("/", "note", "Note");
         DocumentModel folder = new DocumentModelImpl("/", "folder", "Folder");
-        note = remote.createDocument(note);
-        folder = remote.createDocument(folder);
-        remote.save();
+        note = session.createDocument(note);
+        folder = session.createDocument(folder);
+        session.save();
 
-        assertTrue(remote.exists(new PathRef("note")));
-        assertTrue(remote.exists(new PathRef("folder")));
+        assertTrue(session.exists(new PathRef("note")));
+        assertTrue(session.exists(new PathRef("folder")));
 
         // no versions at first
-        List<DocumentRef> versions = remote.getVersionsRefs(note.getRef());
+        List<DocumentRef> versions = session.getVersionsRefs(note.getRef());
         assertEquals(0, versions.size());
 
         // version the note
@@ -1913,36 +1827,36 @@ public abstract class TestAPI extends TestConnection {
         ScopedMap context = note.getContextData();
         context.putScopedValue(ScopeType.REQUEST,
                 VersioningDocument.CREATE_SNAPSHOT_ON_SAVE_KEY, Boolean.TRUE);
-        remote.saveDocument(note);
-        remote.save();
+        session.saveDocument(note);
+        session.save();
 
         // check versions
-        versions = remote.getVersionsRefs(note.getRef());
+        versions = session.getVersionsRefs(note.getRef());
         assertEquals(1, versions.size());
 
         // copy
-        DocumentModel copy = remote.copy(note.getRef(), folder.getRef(), null);
+        DocumentModel copy = session.copy(note.getRef(), folder.getRef(), null);
 
         // check no versions on copy
-        versions = remote.getVersionsRefs(copy.getRef());
+        versions = session.getVersionsRefs(copy.getRef());
         assertEquals(0, versions.size());
 
-        remote.cancel();
+        session.cancel();
     }
 
+    @Test
     public void testCopyFolderOfVersionable() throws Exception {
-        DocumentModel root = getRootDocument();
         DocumentModel folder = new DocumentModelImpl("/", "folder", "Folder");
         DocumentModel note = new DocumentModelImpl("/folder", "note", "Note");
-        folder = remote.createDocument(folder);
-        note = remote.createDocument(note);
-        remote.save();
+        folder = session.createDocument(folder);
+        note = session.createDocument(note);
+        session.save();
 
-        assertTrue(remote.exists(new PathRef("/folder")));
-        assertTrue(remote.exists(new PathRef("/folder/note")));
+        assertTrue(session.exists(new PathRef("/folder")));
+        assertTrue(session.exists(new PathRef("/folder/note")));
 
         // no versions at first
-        List<DocumentRef> versions = remote.getVersionsRefs(note.getRef());
+        List<DocumentRef> versions = session.getVersionsRefs(note.getRef());
         assertEquals(0, versions.size());
 
         // version the note
@@ -1950,26 +1864,26 @@ public abstract class TestAPI extends TestConnection {
         ScopedMap context = note.getContextData();
         context.putScopedValue(ScopeType.REQUEST,
                 VersioningDocument.CREATE_SNAPSHOT_ON_SAVE_KEY, Boolean.TRUE);
-        remote.saveDocument(note);
-        remote.save();
+        session.saveDocument(note);
+        session.save();
 
         // check versions
-        versions = remote.getVersionsRefs(note.getRef());
+        versions = session.getVersionsRefs(note.getRef());
         assertEquals(1, versions.size());
 
         // copy folder, use an all-digit name to test for xpath escaping
-        DocumentModel copy = remote.copy(folder.getRef(), root.getRef(), "123");
+        DocumentModel copy = session.copy(folder.getRef(), root.getRef(), "123");
 
         // check no versions on copied note
-        DocumentModel note2 = remote.getChild(copy.getRef(), "note");
-        versions = remote.getVersionsRefs(note2.getRef());
+        DocumentModel note2 = session.getChild(copy.getRef(), "note");
+        versions = session.getVersionsRefs(note2.getRef());
         assertEquals(0, versions.size());
 
-        remote.cancel();
+        session.cancel();
     }
 
+    @Test
     public void testMove() throws Exception {
-        DocumentModel root = getRootDocument();
         DocumentModel folder1 = new DocumentModelImpl(root.getPathAsString(),
                 "folder1", "Folder");
 
@@ -1983,49 +1897,47 @@ public abstract class TestAPI extends TestConnection {
         folder2 = createChildDocument(folder2);
         file = createChildDocument(file);
 
-        assertTrue(remote.exists(new PathRef("folder1/file")));
-        assertFalse(remote.exists(new PathRef("folder2/file")));
-        assertFalse(remote.exists(new PathRef("folder1/fileMove")));
+        assertTrue(session.exists(new PathRef("folder1/file")));
+        assertFalse(session.exists(new PathRef("folder2/file")));
+        assertFalse(session.exists(new PathRef("folder1/fileMove")));
 
-        remote.move(file.getRef(), folder2.getRef(), null); // move using orig
+        session.move(file.getRef(), folder2.getRef(), null); // move using orig
         // name
 
-        assertFalse(remote.exists(new PathRef("folder1/file")));
-        assertTrue(remote.exists(new PathRef("folder2/file")));
+        assertFalse(session.exists(new PathRef("folder1/file")));
+        assertTrue(session.exists(new PathRef("folder2/file")));
 
-        file = remote.getChild(folder2.getRef(), "file");
-        remote.move(file.getRef(), folder1.getRef(), "fileMove");
+        file = session.getChild(folder2.getRef(), "file");
+        session.move(file.getRef(), folder1.getRef(), "fileMove");
 
-        assertTrue(remote.exists(new PathRef("folder1/fileMove")));
+        assertTrue(session.exists(new PathRef("folder1/fileMove")));
 
         DocumentModel file2 = new DocumentModelImpl(folder2.getPathAsString(),
                 "file2", "File");
         file2 = createChildDocument(file2);
-        assertTrue(remote.exists(new PathRef("folder2/file2")));
-        DocumentModel newFile2 = remote.move(file.getRef(), folder2.getRef(),
+        assertTrue(session.exists(new PathRef("folder2/file2")));
+        DocumentModel newFile2 = session.move(file.getRef(), folder2.getRef(),
                 "file2"); // collision
         String newName = newFile2.getName();
         assertFalse("file2".equals(newName));
-        assertTrue(remote.exists(new PathRef("folder2/file2")));
-        assertTrue(remote.exists(new PathRef("folder2/" + newName)));
+        assertTrue(session.exists(new PathRef("folder2/file2")));
+        assertTrue(session.exists(new PathRef("folder2/" + newName)));
 
-        remote.cancel();
+        session.cancel();
     }
 
     // TODO: fix this test
     public void XXXtestScalarList() throws Exception {
-        DocumentModel root = getRootDocument();
-
         String name2 = "file#" + generateUnique();
         DocumentModel childFile = new DocumentModelImpl(root.getPathAsString(),
                 name2, "File");
         childFile = createChildDocument(childFile);
 
-        String[] str = new String[] { "a", "b", "c" };
+        String[] str = { "a", "b", "c" };
         childFile.setProperty("dublincore", "participants", str);
-        remote.saveDocument(childFile);
+        session.saveDocument(childFile);
 
-        childFile = remote.getChild(root.getRef(), childFile.getName());
+        childFile = session.getChild(root.getRef(), childFile.getName());
 
         str = (String[]) childFile.getProperty("dublincore", "participants");
 
@@ -2039,11 +1951,11 @@ public abstract class TestAPI extends TestConnection {
 
         str = new String[] { "a", "b" };
         childFile.setProperty("dublincore", "participants", str);
-        remote.saveDocument(childFile);
+        session.saveDocument(childFile);
 
         str = (String[]) childFile.getProperty("dublincore", "participants");
 
-        childFile = remote.getChild(root.getRef(), childFile.getName());
+        childFile = session.getChild(root.getRef(), childFile.getName());
         str = (String[]) childFile.getProperty("dublincore", "participants");
 
         assertNotNull(str);
@@ -2052,15 +1964,14 @@ public abstract class TestAPI extends TestConnection {
         assertTrue(list.contains("b"));
     }
 
+    @Test
     public void testBlob() throws Exception {
-        DocumentModel root = getRootDocument();
-
         String name2 = "file#" + generateUnique();
         DocumentModel childFile = new DocumentModelImpl(root.getPathAsString(),
                 name2, "File");
         childFile = createChildDocument(childFile);
 
-        remote.save();
+        session.save();
 
         byte[] bytes = FileUtils.readBytes(Blob.class.getResourceAsStream("TestAPI.class"));
         Blob blob = new ByteArrayBlob(bytes, "java/class");
@@ -2075,9 +1986,9 @@ public abstract class TestAPI extends TestConnection {
         childFile.setProperty("dublincore", "description", "this is a test");
         childFile.setProperty("file", "content", blob);
 
-        remote.saveDocument(childFile);
+        session.saveDocument(childFile);
 
-        childFile = remote.getDocument(childFile.getRef());
+        childFile = session.getDocument(childFile.getRef());
         blob = (Blob) childFile.getProperty("file", "content");
 
         assertEquals("XXX", blob.getDigest());
@@ -2093,8 +2004,6 @@ public abstract class TestAPI extends TestConnection {
      * This test should be done on a repo that contains deprecated blob node
      * types (nt:resource blobs) You should specify the File document UID to
      * test
-     *
-     * @throws Exception
      */
     public void xxx_testBlobCompat() throws Exception {
         String UID = "6c0f8723-25b2-4a28-a93f-d03096057b92";
@@ -2105,9 +2014,9 @@ public abstract class TestAPI extends TestConnection {
                 name2, "File");
         childFile = createChildDocument(childFile);
 
-        remote.save();
+        session.save();
 
-        DocumentModel doc = remote.getDocument(new IdRef(UID));
+        DocumentModel doc = session.getDocument(new IdRef(UID));
         Blob blob = (Blob) doc.getProperty("file", "content");
         String digest = blob.getDigest();
         String filename = blob.getFilename();
@@ -2125,9 +2034,9 @@ public abstract class TestAPI extends TestConnection {
         b2.setEncoding(encoding);
         length = b2.getLength();
         doc.setProperty("file", "content", b2);
-        remote.saveDocument(doc);
+        session.saveDocument(doc);
 
-        remote.getDocument(doc.getRef());
+        session.getDocument(doc.getRef());
         b2 = (Blob) doc.getProperty("file", "content");
         assertEquals("XXX", b2.getDigest());
         assertEquals("blob.txt", b2.getFilename());
@@ -2139,14 +2048,12 @@ public abstract class TestAPI extends TestConnection {
     }
 
     public void xxx__testUploadBigBlob() throws Exception {
-        DocumentModel root = getRootDocument();
-
         String name2 = "file#" + generateUnique();
         DocumentModel childFile = new DocumentModelImpl(root.getPathAsString(),
                 name2, "File");
         childFile = createChildDocument(childFile);
 
-        remote.save();
+        session.save();
 
         byte[] bytes = FileUtils.readBytes(Blob.class.getResourceAsStream("/blob.mp3"));
         Blob blob = new ByteArrayBlob(bytes, "audio/mpeg");
@@ -2156,12 +2063,12 @@ public abstract class TestAPI extends TestConnection {
         childFile.setProperty("common", "description", "desc 1");
         childFile.setProperty("file", "content", blob);
 
-        remote.saveDocument(childFile);
-        remote.save();
+        session.saveDocument(childFile);
+        session.save();
     }
 
+    @Test
     public void testRetrieveSamePropertyInAncestors() throws ClientException {
-        DocumentModel root = getRootDocument();
         DocumentModel folder1 = new DocumentModelImpl(root.getPathAsString(),
                 "folder1", "Folder");
         folder1 = createChildDocument(folder1);
@@ -2180,31 +2087,31 @@ public abstract class TestAPI extends TestConnection {
         file.setProperty("dublincore", "title", "file ##");
         assertEquals("file ##", file.getProperty("dublincore", "title"));
 
-        assertTrue(remote.exists(new PathRef("/folder1")));
-        assertTrue(remote.exists(new PathRef("folder1/folder2")));
-        assertTrue(remote.exists(new PathRef("folder1/folder2/file")));
+        assertTrue(session.exists(new PathRef("/folder1")));
+        assertTrue(session.exists(new PathRef("folder1/folder2")));
+        assertTrue(session.exists(new PathRef("folder1/folder2/file")));
 
         // need to save them before getting properties from schemas...
-        remote.saveDocument(folder1);
-        remote.saveDocument(folder2);
-        remote.saveDocument(file);
-        remote.save();
+        session.saveDocument(folder1);
+        session.saveDocument(folder2);
+        session.saveDocument(file);
+        session.save();
 
-        final DocumentRef[] ancestorRefs = remote.getParentDocumentRefs(file.getRef());
+        final DocumentRef[] ancestorRefs = session.getParentDocumentRefs(file.getRef());
         assertNotNull(ancestorRefs);
         assertEquals(3, ancestorRefs.length);
         assertEquals(folder2.getRef(), ancestorRefs[0]);
         assertEquals(folder1.getRef(), ancestorRefs[1]);
         assertEquals(root.getRef(), ancestorRefs[2]);
 
-        final Object[] fieldValues = remote.getDataModelsField(ancestorRefs,
+        final Object[] fieldValues = session.getDataModelsField(ancestorRefs,
                 "dublincore", "title");
         assertNotNull(fieldValues);
         assertEquals(3, fieldValues.length);
         assertEquals("folder #2", fieldValues[0]);
         assertEquals("folder #1", fieldValues[1]);
 
-        final Object[] fieldValuesBis = remote.getDataModelsFieldUp(
+        final Object[] fieldValuesBis = session.getDataModelsFieldUp(
                 file.getRef(), "dublincore", "title");
         assertNotNull(fieldValuesBis);
         assertEquals(4, fieldValuesBis.length);
@@ -2213,8 +2120,8 @@ public abstract class TestAPI extends TestConnection {
         assertEquals("folder #1", fieldValuesBis[2]);
     }
 
+    @Test
     public void testLock() throws Exception {
-        DocumentModel root = getRootDocument();
         DocumentModel folder1 = new DocumentModelImpl(root.getPathAsString(),
                 "folder1", "Folder");
 
@@ -2225,7 +2132,7 @@ public abstract class TestAPI extends TestConnection {
         assertEquals("bstefanescu", folder1.getLock());
         assertTrue(folder1.isLocked());
 
-        folder1 = remote.getChild(root.getRef(), "folder1");
+        folder1 = session.getChild(root.getRef(), "folder1");
         assertEquals("bstefanescu", folder1.getLock());
         assertTrue(folder1.isLocked());
 
@@ -2236,7 +2143,6 @@ public abstract class TestAPI extends TestConnection {
 
     // TODO: fix and reenable.
     public void XXXtestDocumentAdapter() throws Exception {
-        DocumentModel root = getRootDocument();
         DocumentModel file = new DocumentModelImpl(root.getPathAsString(),
                 "file", "File");
 
@@ -2254,9 +2160,8 @@ public abstract class TestAPI extends TestConnection {
         assertEquals("val2", adoc.getAnnotation("key2"));
     }
 
+    @Test
     public void testGetSourceId() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name2 = "file#" + generateUnique();
         DocumentModel childFile = new DocumentModelImpl(root.getPathAsString(),
                 name2, "File");
@@ -2274,8 +2179,8 @@ public abstract class TestAPI extends TestConnection {
         // Calendar cal = Calendar.getInstance();
         // version.setCreated(cal);
 
-        remote.save();
-        remote.checkIn(childFile.getRef(), version);
+        session.save();
+        session.checkIn(childFile.getRef(), version);
 
         // Different source ids now.
         assertNotNull(childFile.getSourceId());
@@ -2284,9 +2189,8 @@ public abstract class TestAPI extends TestConnection {
         // assertFalse(childFile.getId().equals(childFile.getSourceId()));
     }
 
+    @Test
     public void testGetRepositoryName() throws ClientException {
-        DocumentModel root = getRootDocument();
-
         String name2 = "file#" + generateUnique();
         DocumentModel childFile = new DocumentModelImpl(root.getPathAsString(),
                 name2, "File");
@@ -2295,67 +2199,21 @@ public abstract class TestAPI extends TestConnection {
         assertEquals("default", childFile.getRepositoryName());
     }
 
-    // TODO: fix and reenable, is this a bug?
-    public void XXXtestRetrieveProxies() throws ClientException {
-        DocumentModel root = getRootDocument();
-
-        // Section A
-        String name = "section" + generateUnique();
-        DocumentModel sectionA = new DocumentModelImpl(root.getPathAsString(),
-                name, "Section");
-        sectionA = createChildDocument(sectionA);
-
-        assertEquals("Section", sectionA.getType());
-        assertEquals(name, sectionA.getName());
-
-        // Section B
-        name = "section" + generateUnique();
-        DocumentModel sectionB = new DocumentModelImpl(root.getPathAsString(),
-                name, "Section");
-        sectionB = createChildDocument(sectionB);
-
-        assertEquals("Section", sectionB.getType());
-        assertEquals(name, sectionB.getName());
-
-        // File
-        name = "file" + generateUnique();
-        DocumentModel file = new DocumentModelImpl(root.getPathAsString(),
-                name, "File");
-        file = createChildDocument(file);
-
-        assertEquals("File", file.getType());
-        assertEquals(name, file.getName());
-
-        // Versioning
-        remote.saveDocumentAsNewVersion(file);
-
-        // Publishing
-        remote.publishDocument(file, sectionA);
-        // remote.publishDocument(file, sectionB);
-
-        // Retrieving proxies
-        DocumentModelList proxies = remote.getProxies(file.getRef(),
-                sectionA.getRef());
-
-        assertFalse(proxies.isEmpty());
-        assertEquals(1, proxies.size());
-        // assertEquals(2, proxies.size());
-    }
-
+    @Test
     public void testCreateDocumentModel() throws ClientException {
         // first method: only the typename
-        DocumentModel docModel = remote.createDocumentModel("File");
+        DocumentModel docModel = session.createDocumentModel("File");
         assertEquals("File", docModel.getType());
 
         // bad type should fail with ClientException
         try {
-            remote.createDocumentModel("NotAValidTypeName");
+            session.createDocumentModel("NotAValidTypeName");
             fail();
         } catch (ClientException e) {
         }
 
         // same as previously with path info
-        docModel = remote.createDocumentModel("/path/to/parent", "some-id",
+        docModel = session.createDocumentModel("/path/to/parent", "some-id",
                 "File");
         assertEquals("File", docModel.getType());
         assertEquals("/path/to/parent/some-id", docModel.getPathAsString());
@@ -2364,12 +2222,13 @@ public abstract class TestAPI extends TestConnection {
         // with
         Map<String, Object> context = new HashMap<String, Object>();
         context.put("Meteo", "Today is a beautiful day");
-        docModel = remote.createDocumentModel("File", context);
+        docModel = session.createDocumentModel("File", context);
         assertEquals("File", docModel.getType());
     }
 
+    @SuppressWarnings("unchecked")
+    @Test
     public void testCopyContent() throws ClientException {
-        DocumentModel root = remote.getRootDocument();
         DocumentModel doc = new DocumentModelImpl(root.getPathAsString(),
                 "original", "File");
         doc.setProperty("dublincore", "title", "t");
@@ -2385,14 +2244,14 @@ public abstract class TestAPI extends TestConnection {
         f.put("file", new StringBlob("myfile", "text/test", "UTF-8"));
         files.add(f);
         doc.setProperty("files", "files", files);
-        doc = remote.createDocument(doc);
-        remote.save();
+        doc = session.createDocument(doc);
+        session.save();
 
         DocumentModel copy = new DocumentModelImpl(root.getPathAsString(),
                 "copy", "File");
         copy.copyContent(doc);
-        copy = remote.createDocument(copy);
-        remote.save();
+        copy = session.createDocument(copy);
+        session.save();
 
         assertEquals("t", copy.getProperty("dublincore", "title"));
         assertEquals("d", copy.getProperty("dublincore", "description"));
@@ -2419,9 +2278,10 @@ public abstract class TestAPI extends TestConnection {
         assertEquals("myfile", content);
     }
 
+    @SuppressWarnings("unchecked")
+    @Test
     public void testDocumentModelTreeSort() throws Exception {
         // create a folder tree
-        DocumentModel root = getRootDocument();
         DocumentModel a_folder = new DocumentModelImpl(root.getPathAsString(),
                 "a_folder", "Folder");
         a_folder.setProperty("dublincore", "title", "Z title for a_folder");
@@ -2478,6 +2338,7 @@ public abstract class TestAPI extends TestConnection {
         assertEquals(a2_folder, tree.get(5).getDocument());
         assertEquals(a1_folder, tree.get(6).getDocument());
 
-        remote.cancel();
+        session.cancel();
     }
+
 }

@@ -19,6 +19,7 @@
 
 package org.nuxeo.ecm.core.api.repository;
 
+import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
@@ -36,17 +37,17 @@ import org.nuxeo.runtime.api.Framework;
  * @author <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
  *
  */
-public class RepositoryInstanceHandler implements InvocationHandler, RepositoryConnection {
+public class RepositoryInstanceHandler implements InvocationHandler, RepositoryConnection, Serializable {
 
     public static final Object NULL = new Object();
 
     protected static final ConcurrentHashMap<Method, Method> methods = new ConcurrentHashMap<Method, Method>();
     protected static ConcurrentHashMap<Method, MethodInvoker> invokers = new ConcurrentHashMap<Method, MethodInvoker>();
 
-    protected final Repository repository;
-    protected final RepositoryExceptionHandler exceptionHandler;
-    protected CoreSession session;
-    protected RepositoryInstance  proxy;
+    protected final transient Repository repository;
+    protected final transient RepositoryExceptionHandler exceptionHandler;
+    protected transient CoreSession session;
+    protected transient RepositoryInstance  proxy;
 
     public RepositoryInstanceHandler(Repository repository, RepositoryExceptionHandler exceptionHandler) {
         this.repository = repository;
@@ -143,7 +144,7 @@ public class RepositoryInstanceHandler implements InvocationHandler, RepositoryC
     }
 
     @SuppressWarnings({"ObjectEquality"})
-    public Object invoke(Object proxy, Method method, Object[] args)
+    public synchronized Object invoke(Object proxy, Method method, Object[] args)
     throws Throwable {
         try {
 //            MethodInvoker invoker = invokers.get(method);
@@ -184,6 +185,10 @@ public class RepositoryInstanceHandler implements InvocationHandler, RepositoryC
 
     protected Object getImpl() {
         return this;
+    }
+
+    public Object writeReplace() throws ObjectStreamException {
+        return Proxy.getInvocationHandler(session);
     }
 
 }

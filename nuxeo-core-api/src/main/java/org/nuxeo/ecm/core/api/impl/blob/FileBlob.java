@@ -30,7 +30,9 @@ import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.Serializable;
 
+import org.nuxeo.common.utils.FileUtils;
 import org.nuxeo.ecm.core.api.Blob;
+import org.nuxeo.runtime.api.Framework;
 
 /**
  * @author  <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
@@ -78,21 +80,16 @@ public class FileBlob extends DefaultStreamBlob implements Serializable {
             file.deleteOnExit();
             out = new FileOutputStream(file);
             copy(in, out);
+            Framework.trackFile(file, this);
         } finally {
-            try {
-                in.close();
-            } catch (IOException e) {
-            }
-            if (out != null) {
-                out.close();
-            }
+            FileUtils.close(in);
+            FileUtils.close(out);
         }
     }
 
     public File getFile() {
         return file;
     }
-
 
     @Override
     public long getLength() {
@@ -118,6 +115,7 @@ public class FileBlob extends DefaultStreamBlob implements Serializable {
         // create a temp file where we will put the blob content
         file = File.createTempFile("NXCore-FileBlob-", ".tmp");
         file.deleteOnExit();
+        Framework.trackFile(file, this);
         OutputStream out = null;
         try {
             out = new FileOutputStream(file);
@@ -132,9 +130,7 @@ public class FileBlob extends DefaultStreamBlob implements Serializable {
                 }
             }
         } finally {
-            if (out != null) {
-                out.close();
-            }
+            FileUtils.close(out);
         }
     }
 
@@ -152,21 +148,9 @@ public class FileBlob extends DefaultStreamBlob implements Serializable {
             }
             out.writeInt(-1); // EOF
         } finally {
-            if (in != null) {
-                in.close();
-            }
+            FileUtils.close(in);
         }
 
-    }
-
-    @Override
-    protected void finalize() throws Throwable {
-        if (file != null) {
-            String name = file.getName();
-            if (name.startsWith("NXCore-FileBlob-") && name.endsWith(".tmp")) {
-                file.delete();
-            }
-        }
     }
 
 }

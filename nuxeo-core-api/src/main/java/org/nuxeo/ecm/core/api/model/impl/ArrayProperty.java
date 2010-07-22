@@ -40,13 +40,13 @@ public class ArrayProperty extends ScalarProperty {
     private static final long serialVersionUID = 0L;
 
     public ArrayProperty(Property parent, Field field, int flags) {
-        super (parent, field, flags);
+        super(parent, field, flags);
     }
 
 
     @Override
     public ListType getType() {
-        return (ListType)super.getType();
+        return (ListType) super.getType();
     }
 
     @Override
@@ -63,7 +63,7 @@ public class ArrayProperty extends ScalarProperty {
     public Serializable normalize(Object value)
             throws PropertyConversionException {
         if (isNormalized(value)) {
-            return (Serializable)value;
+            return (Serializable) value;
         }
         if (value instanceof Collection) {
             Collection<?> col = (Collection<?>) value;
@@ -73,6 +73,7 @@ public class ArrayProperty extends ScalarProperty {
         throw new PropertyConversionException(value.getClass(), Object[].class, getPath());
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public <T> T convertTo(Serializable value, Class<T> toType)
             throws PropertyConversionException {
@@ -85,8 +86,7 @@ public class ArrayProperty extends ScalarProperty {
     }
 
     @Override
-    public Object newInstance() throws InstantiationException,
-            IllegalAccessException {
+    public Object newInstance() {
         return new Serializable[0];
     }
 

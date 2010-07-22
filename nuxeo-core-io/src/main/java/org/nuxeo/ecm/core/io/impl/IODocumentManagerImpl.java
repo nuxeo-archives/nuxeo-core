@@ -19,7 +19,6 @@
 
 package org.nuxeo.ecm.core.io.impl;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -72,11 +71,9 @@ public class IODocumentManagerImpl implements IODocumentManager {
                 throw new ClientException("cannot get repository: " + repo);
             }
             systemSession = repository.open();
+        } catch (ClientException e) {
+            throw e;
         } catch (Exception e) {
-            // hmmm...
-            if (e instanceof ClientException) {
-                throw (ClientException) e;
-            }
             throw new ClientException(
                     "Failed to open core session to repository " + repo, e);
         }
@@ -84,8 +81,7 @@ public class IODocumentManagerImpl implements IODocumentManager {
     }
 
     public DocumentTranslationMap importDocuments(InputStream in, String repo,
-            DocumentRef root) throws ImportDocumentException, ClientException,
-            IOException {
+            DocumentRef root) throws ImportDocumentException, ClientException {
         CoreSession coreSession = getCoreSession(repo);
         final DocumentModel dst = coreSession.getDocument(root);
 
@@ -114,9 +110,8 @@ public class IODocumentManagerImpl implements IODocumentManager {
         }
      }
 
-    public DocumentTranslationMap importDocuments(InputStream in,
-            DocumentWriter customDocWriter) throws ImportDocumentException,
-            ClientException, IOException {
+    public DocumentTranslationMap importDocuments(InputStream in, DocumentWriter customDocWriter)
+            throws ImportDocumentException {
 
         DocumentReader reader = null;
 
@@ -143,8 +138,7 @@ public class IODocumentManagerImpl implements IODocumentManager {
 
     public DocumentTranslationMap exportDocuments(OutputStream out,
             String repo, Collection<DocumentRef> sources, boolean recurse,
-            String format) throws ExportDocumentException, ClientException,
-            IOException {
+            String format) throws ExportDocumentException, ClientException {
         CoreSession coreSession = getCoreSession(repo);
 
         DocumentReader reader = null;
@@ -187,7 +181,7 @@ public class IODocumentManagerImpl implements IODocumentManager {
 
     public DocumentTranslationMap exportDocuments(OutputStream out,
             DocumentReader customDocReader, String format)
-            throws ExportDocumentException, ClientException, IOException {
+            throws ExportDocumentException {
 
         DocumentWriter writer = null;
 
@@ -217,7 +211,7 @@ public class IODocumentManagerImpl implements IODocumentManager {
 
     public DocumentTranslationMap importDocuments(
             DocumentReader customDocReader, DocumentWriter customDocWriter)
-            throws ImportDocumentException, ClientException, IOException {
+            throws ImportDocumentException {
 
         try {
             DocumentPipe pipe = new DocumentPipeImpl(10);

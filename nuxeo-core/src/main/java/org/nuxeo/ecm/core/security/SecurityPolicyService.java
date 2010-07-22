@@ -12,35 +12,35 @@
  * Lesser General Public License for more details.
  *
  * Contributors:
- *     <a href="mailto:at@nuxeo.com">Anahide Tchertchian</a>
- *
- * $Id$
+ *     Anahide Tchertchian
+ *     Florent Guillaume
  */
 
 package org.nuxeo.ecm.core.security;
 
 import java.io.Serializable;
 import java.security.Principal;
+import java.util.Collection;
 
 import org.nuxeo.ecm.core.api.security.ACP;
 import org.nuxeo.ecm.core.api.security.Access;
 import org.nuxeo.ecm.core.model.Document;
+import org.nuxeo.ecm.core.query.sql.model.SQLQuery;
 
 /**
  * Service checking permissions for pluggable policies.
  *
  * @author Anahide Tchertchian
+ * @author Florent Guillaume
  */
 public interface SecurityPolicyService extends Serializable {
 
     /**
      * Checks given permission for doc and principal.
-     *
      * <p>
      * The security service checks this service for a security access. This
      * access is defined iterating over pluggable policies in a defined order.
      * If access is not specified, security service applies its default policy.
-     * </p>
      *
      * @param doc the document to check
      * @param mergedAcp merged acp resolved for this document
@@ -51,24 +51,39 @@ public interface SecurityPolicyService extends Serializable {
      * @param principalsToCheck principals (groups) to check for principal
      * @return access: true, false, or nothing. When nothing is returned,
      *         following policies or default core security are applied.
-     * @throws SecurityException
      */
     Access checkPermission(Document doc, ACP mergedAcp, Principal principal,
             String permission, String[] resolvedPermissions,
-            String[] principalsToCheck) throws SecurityException;
+            String[] principalsToCheck);
+
+    void registerDescriptor(SecurityPolicyDescriptor descriptor);
+
+    void unregisterDescriptor(SecurityPolicyDescriptor descriptor);
 
     /**
-     * @param descriptor
-     * @throws Exception
+     * Checks if any policy restricts the given permission.
+     * <p>
+     * If not, then no post-filtering on policies will be needed for query
+     * results.
+     *
+     * @return {@code true} if a policy restricts the permission
      */
-    void registerDescriptor(SecurityPolicyDescriptor descriptor)
-            throws Exception;
+    boolean arePoliciesRestrictingPermission(String permission);
 
     /**
-     * @param descriptor
-     * @throws Exception
+     * Checks if the policies can be expressed in a query.
+     * <p>
+     * If not, then any query made will have to be post-filtered.
+     *
+     * @return {@code true} if all policies can be expressed in a query
      */
-    void unregisterDescriptor(SecurityPolicyDescriptor descriptor)
-            throws Exception;
+    boolean arePoliciesExpressibleInQuery();
+
+    /**
+     * Get the transformers to apply the policies to a query.
+     *
+     * @return the transformers.
+     */
+    Collection<SQLQuery.Transformer> getPoliciesQueryTransformers();
 
 }

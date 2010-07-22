@@ -24,23 +24,22 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 import org.nuxeo.ecm.core.api.DocumentRef;
-import org.nuxeo.ecm.core.api.IdRef;
 
 /**
  * A set of modification descriptors.
- * <p/>
- * This class is not thread safe
+ * <p>
+ * This class is not thread safe.
  *
  * @author <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
- *
  */
 public class ModificationSet implements Serializable, Iterable<Modification> {
 
     private static final long serialVersionUID = 6074152814184873084L;
 
-    private final static int SIZE = 4;
+    private static final int SIZE = 4;
 
     private Modification[] ar = new Modification[SIZE];
+
     private int length = 0;
 
     public int size() {
@@ -48,14 +47,8 @@ public class ModificationSet implements Serializable, Iterable<Modification> {
     }
 
     public boolean add(DocumentRef ref, int modifType) {
-        for (int i=0; i<length; i++) {
-            if (ar[i].ref.equals(ref)) {
-                ar[i].type |= modifType;
-                return true;
-            }
-        }
         if (length == ar.length) {
-            Modification[] tmp = new Modification[ar.length+SIZE];
+            Modification[] tmp = new Modification[ar.length + SIZE];
             System.arraycopy(ar, 0, tmp, 0, ar.length);
             ar = tmp;
         }
@@ -68,7 +61,7 @@ public class ModificationSet implements Serializable, Iterable<Modification> {
     }
 
     public boolean contains(DocumentRef ref) {
-        for (int i=0; i<length; i++) {
+        for (int i = 0; i < length; i++) {
             if (ar[i].ref.equals(ref)) {
                 return true;
             }
@@ -80,17 +73,40 @@ public class ModificationSet implements Serializable, Iterable<Modification> {
         return ar[index];
     }
 
-    public Modification getModifcation(DocumentRef ref) {
-        for (int i=0; i<length; i++) {
+    /**
+     * Retrieves the merged modification value for the DocumentRef
+     *
+     * @param ref The document ref
+     * @return Merged modification relating to this document
+     * @deprecated returns a merged modification, unsafe to use this where order
+     *             of notifications is important
+     */
+    @Deprecated
+    public Modification getModification(DocumentRef ref) {
+        Modification m = null;
+        for (int i = 0; i < length; i++) {
             if (ar[i].ref.equals(ref)) {
-                return ar[i];
+                if (m == null) {
+                    m = new Modification(ref, ar[i].type);
+                } else {
+                    m.type |= ar[i].type;
+                }
             }
         }
-        return null;
+        return m;
+    }
+
+    /**
+     * Deprecated (spelling mistake in method name). Use getModification
+     * insteas.
+     */
+    @Deprecated
+    public Modification getModifcation(DocumentRef ref) {
+        return getModification(ref);
     }
 
     public int indexOf(DocumentRef ref) {
-        for (int i=0; i<length; i++) {
+        for (int i = 0; i < length; i++) {
             if (ar[i].ref.equals(ref)) {
                 return i;
             }
@@ -103,18 +119,31 @@ public class ModificationSet implements Serializable, Iterable<Modification> {
             throw new ArrayIndexOutOfBoundsException(index);
         }
         Modification mod = ar[index];
-        if (index == length -1) {
+        if (index == length - 1) {
             ar[--length] = null;
         } else {
-            System.arraycopy(ar, index+1, ar, index, ar.length-index-1);
+            System.arraycopy(ar, index + 1, ar, index, ar.length - index - 1);
             length--;
         }
         return mod;
     }
 
+    /**
+     * Removes any modifications for the provided document ref
+     *
+     * @param ref The document ref
+     * @return Merged modification relating to this document
+     * @deprecated returns a merged modification, unsafe to use this where order
+     *             of notifications is important
+     */
+    @Deprecated
     public Modification removeModification(DocumentRef ref) {
-        int index = indexOf(ref);
-        return remove(index);
+        Modification m = new Modification(ref, 0);
+        int index = -1;
+        while ((index = indexOf(ref)) != -1) {
+            m.type |= remove(index).type;
+        }
+        return m;
     }
 
     public Modification[] toArray() {
@@ -129,43 +158,22 @@ public class ModificationSet implements Serializable, Iterable<Modification> {
 
     class ModifIterator implements Iterator<Modification> {
         int index = 0;
+
         public boolean hasNext() {
             return index < length;
         }
+
         public Modification next() {
             try {
                 return ar[index++];
             } catch (Throwable t) {
-                throw new NoSuchElementException("Iterator has no more elements");
+                throw new NoSuchElementException(
+                        "Iterator has no more elements");
             }
         }
+
         public void remove() {
             ModificationSet.this.remove(index);
-        }
-    }
-
-    public static void main(String[] args) {
-        ModificationSet set = new ModificationSet();
-        set.add(new IdRef("a"), Modification.CREATE);
-        set.add(new IdRef("b"), Modification.REMOVE);
-        set.add(new IdRef("c"), Modification.CONTENT);
-        set.add(new IdRef("e"), Modification.SECURITY);
-        set.add(new IdRef("d"), Modification.STATE);
-        for (Modification m : set) {
-            System.out.println("> "+m);
-        }
-        System.out.println("===========================");
-        set.add(new IdRef("c"), Modification.STATE | Modification.SECURITY);
-        for (int i=0; i<set.size(); i++) {
-            System.out.println("> "+set.get(i));
-        }
-        System.out.println("===========================");
-        Modification mod = set.getModifcation(new IdRef("c"));
-        System.out.println(mod+" = "+Modification.UPDATE_MODIFICATION);
-        System.out.println("===========================");
-        set.remove(2);
-        for (Modification m : set) {
-            System.out.println("> "+m);
         }
     }
 

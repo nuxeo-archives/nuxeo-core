@@ -40,11 +40,14 @@ public interface LifeCycle {
             throws LifeCycleException;
 
     /**
-     * Returns the initial state name.
-     *
-     * @return the initial state name
+     * Returns the default initial state name.
      */
-    String getInitialStateName();
+    String getDefaultInitialStateName();
+
+    /**
+     * Returns the list of allowed initial state names.
+     */
+    Collection<String> getInitialStateNames();
 
     /**
      * Gets the life cycle name.

@@ -32,6 +32,8 @@ import java.util.List;
  */
 public interface NuxeoPrincipal extends Principal, Serializable {
 
+    String PREFIX = "user:";
+
     /**
      * Gets the first name of this principal.
      *
@@ -80,11 +82,9 @@ public interface NuxeoPrincipal extends Principal, Serializable {
     /**
      * Recursively test if the user is member of this group.
      *
-     * @param group
-     *            The name of the group
-     * @return
+     * @param group The name of the group
      */
-    boolean isMemberOf(String group) throws ClientException;
+    boolean isMemberOf(String group);
 
     /**
      * Gets the roles for this principal.
@@ -117,22 +117,19 @@ public interface NuxeoPrincipal extends Principal, Serializable {
     /**
      * Sets the principalId.
      *
-     * @param principalId
-     *            a new principalId for this instance
+     * @param principalId a new principalId for this instance
      */
     void setPrincipalId(String principalId);
 
     DocumentModel getModel();
 
-    /**
-     * @param model
-     *            The model to set.
-     * @throws ClientException
-     */
     void setModel(DocumentModel model) throws ClientException;
 
     /**
-     * Checks if the principal is an administrator (superuser).
+     * Returns true if the principal is an administrator.
+     * <p>
+     * Security checks still apply on the repository for administrator user. If
+     * user is a system user, this method will return true.
      *
      * @return true if the principal is an administrator.
      */

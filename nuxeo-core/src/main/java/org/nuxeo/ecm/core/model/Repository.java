@@ -38,7 +38,7 @@ public interface Repository {
 
     SchemaManager getTypeManager();
 
-    SecurityManager getSecurityManager();
+    SecurityManager getNuxeoSecurityManager();
 
     void initialize() throws DocumentException;
 
@@ -46,11 +46,6 @@ public interface Repository {
 
     Session[] getOpenedSessions() throws DocumentException;
 
-    /**
-     * TODO: hide shutdown from public API.
-     *
-     * @throws Exception
-     */
     void shutdown();
 
     // stats for debug
@@ -60,5 +55,7 @@ public interface Repository {
     int getClosedSessionsCount();
 
     int getActiveSessionsCount();
+
+    boolean supportsTags();
 
 }

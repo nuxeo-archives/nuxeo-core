@@ -29,9 +29,7 @@ import org.nuxeo.ecm.core.query.Query;
 import org.nuxeo.ecm.core.query.QueryException;
 
 /**
- *
  * @author <a href="mailto:dm@nuxeo.com">Dragos Mihalache</a>
- *
  */
 @SuppressWarnings({"SuppressionAnnotation"})
 final class DocsQueryProviderFactory {
@@ -40,9 +38,6 @@ final class DocsQueryProviderFactory {
 
     private final AbstractSession session;
 
-    /**
-     * @param session
-     */
     DocsQueryProviderFactory(AbstractSession session) {
         this.session = session;
     }
@@ -84,8 +79,6 @@ final class DocsQueryProviderFactory {
             compiledQuery = session.getSession().createQuery(query,
                     Query.Type.NXQL);
         } catch (QueryException e1) {
-            // TODO Auto-generated catch block
-            e1.printStackTrace();
             throw new ClientException("qe", e1);
         }
 
@@ -96,8 +89,6 @@ final class DocsQueryProviderFactory {
                     documents = (DocumentIterator) compiledQuery.execute().getDocuments(
                             start);
                 } catch (QueryException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
                     throw new ClientException("Query exception, ", e);
                 }
                 return documents;
@@ -109,7 +100,6 @@ final class DocsQueryProviderFactory {
         };
     }
 
-    @SuppressWarnings("unchecked")
     private DocsQueryProvider getDQPQueryFtsResult(String keywords, String startingPath)
             throws ClientException {
 
@@ -148,8 +138,6 @@ final class DocsQueryProviderFactory {
                     documents = (DocumentIterator) compiledQuery.execute().getDocuments(
                             start);
                 } catch (QueryException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
                     throw new ClientException("Query exception, ", e);
                 }
                 return documents;

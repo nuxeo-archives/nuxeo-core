@@ -21,87 +21,72 @@ package org.nuxeo.ecm.core.api;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.junit.BeforeClass;
+import org.junit.Test;
 import org.nuxeo.ecm.core.api.impl.DocumentModelImpl;
+import org.nuxeo.runtime.test.NXRuntimeTestCase;
+
+import static org.nuxeo.ecm.core.api.Constants.CORE_BUNDLE;
+import static org.nuxeo.ecm.core.api.Constants.CORE_FACADE_TESTS_BUNDLE;
 
 /**
- *
  * @author <a href="mailto:dms@nuxeo.com">Dragos Mihalache</a>
  */
-public class TestApiHeavyLoad extends TestConnection {
+public class TestApiHeavyLoad extends BaseTestCase {
 
     private static final Log log = LogFactory.getLog(TestApiHeavyLoad.class);
 
-    protected void doDeployments() throws Exception {
-        deployContrib(CoreFacadeTestConstants.CORE_BUNDLE,
+    @BeforeClass
+    public static void startRuntime() throws Exception {
+        runtime = new NXRuntimeTestCase() {};
+        runtime.setUp();
+
+        runtime.deployContrib(CORE_BUNDLE,
                 "OSGI-INF/CoreService.xml");
-        deployContrib(CoreFacadeTestConstants.CORE_BUNDLE,
+        runtime.deployContrib(CORE_BUNDLE,
                 "OSGI-INF/SecurityService.xml");
-        deployContrib(CoreFacadeTestConstants.CORE_FACADE_TESTS_BUNDLE,
+        runtime.deployContrib(CORE_BUNDLE,
+                "OSGI-INF/RepositoryService.xml");
+
+        runtime.deployContrib(CORE_FACADE_TESTS_BUNDLE,
                 "TypeService.xml");
-        deployContrib(CoreFacadeTestConstants.CORE_FACADE_TESTS_BUNDLE,
+        runtime.deployContrib(CORE_FACADE_TESTS_BUNDLE,
                 "permissions-contrib.xml");
-        deployContrib(CoreFacadeTestConstants.CORE_FACADE_TESTS_BUNDLE,
-                "RepositoryService.xml");
-        deployContrib(CoreFacadeTestConstants.CORE_FACADE_TESTS_BUNDLE,
+        runtime.deployContrib(CORE_FACADE_TESTS_BUNDLE,
                 "test-CoreExtensions.xml");
-        deployContrib(CoreFacadeTestConstants.CORE_FACADE_TESTS_BUNDLE,
+        runtime.deployContrib(CORE_FACADE_TESTS_BUNDLE,
                 "CoreTestExtensions.xml");
-        deployContrib(CoreFacadeTestConstants.CORE_FACADE_TESTS_BUNDLE,
+        runtime.deployContrib(CORE_FACADE_TESTS_BUNDLE,
                 "DemoRepository.xml");
-        deployContrib(CoreFacadeTestConstants.CORE_FACADE_TESTS_BUNDLE,
-                "LifeCycleService.xml");
-        deployContrib(CoreFacadeTestConstants.CORE_FACADE_TESTS_BUNDLE,
-                "LifeCycleServiceExtensions.xml");
-        deployContrib(CoreFacadeTestConstants.CORE_FACADE_TESTS_BUNDLE,
-                "CoreEventListenerService.xml");
-        deployContrib(CoreFacadeTestConstants.CORE_FACADE_TESTS_BUNDLE,
-                "DocumentAdapterService.xml");
+
+        runtime.deployBundle("org.nuxeo.ecm.core.event");
     }
 
-    @Override
-    protected void setUp() throws Exception {
-        super.setUp();
-        doDeployments();
-        openSession();
-    }
-
-    @Override
-    protected void tearDown() throws Exception {
-        closeSession();
-        super.tearDown();
-    }
-
-    protected CoreSession getCoreSession() {
-        return remote;
-    }
+    // Tests
 
     protected void createChildDocuments(DocumentModel folder, int childrenCount)
             throws ClientException {
-        final CoreSession coreSession = getCoreSession();
 
         for (int i = 0; i < childrenCount; i++) {
             DocumentModel file = new DocumentModelImpl(
                     folder.getPathAsString(), "file#_" + i, "File");
-            file = coreSession.createDocument(file);
+            file = session.createDocument(file);
             file.setProperty("dublincore", "title", "file_" + i);
-            coreSession.saveDocument(file);
+            session.saveDocument(file);
         }
 
-        coreSession.save();
+        session.save();
     }
 
+    @Test
     public void testRetrieveChildren() throws ClientException {
-        final CoreSession coreSession = getCoreSession();
-
-        DocumentModel root = coreSession.getRootDocument();
-
         DocumentModel folder = new DocumentModelImpl(root.getPathAsString(),
                 "folder#1", "Folder");
-        folder = coreSession.createDocument(folder);
+        folder = session.createDocument(folder);
 
         createChildDocuments(folder, 50);
 
-        DocumentModelIterator docsIt = coreSession.getChildrenIterator(folder.getRef());
+        DocumentModelIterator docsIt = session.getChildrenIterator(folder.getRef());
 
         int count = 0;
         while (docsIt.hasNext()) {
@@ -113,18 +98,15 @@ public class TestApiHeavyLoad extends TestConnection {
         assertEquals(50, count);
     }
 
+    @Test
     public void testNXQuery() throws ClientException {
-        final CoreSession coreSession = getCoreSession();
-
-        DocumentModel root = coreSession.getRootDocument();
-
         DocumentModel folder = new DocumentModelImpl(root.getPathAsString(),
                 "folder#1", "Folder");
-        folder = coreSession.createDocument(folder);
+        folder = session.createDocument(folder);
 
         createChildDocuments(folder, 50);
 
-        DocumentModelIterator docsIt = coreSession.queryIt("SELECT * FROM Document", null, 10000);
+        DocumentModelIterator docsIt = session.queryIt("SELECT * FROM Document", null, 10000);
 
         int count = 0;
         while (docsIt.hasNext()) {
@@ -140,59 +122,41 @@ public class TestApiHeavyLoad extends TestConnection {
         assertEquals(52, count);
     }
 
+    @Test
     public void testFtsQuery() throws ClientException {
         log.info("<testFtsQuery>... ");
-
-        final CoreSession coreSession = getCoreSession();
-
-        DocumentModel root = coreSession.getRootDocument();
-
         DocumentModel folder = new DocumentModelImpl(root.getPathAsString(),
                 "folder#1", "Folder");
-        folder = coreSession.createDocument(folder);
+        folder = session.createDocument(folder);
 
         createChildDocuments(folder, 50);
 
         int pageSize = 10;
-        DocumentModelIterator docsIt = coreSession.querySimpleFtsIt("file", null, pageSize);
+        DocumentModelIterator docsIt = session.querySimpleFtsIt("file", null, pageSize);
 
-        int count = 0;
-        while (docsIt.hasNext()) {
-            DocumentModel dm = docsIt.next();
-            assertEquals("file#_" + count, dm.getName());
-            assertEquals("file_" + count, dm.getProperty("dublincore", "title"));
-            count++;
-        }
-
-        // total docs = root + folder + children(50)
-        assertEquals(50, count);
+        assertEquals(DocumentModelIterator.UNKNOWN_SIZE, docsIt.size());
     }
 
     public void OBSOLETEtestFtsQueryWithinPath() throws ClientException {
         log.info("<testFtsQueryWithinPath>... ");
-
-        final CoreSession coreSession = getCoreSession();
-
-        DocumentModel root = coreSession.getRootDocument();
-
         DocumentModel folder = new DocumentModelImpl(root.getPathAsString(),
                 "folder#1", "Folder");
-        folder = coreSession.createDocument(folder);
+        folder = session.createDocument(folder);
         createChildDocuments(folder, 10);
 
         DocumentModel folder2 = new DocumentModelImpl(folder.getPathAsString(),
                 "folder#2", "Folder");
-        folder2 = coreSession.createDocument(folder2);
+        folder2 = session.createDocument(folder2);
 
         createChildDocuments(folder2, 25);
 
         DocumentModel folder3 = new DocumentModelImpl(folder2.getPathAsString(),
                 "folder#3", "Folder");
-        folder3 = coreSession.createDocument(folder3);
+        folder3 = session.createDocument(folder3);
 
         createChildDocuments(folder3, 25);
 
-        DocumentModelIterator docsIt = coreSession.querySimpleFtsIt(
+        DocumentModelIterator docsIt = session.querySimpleFtsIt(
                 "file", folder2.getPathAsString(), null, 10000);
 
         int count = 0;
@@ -206,4 +170,5 @@ public class TestApiHeavyLoad extends TestConnection {
         // total docs = root + folder + children(50)
         assertEquals(50, count);
     }
+
 }

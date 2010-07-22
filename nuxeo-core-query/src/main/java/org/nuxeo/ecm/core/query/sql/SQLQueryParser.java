@@ -49,7 +49,9 @@ public final class SQLQueryParser {
 
     public static SQLQuery parse(String string) {
         try {
-            return parse(new StringReader(string));
+            SQLQuery query = parse(new StringReader(string));
+            query.setQueryString(string);
+            return query;
         } catch (QueryParseException e) {
             throw new QueryParseException(e.getMessage() + " in query: "
                     + string, e);
@@ -57,10 +59,7 @@ public final class SQLQueryParser {
     }
 
     /**
-     * Return the string literal in a form ready to embed in an NXQL statement.
-     *
-     * @param s
-     * @return
+     * Returns the string literal in a form ready to embed in an NXQL statement.
      */
     public static String prepareStringLiteral(String s) {
         return "'" + s.replaceAll("'", "\\\\'") + "'";

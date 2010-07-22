@@ -26,7 +26,6 @@ import org.nuxeo.common.xmap.annotation.XObject;
 
 /**
  * @author  <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
- *
  */
 @XObject("adapter")
 public class DocumentAdapterDescriptor {
@@ -53,63 +52,37 @@ public class DocumentAdapterDescriptor {
 
     /**
      * Used by XMap to set the factory.
-     *
-     * @param factoryClass
-     * @throws Throwable
      */
     @XNode("@factory")
-    void setFactory(Class factoryClass) throws Throwable {
-        if (!DocumentAdapterFactory.class.isAssignableFrom(factoryClass)) {
-            throw new ClassCastException("Declared factory class "
-                    + factoryClass.getName() + " must implement "
-                    + DocumentAdapterFactory.class + " interface.");
-        }
+    void setFactory(Class<DocumentAdapterFactory> factoryClass) throws Throwable {
         try {
-            factory = (DocumentAdapterFactory) factoryClass.newInstance();
+            factory = factoryClass.newInstance();
         } catch (Throwable e) {
             log.error("ERROR instantiating document adapter factory class!");
             throw e;
         }
     }
 
-    /**
-     * @return the factory
-     */
     public DocumentAdapterFactory getFactory() {
         return factory;
     }
 
-    /**
-     * @param factory the factory to set.
-     */
     public void setFactory(DocumentAdapterFactory factory) {
         this.factory = factory;
     }
 
-    /**
-     * @return the facet.
-     */
     public String getFacet() {
         return facet;
     }
 
-    /**
-     * @param facet the facet to set.
-     */
     public void setFacet(String facet) {
         this.facet = facet;
     }
 
-    /**
-     * @return the interface.
-     */
     public Class getInterface() {
         return itf;
     }
 
-    /**
-     * @param itf the interface to set.
-     */
     public void setInterface(Class itf) {
         this.itf = itf;
     }

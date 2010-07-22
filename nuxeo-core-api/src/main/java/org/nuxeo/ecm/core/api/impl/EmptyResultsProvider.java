@@ -19,7 +19,6 @@
 
 package org.nuxeo.ecm.core.api.impl;
 
-import org.nuxeo.ecm.core.api.ClientException;
 import org.nuxeo.ecm.core.api.DocumentModelList;
 import org.nuxeo.ecm.core.api.PagedDocumentsProvider;
 import org.nuxeo.ecm.core.api.SortInfo;
@@ -81,7 +80,7 @@ public class EmptyResultsProvider implements PagedDocumentsProvider {
     public void previous() {
     }
 
-    public void refresh() throws ClientException {
+    public void refresh() {
     }
 
     public void rewind() {

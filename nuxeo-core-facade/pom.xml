@@ -1,17 +1,15 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
     <groupId>org.nuxeo.ecm.core</groupId>
     <artifactId>nuxeo-core-parent</artifactId>
-    <version>1.4.4-SNAPSHOT</version>
+    <version>1.6.2-APG-240-SNAPSHOT</version>
   </parent>
 
   <artifactId>nuxeo-core-facade</artifactId>
   <name>Nuxeo Core Facade</name>
-  <packaging>ejb</packaging>
   <description>Nuxeo Core: Facade.</description>
 
   <dependencies>
@@ -38,8 +36,7 @@
     </dependency>
     <dependency>
       <groupId>org.nuxeo.ecm.core</groupId>
-      <artifactId>nuxeo-core-jcr-connector</artifactId>
-      <scope>test</scope>
+      <artifactId>nuxeo-core-event</artifactId>
     </dependency>
 
     <dependency>
@@ -70,66 +67,47 @@
       <scope>test</scope>
     </dependency>
     <dependency>
+      <groupId>jmock</groupId>
+      <artifactId>jmock</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.nuxeo.ecm.core</groupId>
+      <artifactId>nuxeo-core-jcr-connector</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>org.nuxeo.ecm.core</groupId>
       <artifactId>nuxeo-core-jcr-connector-test</artifactId>
       <scope>test</scope>
     </dependency>
-
     <dependency>
-      <groupId>log4j</groupId>
-      <artifactId>log4j</artifactId>
+      <groupId>org.nuxeo.ecm.core</groupId>
+      <artifactId>nuxeo-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.nuxeo.runtime</groupId>
+      <artifactId>nuxeo-runtime-osgi</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>log4j</groupId>
-      <artifactId>log4j</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency><!-- TO BE REMOVED; if not present, tests are running in spite of exclude tags -->
-      <groupId>jboss</groupId>
-      <artifactId>jbosssx</artifactId>
+      <groupId>org.nuxeo.ecm.core</groupId>
+      <artifactId>nuxeo-core-query</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <scope>test</scope>
-      <groupId>jboss</groupId>
-      <artifactId>jboss-j2ee</artifactId>
-      <version>4.0.4.GA</version>
-    </dependency>
-    <dependency>
-      <groupId>jboss</groupId>
-      <artifactId>jnp-client</artifactId>
-      <version>4.0.2</version>
+      <groupId>javax.transaction</groupId>
+      <artifactId>jta</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>jboss</groupId>
-      <artifactId>jboss-transaction-client</artifactId>
-      <version>4.0.4.GA</version>
+      <groupId>javax.script</groupId>
+      <artifactId>groovy-engine</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>jboss</groupId>
-      <artifactId>jboss-aop-jdk50</artifactId>
-      <version>1.4.0.SP1</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>jboss</groupId>
-      <artifactId>jboss-aspect-jdk50-client</artifactId>
-      <version>1.5</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>jboss</groupId>
-      <artifactId>jboss-client</artifactId>
-      <version>4.0.2</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>jboss</groupId>
-      <artifactId>ejb3</artifactId>
-      <version>3.0-RC8</version>
+      <groupId>org.codehaus.groovy</groupId>
+      <artifactId>groovy-all</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -139,17 +117,11 @@
       <plugin>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
-          <excludes>
-            <exclude>**/TestApiHeavyLoad_remote.java</exclude>
-            <!-- XXX The following provokes OutOfMemoryError: Java heap space -->
-            <!-- AT: re-activated, these tests are important -->
-            <!--
-              <exclude>**/TestLocalAPI.java</exclude>
-              <exclude>**/TestSecurity.java</exclude>
-            -->
-          </excludes>
+          <forkMode>always</forkMode>
+          <argLine>-Xms128m -Xmx256m</argLine>
         </configuration>
       </plugin>
     </plugins>
   </build>
+
 </project>

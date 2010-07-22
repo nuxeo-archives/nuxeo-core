@@ -65,25 +65,14 @@ public class PermissionProviderBean implements PermissionProvider {
         return permissionProvider.getSubPermissions(perm);
     }
 
-    @Deprecated // use getUserVisiblePermissionDescriptors instead
-    public String[] getUserVisiblePermissions() throws ClientException {
-        return permissionProvider.getUserVisiblePermissions();
-    }
-
-    @Deprecated // use getUserVisiblePermissionDescriptors instead
-    public String[] getUserVisiblePermissions(String typeName)
-            throws ClientException {
-        return permissionProvider.getUserVisiblePermissions(typeName);
-    }
-
     public List<UserVisiblePermission> getUserVisiblePermissionDescriptors()
             throws ClientException {
         return permissionProvider.getUserVisiblePermissionDescriptors();
-
     }
 
     public List<UserVisiblePermission> getUserVisiblePermissionDescriptors(
             String typeName) throws ClientException {
         return permissionProvider.getUserVisiblePermissionDescriptors(typeName);
     }
+
 }

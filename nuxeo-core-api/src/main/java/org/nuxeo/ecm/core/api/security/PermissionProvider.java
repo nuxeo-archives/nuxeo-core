@@ -46,42 +46,12 @@ public interface PermissionProvider {
     String[] getPermissionGroups(String perm);
 
     /**
-     *
-     * Use getUserVisiblePermissionDescriptors instead
-     *
-     * @return get the sorted list of permission names to be used in the
-     *         permission management screen of the UI (be it web based, a rich
-     *         client or any-thing else)
-     * @throws ClientException
-     */
-    @Deprecated
-    String[] getUserVisiblePermissions() throws ClientException;
-
-
-    /**
      * @return get the sorted list of UserVisiblePermission objects to be used in the
      *         permission management screen of the UI (be it web based, a rich
      *         client or any-thing else)
      * @throws ClientException
      */
     List<UserVisiblePermission> getUserVisiblePermissionDescriptors() throws ClientException;
-
-    /**
-     *
-     * Use getUserVisiblePermissionDescriptors instead
-     *
-     * @param typeName the name of a Core type of the document whose ACP is to
-     *            be edited by the user
-     * @return get the sorted list of permission names to be used in the
-     *         permission management screen of the UI (be it web based, a rich
-     *         client or any-thing else) ; if no specific permissions are
-     *         registered for typeName, the default list is returned
-     * @throws ClientException
-     */
-    @Deprecated
-    String[] getUserVisiblePermissions(String typeName)
-            throws ClientException;
-
 
     /**
      * @param typeName the name of a Core type of the document whose ACP is to
@@ -96,7 +66,7 @@ public interface PermissionProvider {
 
     /**
      * @param perm the name of a registered compound permission
-     * @return the list of permission names of sub permission of 'perm'
+     * @return the list of permission names of sub-permissions of 'perm'
      * @throws ClientException if 'perm' is not a registered permission
      */
     String[] getSubPermissions(String perm) throws ClientException;

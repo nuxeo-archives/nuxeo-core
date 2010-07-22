@@ -23,7 +23,6 @@ import org.nuxeo.ecm.core.schema.types.PrimitiveType;
 
 /**
  * @author <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
- *
  */
 public final class BooleanType extends PrimitiveType {
 
@@ -42,7 +41,6 @@ public final class BooleanType extends PrimitiveType {
         return object instanceof Boolean;
     }
 
-    @Override
     public Object convert(Object value) {
         if (value instanceof Boolean) {
             return value;

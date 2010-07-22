@@ -27,6 +27,7 @@ package org.nuxeo.ecm.core.api.event;
 // TODO a better id-zation is to define concrete instances of a "EventType"
 // class, so the id-s won't be checked against ordinar strings. This has to be
 // redefined in CoreEvent API
+// TODO ...or use enums...
 public final class DocumentEventTypes {
 
     public static final String ABOUT_TO_CREATE = "aboutToCreate";
@@ -43,6 +44,8 @@ public final class DocumentEventTypes {
      */
     public static final String DOCUMENT_CREATED = "documentCreated";
 
+    public static final String DOCUMENT_IMPORTED = "documentImported";
+
     @Deprecated
     public static final String ABOUT_TO_INITIALIZE = "aboutToInitialize";
 
@@ -52,6 +55,10 @@ public final class DocumentEventTypes {
     public static final String ABOUT_TO_REMOVE = "aboutToRemove";
 
     public static final String DOCUMENT_REMOVED = "documentRemoved";
+
+    public static final String ABOUT_TO_REMOVE_VERSION = "aboutToRemoveVersion";
+
+    public static final String VERSION_REMOVED = "versionRemoved";
 
     public static final String BEFORE_DOC_UPDATE = "beforeDocumentModification";
 
@@ -79,6 +86,8 @@ public final class DocumentEventTypes {
 
     public static final String DOCUMENT_PROXY_PUBLISHED = "documentProxyPublished";
 
+    public static final String DOCUMENT_PROXY_UPDATED = "documentProxyUpdated";
+
     public static final String SECTION_CONTENT_PUBLISHED = "sectionContentPublished";
 
     public static final String BEFORE_DOC_RESTORE = "beforeRestoringDocument";
@@ -92,8 +101,19 @@ public final class DocumentEventTypes {
     /** This event is too general and should be used with care. */
     public static final String ABOUT_TO_CHECKOUT = "aboutToCheckout";
 
-    /** This event is too general and should be used with care. */
-    public static final String DOCUMENT_CHECKEDOUT = "aboutToCheckedOut";
+    /**
+     * Document checked out. Listeners can increment version numbers. Listeners
+     * will be passed a pristine DocumentModel where changes will not be seen by
+     * the main DocumentModel being saved.
+     */
+    public static final String DOCUMENT_CHECKEDOUT = "documentCheckedOut";
+
+    /**
+     * Listeners can increment version numbers. Listeners will be passed a
+     * pristine DocumentModel where changes will not be seen by the main
+     * DocumentModel being saved.
+     */
+    public static final String INCREMENT_BEFORE_UPDATE = "incrementBeforeUpdate";
 
     /** This event is too general and should be used with care. */
     public static final String ABOUT_TO_CHECKIN = "aboutToCheckIn";

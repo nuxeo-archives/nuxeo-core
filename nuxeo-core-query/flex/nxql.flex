@@ -61,8 +61,8 @@ variables, fields, tables, functions
  */
 /*IdentifierLetter = [:jletterdigit:] | \.*/
 Identifier = [:jletter:] [a-zA-Z0-9_:.-]*
-
 FromIdentifier = {Identifier} (\. {Identifier})*
+PathIdentifier = {Identifier} (\/ {Identifier})+
 
 
 /* integer literal */
@@ -119,9 +119,13 @@ Exponent = [eE] [+-]? [0-9]+
 	"Or"				{ return symbol(sym.OR); }
 	"or"				{ return symbol(sym.OR); }
 
-	"LIKE"				{ return symbol(sym.LIKE); }
-	"Like"				{ return symbol(sym.LIKE); }
-	"like"				{ return symbol(sym.LIKE); }
+  "LIKE"        { return symbol(sym.LIKE); }
+  "Like"        { return symbol(sym.LIKE); }
+  "like"        { return symbol(sym.LIKE); }
+
+  "ILIKE"        { return symbol(sym.ILIKE); }
+  "ILike"        { return symbol(sym.ILIKE); }
+  "ilike"        { return symbol(sym.ILIKE); }
 
 	"DISTINCT"			{ return symbol(sym.DISTINCT); }
 	"Distinct"			{ return symbol(sym.DISTINCT); }
@@ -221,6 +225,7 @@ Exponent = [eE] [+-]? [0-9]+
 
 	/* Identifiers */
 	{Identifier}        { return symbol(sym.IDENTIFIER, yytext()); }
+	{PathIdentifier}    { return symbol(sym.PATH_IDENTIFIER, yytext()); }
 	{FromIdentifier}    { return symbol(sym.FROM_IDENTIFIER, yytext()); }
 
 }

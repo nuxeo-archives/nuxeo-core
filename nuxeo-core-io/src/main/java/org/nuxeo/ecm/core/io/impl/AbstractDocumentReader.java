@@ -34,7 +34,7 @@ import org.nuxeo.ecm.core.io.ExportedDocument;
  *
  */
 public abstract class AbstractDocumentReader implements DocumentReader {
-    
+
     private static final Log log = LogFactory.getLog(AbstractDocumentReader.class);
 
     // this abstract method is needed
@@ -50,6 +50,10 @@ public abstract class AbstractDocumentReader implements DocumentReader {
 
             /*NXP-1688 Rux: no ID, it should be a OS folder and not an exported one*/
             if (doc.getId() != null) {
+                if (log.isDebugEnabled()) {
+                    log.debug("Adding document to be transformed (path): "
+                            + doc.getPath());
+                }
                 docs.add(doc);
             }
             else {

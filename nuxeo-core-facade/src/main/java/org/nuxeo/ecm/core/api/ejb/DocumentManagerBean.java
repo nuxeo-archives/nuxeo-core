@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import javax.annotation.PreDestroy;
 import javax.annotation.Resource;
 import javax.annotation.security.PermitAll;
 import javax.ejb.EJBContext;
@@ -33,8 +34,8 @@ import javax.ejb.PostActivate;
 import javax.ejb.PrePassivate;
 import javax.ejb.Remote;
 import javax.ejb.Remove;
+import javax.ejb.SessionSynchronization;
 import javax.ejb.Stateful;
-import javax.interceptor.Interceptors;
 import javax.persistence.Transient;
 
 import org.apache.commons.logging.Log;
@@ -47,11 +48,13 @@ import org.nuxeo.ecm.core.api.CoreInstance;
 import org.nuxeo.ecm.core.api.CoreSession;
 import org.nuxeo.ecm.core.api.DocumentException;
 import org.nuxeo.ecm.core.api.DocumentModel;
-import org.nuxeo.ecm.core.api.DocumentModelList;
 import org.nuxeo.ecm.core.api.DocumentRef;
+import org.nuxeo.ecm.core.api.RollbackClientException;
 import org.nuxeo.ecm.core.api.VersionModel;
 import org.nuxeo.ecm.core.api.ejb.local.DocumentManagerLocal;
+import org.nuxeo.ecm.core.api.security.ACP;
 import org.nuxeo.ecm.core.api.security.SecuritySummaryEntry;
+import org.nuxeo.ecm.core.model.Document;
 import org.nuxeo.ecm.core.model.NoSuchRepositoryException;
 import org.nuxeo.ecm.core.model.Repository;
 import org.nuxeo.ecm.core.model.Session;
@@ -65,20 +68,21 @@ import org.nuxeo.ecm.core.model.Session;
  * attached/checked.
  *
  * @author <a href="mailto:rcaraghin@nuxeo.com">Razvan Caraghin</a>
- *
  */
 @Stateful
 @Local(DocumentManagerLocal.class)
 @Remote(CoreSession.class)
-// @Interceptors(DocumentParameterInterceptor.class)
 @SerializedConcurrentAccess
-public class DocumentManagerBean extends AbstractSession {
+public class DocumentManagerBean extends AbstractSession implements
+        SessionSynchronization {
 
     private static final long serialVersionUID = 6781675353273516393L;
 
     private static final Log log = LogFactory.getLog(DocumentManagerBean.class);
 
     private static final String CONTEXT_PRINCIPAL_KEY = "principal";
+
+    private Boolean supportsTags = null;
 
     // also need to be transient (not annot only) - see error with
     // org.jaxon.VariableContext
@@ -93,13 +97,19 @@ public class DocumentManagerBean extends AbstractSession {
     @PermitAll
     public void destroy() {
         log.debug("@Remove");
-        super.destroy();
+        // super.destroy();
     }
 
-    // @PostConstruct
-    // protected void create() {
-    // log.debug("@PostConstructor");
-    // }
+    @PreDestroy
+    /*
+     * This method is called before the stateful bean instance is destroyed. <p>
+     * When a client is explicitly destroying a bean using the @Remove method
+     * this method will be automatically called before the instance is destroyed
+     */
+    public void preDestroy() {
+        log.debug("@PreDestroy");
+        super.destroy();
+    }
 
     @PostActivate
     public void readState() {
@@ -170,117 +180,56 @@ public class DocumentManagerBean extends AbstractSession {
             }
             return super.connect(repositoryName, sessionContext);
         } catch (Throwable t) {
-            throw EJBExceptionHandler.wrapException(t);
+            throw ClientException.wrap(t);
         }
     }
 
     // session handling code
 
     @Override
-    protected synchronized Session getSession() throws ClientException {
+    public synchronized Session getSession() throws ClientException {
         assert repositoryName != null;
         // make sure we don't reuse closed sessions
         if (session == null || !session.isLive()) {
             log.debug("Initializing session for repository: " + repositoryName);
             try {
-                NXCore.getRepository(repositoryName);
-            } catch (Exception e) {
-                throw EJBExceptionHandler.wrapException(e);
-            }
-            try {
                 session = createSession(repositoryName, "default",
                         sessionContext);
             } catch (Exception e) {
-                throw EJBExceptionHandler.wrapException(e);
+                throw ClientException.wrap(e);
             }
         }
         return session;
+    }
+
+    public boolean supportsTags(String repositoryName) throws ClientException {
+        try {
+            Repository repo = NXCore.getRepository(repositoryName);
+            return repo.supportsTags();
+        } catch (Exception e) {
+            throw new ClientException("Failed to load repository " + repositoryName, e);
+        }
+    }
+
+    public boolean supportsTags() throws ClientException {
+         if (supportsTags!=null) {
+             return supportsTags.booleanValue();
+         }
+         throw new ClientException("Can not query on a closed repository");
     }
 
     protected Session createSession(String repoName, String ws,
             Map<String, Serializable> context) throws DocumentException,
             NoSuchRepositoryException {
         Repository repo = NXCore.getRepository(repoName);
+        supportsTags = repo.supportsTags();
         return repo.getSession(context);
     }
 
-    // ----------------------- cache interceptors ------------
-
-    @Override
-    @Interceptors(DocumentManagerCacheStatInterceptor.class)
-    public DocumentModel getDocument(DocumentRef docRef) throws ClientException {
-        try {
-            return super.getDocument(docRef);
-        } catch (Throwable t) {
-            throw EJBExceptionHandler.wrapException(t);
-        }
-    }
-
-    @Override
-    @Interceptors(DocumentManagerCacheStatInterceptor.class)
-    public DocumentModel getDocument(DocumentRef docRef, String[] schemas)
-            throws ClientException {
-        try {
-            return super.getDocument(docRef, schemas);
-        } catch (Throwable t) {
-            throw EJBExceptionHandler.wrapException(t);
-        }
-    }
-
-    @Override
-    @Interceptors(DocumentManagerCacheStatInterceptor.class)
-    public DocumentModel getChild(DocumentRef parent, String name)
-            throws ClientException {
-        try {
-            if (log.isDebugEnabled()) {
-                log.debug("UUID: " + parent.toString() + ", name: " + name);
-            }
-            return super.getChild(parent, name);
-        } catch (Throwable t) {
-            throw EJBExceptionHandler.wrapException(t);
-        }
-    }
-
-    @Override
-    @Interceptors(DocumentManagerCacheStatInterceptor.class)
-    public DocumentModelList getChildren(DocumentRef parent)
-            throws ClientException {
-        try {
-            if (log.isDebugEnabled()) {
-                log.debug("UUID: " + parent.toString());
-            }
-            return super.getChildren(parent);
-        } catch (Throwable t) {
-            throw EJBExceptionHandler.wrapException(t);
-        }
-    }
-
-    @Override
-    @Interceptors(DocumentManagerCacheStatInterceptor.class)
-    public DocumentModelList getChildren(DocumentRef parent, String type)
-            throws ClientException {
-        try {
-            if (log.isDebugEnabled()) {
-                log.debug("UUID: " + parent.toString() + " type: " + type);
-            }
-            return super.getChildren(parent, type);
-        } catch (Throwable t) {
-            throw EJBExceptionHandler.wrapException(t);
-        }
-    }
-
-    @Override
-    @Interceptors(DocumentManagerCacheStatInterceptor.class)
-    public DocumentModelList getChildren(DocumentRef parent, String type,
-            String perm) throws ClientException {
-        try {
-            if (log.isDebugEnabled()) {
-                log.debug("UUID: " + parent.toString() + " type: " + type);
-            }
-            return super.getChildren(parent, type, perm);
-        } catch (Throwable t) {
-            throw EJBExceptionHandler.wrapException(t);
-        }
+    public boolean isStateSharedByAllThreadSessions() {
+        // we have an underlying JCA pool that shares state for all connections
+        // in the same thread
+        return true;
     }
 
     @Override
@@ -295,7 +244,272 @@ public class DocumentManagerBean extends AbstractSession {
         try {
             return super.getSecuritySummary(docModel, includeParents);
         } catch (Throwable t) {
-            throw EJBExceptionHandler.wrapException(t);
+            throw ClientException.wrap(t);
+        }
+    }
+
+    // SessionSynchronization: AbstractSession already implements afterBegin,
+    // beforeCompletion and afterCompletion
+
+    // Methods that throws a rolling back application exception
+
+    @Override
+    public DocumentModel createDocument(DocumentModel docModel)
+            throws ClientException {
+
+        try {
+            return super.createDocument(docModel);
+        } catch (Throwable e) {
+            throw new RollbackClientException(e);
+        }
+    }
+
+    @Override
+    public DocumentModel[] createDocument(DocumentModel[] docModels)
+            throws ClientException {
+
+        try {
+            return super.createDocument(docModels);
+        } catch (Throwable e) {
+            throw new RollbackClientException(e);
+        }
+    }
+
+    @Override
+    public void save() throws ClientException {
+        try {
+            super.save();
+        } catch (Throwable e) {
+            throw new RollbackClientException(e);
+        }
+    }
+
+    @Override
+    public DocumentModel saveDocument(DocumentModel docModel)
+            throws ClientException {
+        try {
+            return super.saveDocument(docModel);
+        } catch (Throwable e) {
+            throw new RollbackClientException(e);
+        }
+    }
+
+    @Override
+    public void saveDocuments(DocumentModel[] docModels) throws ClientException {
+        try {
+            super.saveDocuments(docModels);
+        } catch (Throwable e) {
+            throw new RollbackClientException(e);
+        }
+    }
+
+    @Override
+    protected void removeDocument(Document doc) throws ClientException {
+        try {
+            super.removeDocument(doc);
+        } catch (Throwable e) {
+            throw new RollbackClientException(e);
+        }
+    }
+
+    @Override
+    public void removeDocuments(DocumentRef[] docRefs) throws ClientException {
+        try {
+            super.removeDocuments(docRefs);
+        } catch (Throwable e) {
+            throw new RollbackClientException(e);
+        }
+    }
+
+    @Override
+    public void removeChildren(DocumentRef docRef) throws ClientException {
+        try {
+            super.removeChildren(docRef);
+        } catch (Throwable e) {
+            throw new RollbackClientException(e);
+        }
+    }
+
+    @Override
+    public DocumentModel copy(DocumentRef src, DocumentRef dst, String name)
+            throws ClientException {
+        try {
+            return super.copy(src, dst, name);
+        } catch (Throwable e) {
+            throw new RollbackClientException(e);
+        }
+    }
+
+    @Override
+    public List<DocumentModel> copy(List<DocumentRef> src, DocumentRef dst)
+            throws ClientException {
+        try {
+            return super.copy(src, dst);
+        } catch (Throwable e) {
+            throw new RollbackClientException(e);
+        }
+    }
+
+    @Override
+    public DocumentModel copyProxyAsDocument(DocumentRef src, DocumentRef dst,
+            String name) throws ClientException {
+        try {
+            return super.copyProxyAsDocument(src, dst, name);
+        } catch (Throwable e) {
+            throw new RollbackClientException(e);
+        }
+    }
+
+    @Override
+    public List<DocumentModel> copyProxyAsDocument(List<DocumentRef> src,
+            DocumentRef dst) throws ClientException {
+        try {
+            return super.copyProxyAsDocument(src, dst);
+        } catch (Throwable e) {
+            throw new RollbackClientException(e);
+        }
+    }
+
+    @Override
+    public DocumentModel move(DocumentRef src, DocumentRef dst, String name)
+            throws ClientException {
+        try {
+            return super.move(src, dst, name);
+        } catch (Throwable e) {
+            throw new RollbackClientException(e);
+        }
+
+    }
+
+    @Override
+    public void move(List<DocumentRef> src, DocumentRef dst)
+            throws ClientException {
+        try {
+            super.move(src, dst);
+        } catch (Throwable e) {
+            throw new RollbackClientException(e);
+        }
+    }
+
+    @Override
+    public void setACP(DocumentRef docRef, ACP newAcp, boolean overwrite)
+            throws ClientException {
+        try {
+            super.setACP(docRef, newAcp, overwrite);
+        } catch (Throwable e) {
+            throw new RollbackClientException(e);
+        }
+    }
+
+    @Override
+    public DocumentModel restoreToVersion(DocumentRef docRef,
+            VersionModel version) throws ClientException {
+        try {
+            return super.restoreToVersion(docRef, version);
+        } catch (Throwable e) {
+            throw new RollbackClientException(e);
+        }
+    }
+
+    @Override
+    public void checkOut(DocumentRef docRef) throws ClientException {
+        try {
+            super.checkOut(docRef);
+        } catch (Throwable e) {
+            throw new RollbackClientException(e);
+        }
+    }
+
+    @Override
+    public void checkIn(DocumentRef docRef, VersionModel version)
+            throws ClientException {
+        try {
+            super.checkIn(docRef, version);
+        } catch (Throwable e) {
+            throw new RollbackClientException(e);
+        }
+    }
+
+    @Override
+    public DocumentModel createProxy(DocumentRef docRef, DocumentRef folderRef)
+            throws ClientException {
+        try {
+            return super.createProxy(docRef, folderRef);
+        } catch (Throwable e) {
+            throw new RollbackClientException(e);
+        }
+    }
+
+    @Override
+    public DocumentModel createProxy(DocumentRef parentRef, DocumentRef docRef,
+            VersionModel version, boolean overwriteExistingProxy)
+            throws ClientException {
+        try {
+            return super.createProxy(parentRef, docRef, version,
+                    overwriteExistingProxy);
+        } catch (Throwable e) {
+            throw new RollbackClientException(e);
+        }
+    }
+
+    @Override
+    public boolean followTransition(DocumentRef docRef, String transition)
+            throws ClientException {
+        try {
+            return super.followTransition(docRef, transition);
+        } catch (Throwable e) {
+            throw new RollbackClientException(e);
+        }
+
+    }
+
+    @Override
+    public void setLock(DocumentRef docRef, String key) throws ClientException {
+        try {
+            super.setLock(docRef, key);
+        } catch (Throwable e) {
+            throw new RollbackClientException(e);
+        }
+    }
+
+    @Override
+    public String unlock(DocumentRef docRef) throws ClientException {
+        try {
+            return super.unlock(docRef);
+        } catch (Throwable e) {
+            throw new RollbackClientException(e);
+        }
+    }
+
+    @Override
+    public DocumentModel publishDocument(DocumentModel docToPublish,
+            DocumentModel section) throws ClientException {
+        try {
+            return super.publishDocument(docToPublish, section);
+        } catch (Throwable e) {
+            throw new RollbackClientException(e);
+        }
+    }
+
+    @Override
+    public DocumentModel publishDocument(DocumentModel docToPublish,
+            DocumentModel section, boolean overwriteExistingProxy)
+            throws ClientException {
+        try {
+            return super.publishDocument(docToPublish, section,
+                    overwriteExistingProxy);
+        } catch (Throwable e) {
+            throw new RollbackClientException(e);
+        }
+    }
+
+    @Override
+    public void importDocuments(List<DocumentModel> docModels)
+            throws ClientException {
+        try {
+            super.importDocuments(docModels);
+        } catch (Throwable t) {
+            throw new RollbackClientException("Error during document import", t);
         }
     }
 
@@ -305,7 +519,7 @@ public class DocumentManagerBean extends AbstractSession {
         try {
             return super.getSourceDocument(docRef);
         } catch (Throwable t) {
-            throw EJBExceptionHandler.wrapException(t);
+            throw new RollbackClientException(t);
         }
     }
 
@@ -315,7 +529,7 @@ public class DocumentManagerBean extends AbstractSession {
         try {
             return super.getVersionsForDocument(docRef);
         } catch (Throwable t) {
-            throw EJBExceptionHandler.wrapException(t);
+            throw new RollbackClientException(t);
         }
     }
 
@@ -325,7 +539,7 @@ public class DocumentManagerBean extends AbstractSession {
         try {
             return super.getLastDocumentVersion(docRef);
         } catch (Throwable t) {
-            throw EJBExceptionHandler.wrapException(t);
+            throw new RollbackClientException(t);
         }
     }
 
@@ -335,7 +549,7 @@ public class DocumentManagerBean extends AbstractSession {
         try {
             return super.getVersions(docRef);
         } catch (Throwable t) {
-            throw EJBExceptionHandler.wrapException(t);
+            throw new RollbackClientException(t);
         }
     }
 

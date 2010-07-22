@@ -21,7 +21,7 @@ package org.nuxeo.ecm.core.security;
 
 import java.security.Principal;
 
-import org.nuxeo.ecm.core.CoreTestConstants;
+import org.nuxeo.ecm.core.CoreUTConstants;
 import org.nuxeo.ecm.core.api.impl.UserPrincipal;
 import org.nuxeo.ecm.core.api.security.Access;
 import org.nuxeo.ecm.core.api.security.SecurityConstants;
@@ -34,26 +34,26 @@ import org.nuxeo.runtime.test.NXRuntimeTestCase;
  */
 public class TestSecurityPolicyService extends NXRuntimeTestCase {
 
+    static final String creator = "Bodie";
+
+    static final String user = "Bubbles";
+
+    static final Principal creatorPrincipal = new UserPrincipal("Bodie");
+
+    static final Principal userPrincipal = new UserPrincipal("Bubbles");
+
     private SecurityPolicyService service;
 
     private Document doc;
 
-    String creator = "Bodie";
-
-    String user = "Bubbles";
-
-    Principal creatorPrincipal = new UserPrincipal("Bodie");
-
-    Principal userPrincipal = new UserPrincipal("Bubbles");
-
     @Override
     public void setUp() throws Exception {
         super.setUp();
-        deployContrib(CoreTestConstants.CORE_BUNDLE,
+        deployContrib(CoreUTConstants.CORE_BUNDLE,
                 "OSGI-INF/SecurityService.xml");
-        deployContrib(CoreTestConstants.CORE_BUNDLE,
+        deployContrib(CoreUTConstants.CORE_BUNDLE,
                 "OSGI-INF/permissions-contrib.xml");
-        deployContrib(CoreTestConstants.CORE_BUNDLE,
+        deployContrib(CoreUTConstants.CORE_BUNDLE,
                 "OSGI-INF/security-policy-contrib.xml");
         service = Framework.getService(SecurityPolicyService.class);
         assertNotNull(service);
@@ -70,7 +70,7 @@ public class TestSecurityPolicyService extends NXRuntimeTestCase {
 
     public void testPolicies() throws Exception {
         String permission = SecurityConstants.WRITE;
-        String[] permissions = new String[] { SecurityConstants.WRITE };
+        String[] permissions = { SecurityConstants.WRITE };
 
         // without lock
         assertEquals(Access.UNKNOWN, service.checkPermission(doc, null,
@@ -79,14 +79,14 @@ public class TestSecurityPolicyService extends NXRuntimeTestCase {
                 userPrincipal, permission, permissions, null));
 
         // with lock
-        doc.setLock(user + ":");
+        doc.setLock(user + ':');
         assertEquals(Access.DENY, service.checkPermission(doc, null,
                 creatorPrincipal, permission, permissions, null));
         assertEquals(Access.UNKNOWN, service.checkPermission(doc, null,
                 userPrincipal, permission, permissions, null));
 
         // test creator policy takes over lock
-        deployContrib(CoreTestConstants.CORE_TESTS_BUNDLE,
+        deployContrib(CoreUTConstants.CORE_TESTS_BUNDLE,
                 "test-security-policy-contrib.xml");
         assertEquals(Access.GRANT, service.checkPermission(doc, null,
                 creatorPrincipal, permission, permissions, null));

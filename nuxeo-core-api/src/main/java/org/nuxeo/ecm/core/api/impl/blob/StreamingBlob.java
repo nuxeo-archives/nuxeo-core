@@ -31,6 +31,7 @@ import java.io.Reader;
 import java.io.Serializable;
 import java.net.URL;
 
+import org.nuxeo.common.utils.FileUtils;
 import org.nuxeo.ecm.core.api.Blob;
 import org.nuxeo.runtime.api.Framework;
 import org.nuxeo.runtime.services.streaming.ByteArraySource;
@@ -166,6 +167,10 @@ public class StreamingBlob extends DefaultBlob implements Serializable {
         return src.canReopen();
     }
 
+    public StreamSource getStreamSource() {
+        return src;
+    }
+
     /**
      * If the source is cannot be reopen, copy the binary content of the
      * original source to a temporary file and replace the source inplace by a
@@ -185,26 +190,13 @@ public class StreamingBlob extends DefaultBlob implements Serializable {
                 out = new FileOutputStream(persistedTmpFile);
                 copy(in, out);
                 src = new FileSource(persistedTmpFile);
+                Framework.trackFile(persistedTmpFile, this);
             } finally {
-                try {
-                    in.close();
-                } catch (IOException e) {
-                    // TODO: log the error here
-                }
-                if (out != null) {
-                    out.close();
-                }
+                FileUtils.close(in);
+                FileUtils.close(out);
             }
         }
         return this;
-    }
-
-    @Override
-    protected void finalize() throws Throwable {
-        if (persistedTmpFile != null) {
-            persistedTmpFile.delete();
-        }
-        super.finalize();
     }
 
     private void writeObject(ObjectOutputStream out) throws IOException {

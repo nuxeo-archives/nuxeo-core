@@ -26,14 +26,18 @@ import java.util.Map;
 
 import javax.transaction.xa.XAResource;
 
+import org.nuxeo.ecm.core.api.CoreSession;
 import org.nuxeo.ecm.core.api.DocumentException;
+import org.nuxeo.ecm.core.api.IterableQueryResult;
+import org.nuxeo.ecm.core.api.VersionModel;
 import org.nuxeo.ecm.core.query.Query;
 import org.nuxeo.ecm.core.query.QueryException;
+import org.nuxeo.ecm.core.query.QueryFilter;
 import org.nuxeo.ecm.core.schema.SchemaManager;
 import org.nuxeo.ecm.core.security.SecurityManager;
 
 /**
- * @author  <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
+ * @author <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
  *
  */
 public interface Session {
@@ -53,9 +57,11 @@ public interface Session {
     /**
      * The unique ID of the user session on this repository.
      * <p>
-     * The ID is unique in the application (possible deployed on multiple machines).
+     * The ID is unique in the application (possible deployed on multiple
+     * machines).
      * <p>
-     * This ID is normally passed by the session creator through the session context.
+     * This ID is normally passed by the session creator through the session
+     * context.
      *
      * @return the user session id
      */
@@ -81,7 +87,15 @@ public interface Session {
      * @param query the SQL like query
      * @return the query
      */
-    Query createQuery(String query, Query.Type qType, String... params) throws QueryException;
+    Query createQuery(String query, Query.Type qType, String... params)
+            throws QueryException;
+
+    /**
+     *
+     * @throws QueryException
+     */
+    IterableQueryResult queryAndFetch(String query, String queryType,
+            QueryFilter queryFilter, Object... params) throws QueryException;
 
     /**
      * Gets the type manager used by the repository.
@@ -164,6 +178,15 @@ public interface Session {
     Document getRootDocument() throws DocumentException;
 
     /**
+     * Gets the null document, to be used as a fake parent to add placeless
+     * children.
+     *
+     * @return the null document
+     * @throws DocumentException
+     */
+    Document getNullDocument() throws DocumentException;
+
+    /**
      * Copies the source document to the given folder.
      * <p>
      * If the destination document is not a folder, an exception is thrown.
@@ -173,7 +196,8 @@ public interface Session {
      * @param name
      * @throws DocumentException if any error occurs
      */
-    Document copy(Document src, Document dst, String name) throws DocumentException;
+    Document copy(Document src, Document dst, String name)
+            throws DocumentException;
 
     /**
      * Moves the source document to the given folder.
@@ -186,13 +210,14 @@ public interface Session {
      *            should be preserved
      * @throws DocumentException if any error occurs
      */
-    Document move(Document src, Document dst, String name) throws DocumentException;
+    Document move(Document src, Document dst, String name)
+            throws DocumentException;
 
     /**
      * Gets a blob stream using the given key.
      * <p>
-     * The implementation may use anything as the key.
-     * It may use the property path or a unique ID of the property.
+     * The implementation may use anything as the key. It may use the property
+     * path or a unique ID of the property.
      * <p>
      * This method can be used to lazily fetch blob content.
      *
@@ -203,7 +228,19 @@ public interface Session {
     InputStream getDataStream(String key) throws DocumentException;
 
     /**
-     * Creates a proxy to the given version of the given document inside the given parent.
+     * Creates a generic proxy to the given document inside the given folder.
+     *
+     * @param doc the document
+     * @param folder the folder
+     * @return the proxy
+     * @throws DocumentException if any error occurs
+     */
+    Document createProxy(Document doc, Document folder)
+            throws DocumentException;
+
+    /**
+     * Creates a proxy to the given version of the given document inside the
+     * given parent.
      *
      * @param parent the parent
      * @param doc the document
@@ -220,9 +257,6 @@ public interface Session {
      * <p>
      * If the document is a version, then only proxies to that version will be
      * looked up.
-     * <p>
-     * If the document is a proxy, then all similar proxies (pointing to any
-     * version of the same base document) are retrieved.
      *
      * @param doc the document or version
      * @param folder the folder, or null
@@ -231,6 +265,40 @@ public interface Session {
      * @since 1.4.1 for the case where doc is a proxy
      */
     Collection<Document> getProxies(Document doc, Document folder)
+            throws DocumentException;
+
+    /**
+     * Imports a document with a given id and parent.
+     * <p>
+     * The document can then be filled with the normal imported properties.
+     *
+     * @param uuid the document uuid
+     * @param parent the document parent, or {@code null} for a version
+     * @param name the document name in its parent
+     * @param typeName the document type, or {@code ecm:proxy} for a proxy
+     * @param properties system properties of the document, which will vary
+     *            depending whether it's a live document, a version or a proxy
+     *            (see the various {@code IMPORT_*} constants of
+     *            {@link CoreSession})
+     * @return a writable {@link Document}, even for proxies and versions
+     * @throws DocumentException
+     */
+    Document importDocument(String uuid, Document parent, String name,
+            String typeName, Map<String, Serializable> properties)
+            throws DocumentException;
+
+    /**
+     * Gets a version of a document, given its versionable id and label.
+     * <p>
+     * The version model contains the label of the version to look for. On
+     * return, it is filled with the version's description and creation date.
+     *
+     * @param versionableId the versionable id
+     * @param versionModel the version model
+     * @return the version, or {@code null} if not found
+     * @throws DocumentException
+     */
+    Document getVersion(String versionableId, VersionModel versionModel)
             throws DocumentException;
 
 }

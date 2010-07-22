@@ -31,14 +31,14 @@ public class TestTypeManager extends NXRuntimeTestCase {
     SchemaManagerImpl typeManager;
 
     @Override
-    protected void setUp() throws Exception {
+    public void setUp() throws Exception {
         super.setUp();
         deployBundle("org.nuxeo.ecm.core.schema");
         typeManager = (SchemaManagerImpl) getTypeManager();
     }
 
     @Override
-    protected void tearDown() throws Exception {
+    public void tearDown() throws Exception {
         typeManager = null;
         super.tearDown();
     }
@@ -72,7 +72,7 @@ public class TestTypeManager extends NXRuntimeTestCase {
     }
 
     public void testFacetsCache() {
-        String[] facets = new String[] { "parent1", "parent2" };
+        String[] facets = { "parent1", "parent2" };
         SchemaDescriptor[] schemas = new SchemaDescriptor[0];
         DocumentTypeDescriptor dtd = new DocumentTypeDescriptor("Document",
                 "Parent", schemas, facets);
@@ -119,7 +119,7 @@ public class TestTypeManager extends NXRuntimeTestCase {
         assertTrue(tff.contains("Parent"));
     }
 
-    public void testInheritanceCache() throws Exception {
+    public void testInheritanceCache() {
         SchemaDescriptor[] schemas = new SchemaDescriptor[0];
         DocumentTypeDescriptor dtd;
         dtd = new DocumentTypeDescriptor(TypeConstants.DOCUMENT,

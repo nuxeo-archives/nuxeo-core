@@ -37,7 +37,6 @@ import org.nuxeo.ecm.core.schema.types.Type;
  * the property will be created by the underlying storage.
  *
  * @author  <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
- *
  */
 public interface Property {
 
@@ -56,9 +55,8 @@ public interface Property {
      * Gets the property type.
      *
      * @return the property type
-     * @throws DocumentException if the type cannot be resolved
      */
-    Type getType() throws DocumentException;
+    Type getType();
 
     /**
      * Gets the value of this property.
@@ -85,10 +83,9 @@ public interface Property {
      * If the property is null the first time a write operation is done
      * on it the property will be created by the underlying storage
      *
-     * @return true if the property is null or false otherwise
-     * @throws DocumentException
+     * @return true if the property is null, false otherwise
      */
-    boolean isNull() throws DocumentException;
+    boolean isNull();
 
     /**
      * Nullify this property.
@@ -115,8 +112,6 @@ public interface Property {
      * @param name the property name
      * @return the property
      * @throws DocumentException
-     * @throws NoSuchPropertyException if a property with that name doesn't
-     *             exists in this composite property schema
      * @throws UnsupportedOperationException if this is not a composite property
      */
     Property getProperty(String name) throws DocumentException;

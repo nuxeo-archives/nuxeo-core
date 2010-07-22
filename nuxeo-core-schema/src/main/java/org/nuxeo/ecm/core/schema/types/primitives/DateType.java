@@ -28,7 +28,6 @@ import org.nuxeo.ecm.core.schema.utils.DateParser;
 // TODO this should be renamed to TimestampType
 /**
  * @author <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
- *
  */
 public class DateType extends PrimitiveType {
 
@@ -47,7 +46,6 @@ public class DateType extends PrimitiveType {
         return object instanceof Date || object instanceof Calendar;
     }
 
-    @Override
     public Object convert(Object value) {
         if (value instanceof Date) {
             return value;

@@ -19,6 +19,7 @@
 package org.nuxeo.ecm.core.lifecycle.impl;
 
 import java.util.Collection;
+import java.util.Collections;
 
 import org.nuxeo.ecm.core.lifecycle.LifeCycle;
 import org.nuxeo.ecm.core.lifecycle.LifeCycleException;
@@ -35,30 +36,33 @@ import org.nuxeo.ecm.core.lifecycle.LifeCycleTransition;
  */
 public class LifeCycleImpl implements LifeCycle {
 
-    /** The name of the life cycle. */
     private final String name;
 
-    /** The initial state name. */
-    private final String initialStateName;
+    private final String defaultInitialStateName;
 
-    /** The list of life cycle states. */
+    private final Collection<String> initialStateNames;
+
     private final Collection<LifeCycleState> states;
 
-    /** The list of life cycle transition. */
     private final Collection<LifeCycleTransition> transitions;
 
-
-    public LifeCycleImpl(String name, String initialStateName,
+    public LifeCycleImpl(String name, String defaultInitialStateName,
+            Collection<String> initialStateNames,
             Collection<LifeCycleState> states,
             Collection<LifeCycleTransition> transitions) {
         this.name = name;
-        this.initialStateName = initialStateName;
+        this.defaultInitialStateName = defaultInitialStateName;
+        this.initialStateNames = initialStateNames;
         this.states = states;
         this.transitions = transitions;
     }
 
-    public String getInitialStateName() {
-        return initialStateName;
+    public String getDefaultInitialStateName() {
+        return defaultInitialStateName;
+    }
+
+    public Collection<String> getInitialStateNames() {
+        return initialStateNames;
     }
 
     public String getName() {
@@ -80,14 +84,13 @@ public class LifeCycleImpl implements LifeCycle {
         return lifeCycleState;
     }
 
-    public Collection<String> getAllowedStateTransitionsFrom(String state)
+    public Collection<String> getAllowedStateTransitionsFrom(String stateName)
             throws LifeCycleException {
-        LifeCycleState lifeCycleState = getStateByName(state);
+        LifeCycleState lifeCycleState = getStateByName(stateName);
         if (lifeCycleState != null) {
             return lifeCycleState.getAllowedStateTransitions();
         } else {
-            throw new LifeCycleException("State <" + state
-                    + "> does not exist !");
+            return Collections.emptyList();
         }
     }
 
@@ -95,10 +98,10 @@ public class LifeCycleImpl implements LifeCycle {
         return transitions;
     }
 
-    public LifeCycleTransition getTransitionByName(String transition) {
+    public LifeCycleTransition getTransitionByName(String transitionName) {
         LifeCycleTransition lifeCycleTransition = null;
         for (LifeCycleTransition itransition : transitions) {
-            if (itransition.getName().equals(transition)) {
+            if (itransition.getName().equals(transitionName)) {
                 lifeCycleTransition = itransition;
                 break;
             }

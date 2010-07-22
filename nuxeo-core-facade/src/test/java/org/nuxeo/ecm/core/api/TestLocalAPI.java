@@ -19,6 +19,15 @@
 
 package org.nuxeo.ecm.core.api;
 
+import static org.nuxeo.ecm.core.api.Constants.CORE_BUNDLE;
+import static org.nuxeo.ecm.core.api.Constants.CORE_FACADE_TESTS_BUNDLE;
+import static org.nuxeo.ecm.core.api.security.SecurityConstants.ADD_CHILDREN;
+import static org.nuxeo.ecm.core.api.security.SecurityConstants.READ;
+import static org.nuxeo.ecm.core.api.security.SecurityConstants.WRITE;
+import static org.nuxeo.ecm.core.api.security.SecurityConstants.WRITE_PROPERTIES;
+import static org.nuxeo.ecm.core.api.security.SecurityConstants.WRITE_SECURITY;
+import static org.nuxeo.ecm.core.lifecycle.LifeCycleConstants.INITIAL_LIFECYCLE_STATE_OPTION_NAME;
+
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -28,8 +37,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.junit.BeforeClass;
+import org.junit.Test;
 import org.nuxeo.ecm.core.api.impl.DocumentModelImpl;
 import org.nuxeo.ecm.core.api.impl.UserPrincipal;
 import org.nuxeo.ecm.core.api.impl.VersionModelImpl;
@@ -39,62 +48,45 @@ import org.nuxeo.ecm.core.api.model.Property;
 import org.nuxeo.ecm.core.api.security.ACE;
 import org.nuxeo.ecm.core.api.security.ACL;
 import org.nuxeo.ecm.core.api.security.ACP;
-import org.nuxeo.ecm.core.api.security.SecurityConstants;
 import org.nuxeo.ecm.core.api.security.impl.ACLImpl;
 import org.nuxeo.ecm.core.api.security.impl.ACPImpl;
-import org.nuxeo.runtime.RuntimeService;
+import org.nuxeo.runtime.test.NXRuntimeTestCase;
 
 /**
- *
  * @author Razvan Caraghin
- *
  */
-public class TestLocalAPI extends TestAPI {
+public class TestLocalAPI extends BaseTestCase {
 
-    protected RuntimeService runtime;
+    @BeforeClass
+    public static void startRuntime() throws Exception {
+        runtime = new NXRuntimeTestCase() {};
+        runtime.setUp();
 
-    private static final Log log = LogFactory.getLog(TestLocalAPI.class);
+        runtime.deployContrib(CORE_BUNDLE, "OSGI-INF/CoreService.xml");
+        runtime.deployContrib(CORE_BUNDLE, "OSGI-INF/SecurityService.xml");
+        runtime.deployContrib(CORE_BUNDLE, "OSGI-INF/RepositoryService.xml");
 
-    protected void doDeployments() throws Exception {
-        deployContrib(CoreFacadeTestConstants.CORE_BUNDLE,
-                "OSGI-INF/CoreService.xml");
-        deployContrib(CoreFacadeTestConstants.CORE_BUNDLE,
-                "OSGI-INF/SecurityService.xml");
-        deployContrib(CoreFacadeTestConstants.CORE_FACADE_TESTS_BUNDLE,
-                "TypeService.xml");
-        deployContrib(CoreFacadeTestConstants.CORE_FACADE_TESTS_BUNDLE,
-                "permissions-contrib.xml");
-        deployContrib(CoreFacadeTestConstants.CORE_FACADE_TESTS_BUNDLE,
-                "RepositoryService.xml");
-        deployContrib(CoreFacadeTestConstants.CORE_FACADE_TESTS_BUNDLE,
-                "test-CoreExtensions.xml");
-        deployContrib(CoreFacadeTestConstants.CORE_FACADE_TESTS_BUNDLE,
-                "CoreTestExtensions.xml");
-        deployContrib(CoreFacadeTestConstants.CORE_FACADE_TESTS_BUNDLE,
-                "DemoRepository.xml");
-        deployContrib(CoreFacadeTestConstants.CORE_FACADE_TESTS_BUNDLE,
-                "LifeCycleService.xml");
-        deployContrib(CoreFacadeTestConstants.CORE_FACADE_TESTS_BUNDLE,
-                "LifeCycleServiceExtensions.xml");
-        deployContrib(CoreFacadeTestConstants.CORE_FACADE_TESTS_BUNDLE,
-                "CoreEventListenerService.xml");
-        deployContrib(CoreFacadeTestConstants.CORE_FACADE_TESTS_BUNDLE,
-                "DocumentAdapterService.xml");
+        runtime.deployBundle("org.nuxeo.ecm.core.event");
+
+        runtime.deployContrib(CORE_FACADE_TESTS_BUNDLE, "TypeService.xml");
+        runtime.deployContrib(CORE_FACADE_TESTS_BUNDLE, "permissions-contrib.xml");
+        runtime.deployContrib(CORE_FACADE_TESTS_BUNDLE, "test-CoreExtensions.xml");
+        runtime.deployContrib(CORE_FACADE_TESTS_BUNDLE, "CoreTestExtensions.xml");
+        runtime.deployContrib(CORE_FACADE_TESTS_BUNDLE, "DemoRepository.xml");
+        runtime.deployContrib(CORE_FACADE_TESTS_BUNDLE, "LifeCycleService.xml");
+        runtime.deployContrib(CORE_FACADE_TESTS_BUNDLE, "LifeCycleServiceExtensions.xml");
+        runtime.deployContrib(CORE_FACADE_TESTS_BUNDLE, "DocumentAdapterService.xml");
     }
 
-    @Override
-    protected void setUp() throws Exception {
-        super.setUp();
-        doDeployments();
-        openSession();
-    }
+    // Tests
 
+    @Test
     public void testPropertyModel() throws Exception {
         DocumentModel root = getRootDocument();
         DocumentModel doc = new DocumentModelImpl(root.getPathAsString(),
                 "theDoc", "MyDocType");
 
-        doc = remote.createDocument(doc);
+        doc = session.createDocument(doc);
 
         DocumentPart dp = doc.getPart("MySchema");
         Property p = dp.get("long");
@@ -102,29 +94,29 @@ public class TestLocalAPI extends TestAPI {
         assertTrue(p.isPhantom());
         assertNull(p.getValue());
         p.setValue(12);
-        assertEquals(new Long(12), p.getValue());
-        remote.saveDocument(doc);
+        assertEquals(12L, p.getValue());
+        session.saveDocument(doc);
 
         dp = doc.getPart("MySchema");
         p = dp.get("long");
         assertFalse(p.isPhantom());
-        assertEquals(new Long(12), p.getValue());
+        assertEquals(12L, p.getValue());
         p.setValue(null);
         assertFalse(p.isPhantom());
         assertNull(p.getValue());
 
-        remote.saveDocument(doc);
+        session.saveDocument(doc);
 
         dp = doc.getPart("MySchema");
         p = dp.get("long");
         // assertTrue(p.isPhantom());
         assertNull(p.getValue());
-        p.setValue(new Long(13));
+        p.setValue(13L);
         p.remove();
         assertTrue(p.isRemoved());
         assertNull(p.getValue());
 
-        remote.saveDocument(doc);
+        session.saveDocument(doc);
 
         dp = doc.getPart("MySchema");
         p = dp.get("long");
@@ -132,50 +124,49 @@ public class TestLocalAPI extends TestAPI {
         assertNull(p.getValue());
     }
 
+    @Test
     public void testOrdering() throws Exception {
-        DocumentModel root = getRootDocument();
         DocumentModel parent = new DocumentModelImpl(root.getPathAsString(),
                 "theParent", "OrderedFolder");
 
-        parent = remote.createDocument(parent);
+        parent = session.createDocument(parent);
 
         DocumentModel doc1 = new DocumentModelImpl(parent.getPathAsString(),
                 "the1", "File");
-        doc1 = remote.createDocument(doc1);
+        doc1 = session.createDocument(doc1);
         DocumentModel doc2 = new DocumentModelImpl(parent.getPathAsString(),
                 "the2", "File");
-        doc2 = remote.createDocument(doc2);
+        doc2 = session.createDocument(doc2);
 
         String name1 = doc1.getName();
         String name2 = doc2.getName();
 
-        DocumentModelList children = remote.getChildren(parent.getRef());
+        DocumentModelList children = session.getChildren(parent.getRef());
         assertEquals(2, children.size());
         assertEquals(name1, children.get(0).getName());
         assertEquals(name2, children.get(1).getName());
 
-        remote.orderBefore(parent.getRef(), name2, name1);
+        session.orderBefore(parent.getRef(), name2, name1);
 
-        children = remote.getChildren(parent.getRef());
+        children = session.getChildren(parent.getRef());
         assertEquals(2, children.size());
         assertEquals(name2, children.get(0).getName());
         assertEquals(name1, children.get(1).getName());
 
-        remote.orderBefore(parent.getRef(), name2, null);
+        session.orderBefore(parent.getRef(), name2, null);
 
-        children = remote.getChildren(parent.getRef());
+        children = session.getChildren(parent.getRef());
         assertEquals(2, children.size());
         assertEquals(name1, children.get(0).getName());
         assertEquals(name2, children.get(1).getName());
-
     }
 
+    @Test
     public void testPropertyXPath() throws Exception {
-        DocumentModel root = getRootDocument();
         DocumentModel parent = new DocumentModelImpl(root.getPathAsString(),
                 "theParent", "OrderedFolder");
 
-        parent = remote.createDocument(parent);
+        parent = session.createDocument(parent);
 
         DocumentModel doc = new DocumentModelImpl(parent.getPathAsString(),
                 "theDoc", "File");
@@ -189,12 +180,12 @@ public class TestLocalAPI extends TestAPI {
     }
 
     @SuppressWarnings("unchecked")
+    @Test
     public void testComplexList() throws Exception {
-        DocumentModel root = getRootDocument();
         DocumentModel doc = new DocumentModelImpl(root.getPathAsString(),
                 "mydoc", "MyDocType");
 
-        doc = remote.createDocument(doc);
+        doc = session.createDocument(doc);
 
         List list = (List) doc.getProperty("testList", "attachments");
         assertNotNull(list);
@@ -204,14 +195,13 @@ public class TestLocalAPI extends TestAPI {
         diff.add(new Attachment("at1", "value1").asMap());
         diff.add(new Attachment("at2", "value2").asMap());
         doc.setProperty("testList", "attachments", diff);
-        doc = remote.saveDocument(doc);
+        doc = session.saveDocument(doc);
 
         list = (List) doc.getProperty("testList", "attachments");
         assertNotNull(list);
         assertEquals(2, list.size());
 
-        Blob blob;
-        blob = (Blob) ((Map) list.get(0)).get("content");
+        Blob blob = (Blob) ((Map) list.get(0)).get("content");
         assertEquals("value1", blob.getString());
         blob = (Blob) ((Map) list.get(1)).get("content");
         assertEquals("value2", blob.getString());
@@ -220,7 +210,7 @@ public class TestLocalAPI extends TestAPI {
         diff.remove(0);
         diff.insert(0, new Attachment("at1.bis", "value1.bis").asMap());
         doc.setProperty("testList", "attachments", diff);
-        doc = remote.saveDocument(doc);
+        doc = session.saveDocument(doc);
 
         list = (List) doc.getProperty("testList", "attachments");
         assertNotNull(list);
@@ -234,7 +224,7 @@ public class TestLocalAPI extends TestAPI {
         diff = new ListDiff();
         diff.move(0, 1);
         doc.setProperty("testList", "attachments", diff);
-        doc = remote.saveDocument(doc);
+        doc = session.saveDocument(doc);
 
         list = (List) doc.getProperty("testList", "attachments");
         assertNotNull(list);
@@ -247,19 +237,19 @@ public class TestLocalAPI extends TestAPI {
         diff = new ListDiff();
         diff.removeAll();
         doc.setProperty("testList", "attachments", diff);
-        doc = remote.saveDocument(doc);
+        doc = session.saveDocument(doc);
 
         list = (List) doc.getProperty("testList", "attachments");
         assertNotNull(list);
         assertEquals(0, list.size());
     }
 
+    @Test
     public void testDataModel() throws Exception {
-        DocumentModel root = getRootDocument();
         DocumentModel doc = new DocumentModelImpl(root.getPathAsString(),
                 "mydoc", "Book");
 
-        doc = remote.createDocument(doc);
+        doc = session.createDocument(doc);
 
         DataModel dm = doc.getDataModel("book");
         dm.setValue("title", "my title");
@@ -287,7 +277,7 @@ public class TestLocalAPI extends TestAPI {
         doc = new DocumentModelImpl(root.getPathAsString(), "mydoc2",
                 "MyDocType");
 
-        doc = remote.createDocument(doc);
+        doc = session.createDocument(doc);
 
         List list = (List) doc.getProperty("testList", "attachments");
         assertNotNull(list);
@@ -297,7 +287,7 @@ public class TestLocalAPI extends TestAPI {
         diff.add(new Attachment("at1", "value1").asMap());
         diff.add(new Attachment("at2", "value2").asMap());
         doc.setProperty("testList", "attachments", diff);
-        doc = remote.saveDocument(doc);
+        doc = session.saveDocument(doc);
 
         dm = doc.getDataModel("testList");
 
@@ -309,20 +299,20 @@ public class TestLocalAPI extends TestAPI {
         assertEquals("at2-modif", dm.getValue("attachments/item[1]/name"));
         dm.setValue("attachments/item[1]/name", "at2-modif2");
         assertEquals("at2-modif2", dm.getValue("attachments/item[1]/name"));
-
     }
 
+    @Test
     public void testGetChildrenRefs() throws Exception {
-        DocumentModel root = getRootDocument();
         DocumentModel doc = new DocumentModelImpl(root.getPathAsString(),
                 "mydoc", "Book");
-        doc = remote.createDocument(doc);
+        doc = session.createDocument(doc);
         DocumentModel doc2 = new DocumentModelImpl(root.getPathAsString(),
                 "mydoc2", "MyDocType");
-        doc2 = remote.createDocument(doc2);
-        List<DocumentRef> childrenRefs = remote.getChildrenRefs(root.getRef(),
+        doc2 = session.createDocument(doc2);
+        List<DocumentRef> childrenRefs = session.getChildrenRefs(root.getRef(),
                 null);
         assertEquals(2, childrenRefs.size());
+
         Set<String> expected = new HashSet<String>();
         expected.add(doc.getId());
         expected.add(doc2.getId());
@@ -338,18 +328,17 @@ public class TestLocalAPI extends TestAPI {
         return bytes;
     }
 
-    @SuppressWarnings("unchecked")
+    @Test
     public void testLazyBlob() throws Exception {
-        DocumentModel root = getRootDocument();
         DocumentModel doc = new DocumentModelImpl(root.getPathAsString(),
                 "mydoc", "File");
 
-        doc = remote.createDocument(doc);
+        doc = session.createDocument(doc);
         byte[] bytes = createBytes(1024 * 1024, (byte) 24);
 
         Blob blob = new ByteArrayBlob(bytes);
         doc.getPart("file").get("content").setValue(blob);
-        doc = remote.saveDocument(doc);
+        doc = session.saveDocument(doc);
 
         blob = (Blob) doc.getPart("file").get("content").getValue();
         assertTrue(Arrays.equals(bytes, blob.getByteArray()));
@@ -359,32 +348,32 @@ public class TestLocalAPI extends TestAPI {
 
         blob = (Blob) doc.getPart("file").get("content").getValue();
         assertTrue(Arrays.equals(bytes, blob.getByteArray()));
-
     }
 
+    @Test
     public void testProxy() throws Exception {
-        DocumentModel root = getRootDocument();
         DocumentModel doc = new DocumentModelImpl(root.getPathAsString(),
                 "proxy_test", "File");
 
-        doc = remote.createDocument(doc);
-        doc.setProperty("common", "title", "the title");
-        doc = remote.saveDocument(doc);
+        doc = session.createDocument(doc);
+        doc.setProperty("dublincore", "title", "the title");
+        doc = session.saveDocument(doc);
         // remote.save();
 
         VersionModel version = new VersionModelImpl();
         version.setCreated(Calendar.getInstance());
         version.setLabel("v1");
-        remote.checkIn(doc.getRef(), version);
-        // remote.save();
+        session.checkIn(doc.getRef(), version);
+        session.save();
 
         // checkout the doc to modify it
-        remote.checkOut(doc.getRef());
-        doc.setProperty("common", "title", "the title modified");
-        doc = remote.saveDocument(doc);
-        // remote.save();
+        session.checkOut(doc.getRef());
+        doc.setProperty("dublincore", "title", "the title modified");
+        doc = session.saveDocument(doc);
+        session.saveDocument(doc);
+        session.save();
 
-        DocumentModel proxy = remote.createProxy(root.getRef(), doc.getRef(),
+        DocumentModel proxy = session.createProxy(root.getRef(), doc.getRef(),
                 version, true);
         // remote.save();
         // assertEquals("the title", proxy.getProperty("common", "title"));
@@ -395,41 +384,42 @@ public class TestLocalAPI extends TestAPI {
         VersionModel version2 = new VersionModelImpl();
         version2.setCreated(Calendar.getInstance());
         version2.setLabel("v2");
-        remote.checkIn(doc.getRef(), version2);
+        session.checkIn(doc.getRef(), version2);
         // remote.save();
-
-        DocumentModelList list = remote.getChildren(root.getRef());
+        session.checkOut(doc.getRef());
+        DocumentModelList list = session.getChildren(root.getRef());
         assertEquals(2, list.size());
 
         for (DocumentModel model : list) {
             assertEquals("File", model.getType());
         }
 
-        remote.removeDocument(proxy.getRef());
+        session.removeDocument(proxy.getRef());
         // remote.save();
 
-        list = remote.getChildren(root.getRef());
+        list = session.getChildren(root.getRef());
         assertEquals(1, list.size());
 
         // create folder to hold proxies
         DocumentModel folder = new DocumentModelImpl(root.getPathAsString(),
                 "folder", "Folder");
-        folder = remote.createDocument(folder);
-        remote.save();
-        folder = remote.getDocument(folder.getRef());
+        folder = session.createDocument(folder);
+        session.save();
+        folder = session.getDocument(folder.getRef());
+        assertTrue(session.isCheckedOut(doc.getRef()));
 
         // publishDocument API
-        proxy = remote.publishDocument(doc, root);
-        remote.save(); // needed for publish-by-copy to work
-        assertEquals(3, remote.getChildrenRefs(root.getRef(), null).size());
+        proxy = session.publishDocument(doc, root);
+        session.save(); // needed for publish-by-copy to work
+        assertEquals(3, session.getChildrenRefs(root.getRef(), null).size());
         assertTrue(proxy.isProxy());
 
         // republish a proxy
-        DocumentModel proxy2 = remote.publishDocument(proxy, folder);
-        remote.save();
+        DocumentModel proxy2 = session.publishDocument(proxy, folder);
+        session.save();
         assertTrue(proxy2.isProxy());
-        assertEquals(1, remote.getChildrenRefs(folder.getRef(), null).size());
-        assertEquals(3, remote.getChildrenRefs(root.getRef(), null).size());
+        assertEquals(1, session.getChildrenRefs(folder.getRef(), null).size());
+        assertEquals(3, session.getChildrenRefs(root.getRef(), null).size());
 
         // a second time to check overwrite
         // XXX this test fails for mysterious reasons (hasNode doesn't detect
@@ -441,12 +431,13 @@ public class TestLocalAPI extends TestAPI {
         // assertEquals(3, remote.getChildrenRefs(root.getRef(), null).size());
 
         // and without overwrite
-        remote.publishDocument(proxy, folder, false);
-        remote.save();
-        assertEquals(2, remote.getChildrenRefs(folder.getRef(), null).size());
-        assertEquals(3, remote.getChildrenRefs(root.getRef(), null).size());
+        session.publishDocument(proxy, folder, false);
+        session.save();
+        assertEquals(2, session.getChildrenRefs(folder.getRef(), null).size());
+        assertEquals(3, session.getChildrenRefs(root.getRef(), null).size());
     }
 
+    @Test
     public void testPermissionChecks() throws Exception {
 
         CoreSession joeReaderSession = null;
@@ -486,8 +477,9 @@ public class TestLocalAPI extends TestAPI {
 
             joeContributorSession.saveDocument(joeContributorDoc);
 
-            DocumentRef childRef = joeContributorSession.createDocument(new DocumentModelImpl(
-                    joeContributorDoc.getPathAsString(), "child", "File")).getRef();
+            DocumentRef childRef = joeContributorSession.createDocument(
+                    new DocumentModelImpl(joeContributorDoc.getPathAsString(),
+                            "child", "File")).getRef();
             joeContributorSession.save();
 
             // joe contributor can copy the newly created doc
@@ -506,8 +498,6 @@ public class TestLocalAPI extends TestAPI {
                 fail("should have raised a security exception");
             } catch (DocumentSecurityException e) {
             }
-
-
             joeContributorSession.save();
 
             // local manager can read, write, create and remove
@@ -516,8 +506,9 @@ public class TestLocalAPI extends TestAPI {
 
             joeLocalManagerSession.saveDocument(joeLocalManagerDoc);
 
-            childRef = joeLocalManagerSession.createDocument(new DocumentModelImpl(
-                    joeLocalManagerDoc.getPathAsString(), "child2", "File")).getRef();
+            childRef = joeLocalManagerSession.createDocument(
+                    new DocumentModelImpl(joeLocalManagerDoc.getPathAsString(),
+                            "child2", "File")).getRef();
             joeLocalManagerSession.save();
 
             // joe local manager can copy the newly created doc
@@ -526,9 +517,7 @@ public class TestLocalAPI extends TestAPI {
             // joe local manager cannot move the doc
             joeLocalManagerSession.move(childRef, ref, "child2_move");
 
-            joeLocalManagerSession.removeDocument(ref);
             joeLocalManagerSession.save();
-
         } finally {
             if (joeReaderSession != null) {
                 CoreInstance.getInstance().close(joeReaderSession);
@@ -539,10 +528,13 @@ public class TestLocalAPI extends TestAPI {
             if (joeLocalManagerSession != null) {
                 CoreInstance.getInstance().close(joeLocalManagerSession);
             }
+            session.removeDocument(ref);
+            session.save();
         }
     }
 
-    protected CoreSession openSession(String userName) throws ClientException {
+    protected static CoreSession openSession(String userName)
+            throws ClientException {
         Map<String, Serializable> ctx = new HashMap<String, Serializable>();
         ctx.put("username", userName);
         ctx.put("principal", new UserPrincipal(userName));
@@ -551,47 +543,57 @@ public class TestLocalAPI extends TestAPI {
 
     protected DocumentRef createDocumentModelWithSamplePermissions(String name)
             throws ClientException {
-        DocumentModel root = getRootDocument();
         DocumentModel doc = new DocumentModelImpl(root.getPathAsString(), name,
                 "Folder");
-        doc = remote.createDocument(doc);
+        doc = session.createDocument(doc);
 
         ACP acp = doc.getACP();
         ACL localACL = acp.getOrCreateACL();
 
-        localACL.add(new ACE("joe_reader", SecurityConstants.READ, true));
+        localACL.add(new ACE("joe_reader", READ, true));
 
-        localACL.add(new ACE("joe_contributor", SecurityConstants.READ, true));
-        localACL.add(new ACE("joe_contributor",
-                SecurityConstants.WRITE_PROPERTIES, true));
-        localACL.add(new ACE("joe_contributor", SecurityConstants.ADD_CHILDREN,
-                true));
+        localACL.add(new ACE("joe_contributor", READ, true));
+        localACL.add(new ACE("joe_contributor", WRITE_PROPERTIES, true));
+        localACL.add(new ACE("joe_contributor", ADD_CHILDREN, true));
 
-        localACL.add(new ACE("joe_localmanager", SecurityConstants.READ, true));
-        localACL.add(new ACE("joe_localmanager", SecurityConstants.WRITE, true));
-        localACL.add(new ACE("joe_localmanager",
-                SecurityConstants.WRITE_SECURITY, true));
+        localACL.add(new ACE("joe_localmanager", READ, true));
+        localACL.add(new ACE("joe_localmanager", WRITE, true));
+        localACL.add(new ACE("joe_localmanager", WRITE_SECURITY, true));
 
         acp.addACL(localACL);
         doc.setACP(acp, true);
 
         // add the permission to remove children on the root
-        ACP rootACP = root.getACP();
-        ACL rootACL = rootACP.getOrCreateACL();
-        rootACL.add(new ACE("joe_localmanager", SecurityConstants.REMOVE_CHILDREN, true));
-        rootACP.addACL(rootACL);
-        root.setACP(rootACP, true);
+        //ACP rootACP = root.getACP();
+        //ACL rootACL = rootACP.getOrCreateACL();
+        //rootACL.add(new ACE("joe_localmanager", REMOVE_CHILDREN, true));
+        //rootACP.addACL(rootACL);
+        //root.setACP(rootACP, true);
 
         // make it visible for others
-        remote.save();
+        session.save();
         return doc.getRef();
+    }
+
+    @Test
+    public void testDocumentInitialLifecycleState() throws Exception {
+        DocumentModel docProject = new DocumentModelImpl(
+                root.getPathAsString(), "DocWork", "File");
+        docProject = session.createDocument(docProject);
+        assertEquals("project", docProject.getCurrentLifeCycleState());
+
+        DocumentModel docApproved = new DocumentModelImpl(
+                root.getPathAsString(), "DocApproved", "File");
+        docApproved.putContextData(INITIAL_LIFECYCLE_STATE_OPTION_NAME, "approved");
+        docApproved = session.createDocument(docApproved);
+        assertEquals("approved", docApproved.getCurrentLifeCycleState());
     }
 
     // see identical test in TestSQLRepositoryVersioning
 
+    @Test
     public void testVersionSecurity() throws Exception {
-        CoreSession session = remote;
-        DocumentModel folder = new DocumentModelImpl("/", "folder", "Folder");
+        DocumentModel folder = new DocumentModelImpl("/", "folder123", "Folder");
         folder = session.createDocument(folder);
         ACP acp = new ACPImpl();
         ACE ace = new ACE("princ1", "perm1", true);
@@ -599,8 +601,9 @@ public class TestLocalAPI extends TestAPI {
         acl.add(ace);
         acp.addACL(acl);
         session.setACP(folder.getRef(), acp, true);
-        DocumentModel file = new DocumentModelImpl("/folder", "file", "File");
+        DocumentModel file = new DocumentModelImpl("/folder123", "file123", "File");
         file = session.createDocument(file);
+
         // set security
         acp = new ACPImpl();
         ace = new ACE("princ2", "perm2", true);
@@ -609,6 +612,7 @@ public class TestLocalAPI extends TestAPI {
         acp.addACL(acl);
         session.setACP(file.getRef(), acp, true);
         session.save();
+
         VersionModel vm = new VersionModelImpl();
         vm.setLabel("v1");
         session.checkIn(file.getRef(), vm);
@@ -618,30 +622,27 @@ public class TestLocalAPI extends TestAPI {
         DocumentModel version = session.getDocumentWithVersion(file.getRef(), vm);
         acp = session.getACP(version.getRef());
         ACL[] acls = acp.getACLs();
-        if (this.getClass().getName().equals(TestLocalAPI.class.getName())) {
+
+        if (!usingCustomVersioning) {
             // JCR versioning (unused) does something incorrect here
             return;
         }
+
         // the following is only run with TestLocalAPIWithCustomVersioning
         assertEquals(2, acls.length);
         acl = acls[0];
         assertEquals(1, acl.size());
         assertEquals("princ2", acl.get(0).getUsername());
         acl = acls[1];
-        assertEquals(1 + 4, acl.size()); // 1 + 4 root defaults
+        assertEquals(1 + 3, acl.size()); // 1 + 3 root defaults
         assertEquals("princ1", acl.get(0).getUsername());
 
         // remove live document (create a proxy so the version stays)
         session.createProxy(folder.getRef(), file.getRef(), vm, true);
         session.save();
         session.removeDocument(file.getRef());
-        // recheck security on version
-        try {
-            session.getACP(version.getRef());
-            fail();
-        } catch (DocumentSecurityException e) {
-            // ok
-        }
+        // recheck security on version (works because we're administrator)
+        session.getACP(version.getRef());
     }
 
 }

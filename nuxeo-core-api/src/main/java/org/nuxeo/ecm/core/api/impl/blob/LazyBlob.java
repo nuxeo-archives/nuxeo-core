@@ -201,11 +201,7 @@ public class LazyBlob extends DefaultStreamBlob implements Serializable {
 
         // Close the session because it means we opened a new one.
         if (sid == null) {
-            try {
-                CoreInstance.getInstance().close(client);
-            } catch (ClientException ce) {
-                throw new IOException(ce.getMessage());
-            }
+            CoreInstance.getInstance().close(client);
         }
 
         return in;
@@ -216,6 +212,10 @@ public class LazyBlob extends DefaultStreamBlob implements Serializable {
     }
 
     public Blob persist() throws IOException {
+        // NXP-3190: fetch it first in case it's not initialized
+        if (in == null) {
+            getStream();
+        }
         // optimize -> when the underlying stream is an SerializableINputStream
         // this can be optimized by reusing the temp file
         // of the underlying stream
@@ -263,8 +263,7 @@ public class LazyBlob extends DefaultStreamBlob implements Serializable {
         if (!dataKeyEquals) {
             return false;
         }
-        boolean repoEquals = equalValues(repositoryName, other.repositoryName);
-        return repoEquals;
+        return equalValues(repositoryName, other.repositoryName);
     }
 
     @Override

@@ -34,6 +34,8 @@ import org.nuxeo.common.collections.PrimitiveArrays;
 import org.nuxeo.common.utils.Base64;
 import org.nuxeo.common.utils.Path;
 import org.nuxeo.ecm.core.api.Blob;
+import org.nuxeo.ecm.core.api.ClientException;
+import org.nuxeo.ecm.core.api.ClientRuntimeException;
 import org.nuxeo.ecm.core.api.DataModel;
 import org.nuxeo.ecm.core.api.DocumentLocation;
 import org.nuxeo.ecm.core.api.DocumentModel;
@@ -81,23 +83,30 @@ public class ExportedDocumentImpl implements ExportedDocument {
     private final Map<String, Blob> blobs = new HashMap<String, Blob>(4);
 
     // the optional attached documents
-    private final Map<String, Document> documents = new HashMap<String, Document>(4);
-
+    private final Map<String, Document> documents = new HashMap<String, Document>(
+            4);
 
     public ExportedDocumentImpl() {
     }
 
     /**
-     *
      * @param doc
      * @param path the path to use for this document this is used to remove full
      *            paths
      */
-    public ExportedDocumentImpl(DocumentModel doc, Path path, boolean inlineBlobs)
-            throws IOException {
+    public ExportedDocumentImpl(DocumentModel doc, Path path,
+            boolean inlineBlobs) throws IOException {
         id = doc.getId();
-        this.path = path.makeRelative();
-        readDocument(doc, inlineBlobs);
+        if (path == null) {
+            this.path = new Path("");
+        } else {
+            this.path = path.makeRelative();
+        }
+        try {
+            readDocument(doc, inlineBlobs);
+        } catch (ClientException e) {
+            throw new ClientRuntimeException(e);
+        }
 
         srcLocation = new DocumentLocationImpl(doc);
     }
@@ -112,55 +121,37 @@ public class ExportedDocumentImpl implements ExportedDocument {
     }
 
     /**
-     * @return source DocumentLocation
+     * @return the source DocumentLocation
      */
     public DocumentLocation getSourceLocation() {
         return srcLocation;
     }
 
-    /**
-     * @return the path.
-     */
     public Path getPath() {
         return path;
     }
 
-    /**
-     * @param path the path to set.
-     */
     public void setPath(Path path) {
         this.path = path;
     }
 
-    /**
-     * @return the id.
-     */
     public String getId() {
         return id;
     }
 
-    /**
-     * @param id the id to set.
-     */
     public void setId(String id) {
         this.id = id;
     }
 
     public String getType() {
-        return document.getRootElement().element(ExportConstants.SYSTEM_TAG)
-                .elementText("type");
+        return document.getRootElement().element(ExportConstants.SYSTEM_TAG).elementText(
+                "type");
     }
 
-    /**
-     * @return the document.
-     */
     public Document getDocument() {
         return document;
     }
 
-    /**
-     * @param document the document to set.
-     */
     public void setDocument(Document document) {
         this.document = document;
         id = document.getRootElement().attributeValue(ExportConstants.ID_ATTR);
@@ -169,9 +160,6 @@ public class ExportedDocumentImpl implements ExportedDocument {
         srcLocation = new DocumentLocationImpl(repName, new IdRef(id));
     }
 
-    /**
-     * @return the blobs.
-     */
     public Map<String, Blob> getBlobs() {
         return blobs;
     }
@@ -192,9 +180,6 @@ public class ExportedDocumentImpl implements ExportedDocument {
         return !blobs.isEmpty();
     }
 
-    /**
-     * @return the documents.
-     */
     public Map<String, Document> getDocuments() {
         return documents;
     }
@@ -212,16 +197,14 @@ public class ExportedDocumentImpl implements ExportedDocument {
     }
 
     /**
-     * The number of files describing the document.
-     *
-     * @return
+     * @return the number of files describing the document.
      */
     public int getFilesCount() {
         return 1 + documents.size() + blobs.size();
     }
 
     private void readDocument(DocumentModel doc, boolean inlineBlobs)
-            throws IOException {
+            throws IOException, ClientException {
         document = DocumentFactory.getInstance().createDocument();
         document.setName(doc.getName());
         Element rootElement = document.addElement(ExportConstants.DOCUMENT_TAG);
@@ -233,7 +216,7 @@ public class ExportedDocumentImpl implements ExportedDocument {
         systemElement.addElement(ExportConstants.TYPE_TAG).addText(
                 doc.getType());
         systemElement.addElement(ExportConstants.PATH_TAG).addText(
-                doc.getPath().toString());
+                path.toString());
         // lifecycle
         try {
             String lifeCycleState = doc.getCurrentLifeCycleState();
@@ -258,8 +241,7 @@ public class ExportedDocumentImpl implements ExportedDocument {
         }
 
         // write schemas
-        SchemaManager schemaManager = Framework.getLocalService(
-                SchemaManager.class);
+        SchemaManager schemaManager = Framework.getLocalService(SchemaManager.class);
         String[] schemaNames = doc.getDeclaredSchemas();
         for (String schemaName : schemaNames) {
             Element schemaElement = rootElement.addElement(
@@ -290,7 +272,7 @@ public class ExportedDocumentImpl implements ExportedDocument {
             element.addText(type.encode(value));
         } else if (type.isComplexType()) {
             ComplexType ctype = (ComplexType) type;
-            if (ctype.getName().equals(TypeConstants.CONTENT)) {
+            if (TypeConstants.isContentType(ctype)) {
                 readBlob(element, ctype, (Blob) value, inlineBlobs);
             } else {
                 readComplex(element, ctype, (Map) value, inlineBlobs);
@@ -316,6 +298,8 @@ public class ExportedDocumentImpl implements ExportedDocument {
                 blob.getEncoding() != null ? blob.getEncoding() : "");
         element.addElement(ExportConstants.BLOB_MIME_TYPE).addText(
                 blob.getMimeType() != null ? blob.getMimeType() : "");
+        element.addElement(ExportConstants.BLOB_FILENAME).addText(
+                blob.getFilename() != null ? blob.getFilename() : "");
         Element data = element.addElement(ExportConstants.BLOB_DATA);
         if (inlineBlobs) {
             String content = Base64.encodeBytes(blob.getByteArray());

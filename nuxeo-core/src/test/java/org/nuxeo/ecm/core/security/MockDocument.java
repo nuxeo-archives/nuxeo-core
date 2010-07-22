@@ -50,7 +50,7 @@ public class MockDocument implements Document {
 
     final String creator;
 
-    String lock = null;
+    String lock;
 
     public MockDocument(String uuid, String creator) {
         this.uuid = uuid;
@@ -82,6 +82,12 @@ public class MockDocument implements Document {
     }
 
     // not implemented (useless)
+
+    public void setLifeCyclePolicy(String policy) {
+    }
+
+    public void setCurrentLifeCycleState(String state) {
+    }
 
     public boolean followTransition(String transition)
             throws LifeCycleException {

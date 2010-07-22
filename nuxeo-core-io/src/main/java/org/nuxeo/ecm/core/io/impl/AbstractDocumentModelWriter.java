@@ -61,7 +61,8 @@ import org.nuxeo.runtime.services.streaming.ByteArraySource;
  */
 // TODO: improve it ->
 // modify core session to add a batch create method and use it
-public abstract class AbstractDocumentModelWriter extends AbstractDocumentWriter {
+public abstract class AbstractDocumentModelWriter extends
+        AbstractDocumentWriter {
 
     protected CoreSession session;
 
@@ -71,8 +72,7 @@ public abstract class AbstractDocumentModelWriter extends AbstractDocumentWriter
 
     protected int unsavedDocuments = 0;
 
-    private final Map<DocumentLocation, DocumentLocation> translationMap
-            = new HashMap<DocumentLocation, DocumentLocation>();
+    private final Map<DocumentLocation, DocumentLocation> translationMap = new HashMap<DocumentLocation, DocumentLocation>();
 
     /**
      *
@@ -85,8 +85,8 @@ public abstract class AbstractDocumentModelWriter extends AbstractDocumentWriter
         this(session, parentPath, 10);
     }
 
-    protected AbstractDocumentModelWriter(CoreSession session, String parentPath,
-            int saveInterval) {
+    protected AbstractDocumentModelWriter(CoreSession session,
+            String parentPath, int saveInterval) {
         if (session == null) {
             throw new IllegalArgumentException("null session");
         }
@@ -124,9 +124,7 @@ public abstract class AbstractDocumentModelWriter extends AbstractDocumentWriter
      * The parent of this document is assumed to exist.
      *
      * @param xdoc the document containing
-     * @param toPath the path opf the doc to create
-     * @return
-     * @throws ClientException
+     * @param toPath the path of the doc to create
      */
     protected DocumentModel createDocument(ExportedDocument xdoc, Path toPath)
             throws ClientException {
@@ -135,17 +133,20 @@ public abstract class AbstractDocumentModelWriter extends AbstractDocumentWriter
 
         DocumentModel doc = new DocumentModelImpl(parentPath.toString(), name,
                 xdoc.getType());
-        doc = session.createDocument(doc);
-        // now fill it with data and save it -> TODO this should be changed
-        // after the core API will be refactored
 
-        // load into the document the system properties
-        loadSystemInfo(doc, xdoc.getDocument());
-
+        // set lifecycle state at creation
+        Element system = xdoc.getDocument().getRootElement().element(
+                ExportConstants.SYSTEM_TAG);
+        String lifeCycleState = system.element(
+                ExportConstants.LIFECYCLE_STATE_TAG).getText();
+        doc.putContextData("initialLifecycleState", lifeCycleState);
         // then load schemas data
         loadSchemas(xdoc, doc, xdoc.getDocument());
 
-        doc = session.saveDocument(doc);
+        doc = session.createDocument(doc);
+
+        // load into the document the system properties, document needs to exist
+        loadSystemInfo(doc, xdoc.getDocument());
 
         unsavedDocuments += 1;
         saveIfNeeded();
@@ -155,11 +156,6 @@ public abstract class AbstractDocumentModelWriter extends AbstractDocumentWriter
 
     /**
      * Updates an existing document.
-     *
-     * @param xdoc
-     * @param doc
-     * @return
-     * @throws ClientException
      */
     protected DocumentModel updateDocument(ExportedDocument xdoc,
             DocumentModel doc) throws ClientException {
@@ -185,9 +181,6 @@ public abstract class AbstractDocumentModelWriter extends AbstractDocumentWriter
     @SuppressWarnings("unchecked")
     protected void loadSystemInfo(DocumentModel docModel, Document doc)
             throws ClientException {
-        // how do I set the life cycle? whould we set it?
-
-        // TODO import security
         Element system = doc.getRootElement().element(
                 ExportConstants.SYSTEM_TAG);
         Element accessControl = system.element(ExportConstants.ACCESS_CONTROL_TAG);
@@ -225,8 +218,7 @@ public abstract class AbstractDocumentModelWriter extends AbstractDocumentWriter
     @SuppressWarnings("unchecked")
     protected void loadSchemas(ExportedDocument xdoc, DocumentModel docModel,
             Document doc) throws ClientException {
-        SchemaManager schemaMgr = Framework.getLocalService(
-                SchemaManager.class);
+        SchemaManager schemaMgr = Framework.getLocalService(SchemaManager.class);
         Iterator<Element> it = doc.getRootElement().elementIterator(
                 ExportConstants.SCHEMA_TAG);
         while (it.hasNext()) {
@@ -241,7 +233,7 @@ public abstract class AbstractDocumentModelWriter extends AbstractDocumentWriter
     }
 
     @SuppressWarnings("unchecked")
-    protected void loadSchema(ExportedDocument xdoc, Schema schema,
+    protected static void loadSchema(ExportedDocument xdoc, Schema schema,
             DocumentModel doc, Element schemaElement) throws ClientException {
         String schemaName = schemaElement.attributeValue(ExportConstants.NAME_ATTR);
         Map<String, Object> data = new HashMap<String, Object>();
@@ -262,8 +254,8 @@ public abstract class AbstractDocumentModelWriter extends AbstractDocumentWriter
     }
 
     @SuppressWarnings("unchecked")
-    private Object getElementData(ExportedDocument xdoc, Element element,
-            Type type) {
+    private static Object getElementData(ExportedDocument xdoc,
+            Element element, Type type) {
         if (type.isSimpleType()) {
             return type.decode(element.getText());
         } else if (type.isListType()) {
@@ -280,16 +272,18 @@ public abstract class AbstractDocumentModelWriter extends AbstractDocumentWriter
                 if (klass.isPrimitive()) {
                     return PrimitiveArrays.toPrimitiveArray(list, klass);
                 } else {
-                    return list.toArray((Object[])Array.newInstance(klass, list.size()));
+                    return list.toArray((Object[]) Array.newInstance(klass,
+                            list.size()));
                 }
             }
             return list;
         } else {
             ComplexType ctype = (ComplexType) type;
-            if (ctype.getName().equals(TypeConstants.CONTENT)) {
+            if (TypeConstants.isContentType(ctype)) {
                 String mimeType = element.elementText(ExportConstants.BLOB_MIME_TYPE);
                 String encoding = element.elementText(ExportConstants.BLOB_ENCODING);
                 String content = element.elementTextTrim(ExportConstants.BLOB_DATA);
+                String filename = element.elementTextTrim(ExportConstants.BLOB_FILENAME);
                 if ((content == null || content.length() == 0)
                         && (mimeType == null || mimeType.length() == 0)) {
                     return null; // remove blob
@@ -298,13 +292,14 @@ public abstract class AbstractDocumentModelWriter extends AbstractDocumentWriter
                 if (xdoc.hasExternalBlobs()) {
                     blob = xdoc.getBlob(content);
                 }
-                if (blob == null) { // may be the blob is embedded like a Base64
+                if (blob == null) { // maybe the blob is embedded in Base64
                     // encoded data
                     byte[] bytes = Base64.decode(content);
                     blob = new StreamingBlob(new ByteArraySource(bytes));
                 }
                 blob.setMimeType(mimeType);
                 blob.setEncoding(encoding);
+                blob.setFilename(filename);
                 return blob;
             } else { // a complex type
                 Map<String, Object> map = new HashMap<String, Object>();

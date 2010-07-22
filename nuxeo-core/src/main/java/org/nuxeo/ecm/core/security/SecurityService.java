@@ -21,11 +21,13 @@ package org.nuxeo.ecm.core.security;
 
 import java.security.Principal;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.nuxeo.ecm.core.api.CoreSession;
 import org.nuxeo.ecm.core.api.DocumentException;
 import org.nuxeo.ecm.core.api.IdRef;
 import org.nuxeo.ecm.core.api.NuxeoPrincipal;
@@ -34,13 +36,12 @@ import org.nuxeo.ecm.core.api.security.ACL;
 import org.nuxeo.ecm.core.api.security.ACP;
 import org.nuxeo.ecm.core.api.security.Access;
 import org.nuxeo.ecm.core.api.security.PermissionProvider;
-import org.nuxeo.ecm.core.api.security.PolicyService;
 import org.nuxeo.ecm.core.api.security.SecurityConstants;
 import org.nuxeo.ecm.core.api.security.SecuritySummaryEntry;
 import org.nuxeo.ecm.core.api.security.impl.SecuritySummaryEntryImpl;
 import org.nuxeo.ecm.core.model.Document;
 import org.nuxeo.ecm.core.model.Session;
-import org.nuxeo.runtime.api.Framework;
+import org.nuxeo.ecm.core.query.sql.model.SQLQuery;
 import org.nuxeo.runtime.model.ComponentContext;
 import org.nuxeo.runtime.model.ComponentInstance;
 import org.nuxeo.runtime.model.ComponentName;
@@ -124,8 +125,22 @@ public class SecurityService extends DefaultComponent {
         return permissionProvider;
     }
 
-    public void invalidateCache(Session session, String username) {
-        session.getRepository().getSecurityManager().invalidateCache(session);
+    // Never used. Remove ?
+    public static void invalidateCache(Session session, String username) {
+        session.getRepository().getNuxeoSecurityManager().invalidateCache(
+                session);
+    }
+
+    public boolean arePoliciesRestrictingPermission(String permission) {
+        return securityPolicyService.arePoliciesRestrictingPermission(permission);
+    }
+
+    public boolean arePoliciesExpressibleInQuery() {
+        return securityPolicyService.arePoliciesExpressibleInQuery();
+    }
+
+    public Collection<SQLQuery.Transformer> getPoliciesQueryTransformers() {
+        return securityPolicyService.getPoliciesQueryTransformers();
     }
 
     public boolean checkPermission(Document doc, Principal principal,
@@ -134,25 +149,17 @@ public class SecurityService extends DefaultComponent {
 
         // system bypass
         // :FIXME: tmp hack
-        if (username.equals("system")) {
+        if (SecurityConstants.SYSTEM_USERNAME.equals(username)) {
             return true;
         }
 
-        // Security Policy
-        PolicyService policyService = Framework.getLocalService(PolicyService.class);
-        if (policyService != null) {
-            CorePolicyService corePolicyService = (CorePolicyService) policyService.getCorePolicy();
-            if (corePolicyService != null
-                    && principal instanceof NuxeoPrincipal) {
-                if (!corePolicyService.checkPolicy(doc,
-                        (NuxeoPrincipal) principal, permission)) {
-                    return false;
-                }
-            }
+        if (principal instanceof NuxeoPrincipal
+                && ((NuxeoPrincipal) principal).isAdministrator()) {
+            return true;
         }
 
         // get the security store
-        SecurityManager securityManager = doc.getSession().getRepository().getSecurityManager();
+        SecurityManager securityManager = doc.getSession().getRepository().getNuxeoSecurityManager();
 
         // fully check each ACE in turn
         String[] resolvedPermissions = getPermissionsToCheck(permission);
@@ -180,123 +187,45 @@ public class SecurityService extends DefaultComponent {
     /**
      * Provides the full list of all permissions or groups of permissions that
      * contain the given one (inclusive).
+     * <p>
+     * It is exposed remotely through
+     * {@link CoreSession#getPermissionsToCheck}.
      *
      * @param permission
      * @return the list, as an array of strings.
      */
-    // TODO nicely expose for other (remote) services (Search...)
     public String[] getPermissionsToCheck(String permission) {
         String[] groups = permissionProvider.getPermissionGroups(permission);
         if (groups == null) {
-            return new String[] { permission };
+            return new String[] { permission, SecurityConstants.EVERYTHING };
         } else {
-            String[] perms = new String[groups.length + 1];
+            String[] perms = new String[groups.length + 2];
             perms[0] = permission;
             System.arraycopy(groups, 0, perms, 1, groups.length);
+            perms[groups.length + 1] = SecurityConstants.EVERYTHING;
             return perms;
         }
     }
 
-    protected String[] getPrincipalsToCheck(Principal principal) {
+    public static String[] getPrincipalsToCheck(Principal principal) {
         List<String> userGroups = null;
         if (principal instanceof NuxeoPrincipal) {
             userGroups = ((NuxeoPrincipal) principal).getAllGroups();
         }
         if (userGroups == null) {
-            return new String[] { principal.getName() };
+            return new String[] { principal.getName(),
+                    SecurityConstants.EVERYONE };
         } else {
-            String[] tmp = userGroups.toArray(new String[userGroups.size()]);
-            String[] groups = new String[tmp.length + 1];
-            groups[0] = principal.getName();
-            System.arraycopy(tmp, 0, groups, 1, tmp.length);
+            int size = userGroups.size();
+            String[] groups = new String[size + 2];
+            userGroups.toArray(groups);
+            groups[size] = principal.getName();
+            groups[size + 1] = SecurityConstants.EVERYONE;
             return groups;
         }
     }
 
-    @Deprecated
-    public boolean checkPermissionOld(Document doc, Principal principal,
-            String permission) throws SecurityException {
-        String username = principal.getName();
-
-        // system bypass
-        // :FIXME: tmp hack
-        if (username.equals("system")) {
-            return true;
-        }
-
-        // if document is locked by someone else the WRITE permission should be
-        // disallowed
-        try {
-            String lock = doc.getLock();
-            if (lock != null && !lock.startsWith(username + ':')
-                    && permission.equals(SecurityConstants.WRITE)) {
-                // locked by another user
-                return false; // DENY WRITE
-            }
-        } catch (Exception e) {
-            log.debug("Failed to get lock status on document ", e);
-            // ignore
-        }
-
-        // get the security store
-        SecurityManager securityManager = doc.getSession().getRepository().getSecurityManager();
-
-        Access access = checkPermissionForUser(securityManager, doc, username,
-                permission);
-        if (access == Access.UNKNOWN) {
-
-            // do the same for each user group if any
-            if (principal instanceof NuxeoPrincipal) {
-                List<String> userGroups = ((NuxeoPrincipal) principal).getAllGroups();
-                if (userGroups != null && !userGroups.isEmpty()) {
-                    for (String userGroup : userGroups) {
-                        access = checkPermissionForUser(securityManager, doc,
-                                userGroup, permission);
-                        if (access != Access.UNKNOWN) {
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        return access.toBoolean();
-    }
-
-    @Deprecated
-    private Access checkPermissionForUser(SecurityManager securityManager,
-            Document doc, String username, String permission)
-            throws SecurityException {
-
-        // first check the Everything pseudo permission
-        // permission RESTRICTED_READ needs special handling
-        // because it's a negative permission
-        Access access;
-        /*
-         * if (!permission.equals(RESTRICTED_READ)) { access =
-         * securityManager.getAccess(doc, username, EVERYTHING); if (access !=
-         * Access.UNKNOWN) { return access; } }
-         */
-        // second check the given permission
-        access = securityManager.getAccess(doc, username, permission);
-        if (access != Access.UNKNOWN) {
-            return access;
-        }
-
-        // third check the permission groups
-        String[] permGroups = permissionProvider.getPermissionGroups(permission);
-        if (permGroups != null) {
-            for (String permGroup : permGroups) {
-                access = securityManager.getAccess(doc, username, permGroup);
-                if (access != Access.UNKNOWN) {
-                    return access;
-                }
-            }
-        }
-        return Access.UNKNOWN;
-    }
-
-    public List<SecuritySummaryEntry> getSecuritySummary(Document doc,
+    public static List<SecuritySummaryEntry> getSecuritySummary(Document doc,
             Boolean includeParents) {
         List<SecuritySummaryEntry> result = new ArrayList<SecuritySummaryEntry>();
 
@@ -306,20 +235,20 @@ public class SecurityService extends DefaultComponent {
 
         addChildrenToSecuritySummary(doc, result);
         // TODO: change API to use boolean instead
-        if (includeParents.booleanValue()) {
+        if (includeParents) {
             addParentsToSecurirySummary(doc, result);
         }
         return result;
     }
 
-    private SecuritySummaryEntry createSecuritySummaryEntry(Document doc)
+    private static SecuritySummaryEntry createSecuritySummaryEntry(Document doc)
             throws DocumentException {
         return new SecuritySummaryEntryImpl(new IdRef(doc.getUUID()),
                 new PathRef(doc.getPath()),
                 doc.getSession().getSecurityManager().getACP(doc));
     }
 
-    private void addParentsToSecurirySummary(Document doc,
+    private static void addParentsToSecurirySummary(Document doc,
             List<SecuritySummaryEntry> summary) {
 
         Document parent;
@@ -349,7 +278,7 @@ public class SecurityService extends DefaultComponent {
         addParentsToSecurirySummary(parent, summary);
     }
 
-    private void addChildrenToSecuritySummary(Document doc,
+    private static void addChildrenToSecuritySummary(Document doc,
             List<SecuritySummaryEntry> summary) {
         try {
             SecuritySummaryEntry entry = createSecuritySummaryEntry(doc);

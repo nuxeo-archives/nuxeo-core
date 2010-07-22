@@ -23,7 +23,6 @@ package org.nuxeo.ecm.core.api;
  * A PATH reference to a document.
  *
  * @author  <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
- *
  */
 public class PathRef implements DocumentRef {
 
@@ -33,7 +32,9 @@ public class PathRef implements DocumentRef {
 
 
     public PathRef(String parentPath, String name) {
-        if ("/".equals(parentPath)) {
+        if (parentPath == null) {
+            value = name;
+        } else if ("/".equals(parentPath)) {
             value = '/' + name;
         } else {
             value = parentPath + '/' + name;

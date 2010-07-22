@@ -19,6 +19,16 @@
 
 package org.nuxeo.ecm.core.api;
 
+import static org.nuxeo.ecm.core.api.Constants.CORE_BUNDLE;
+import static org.nuxeo.ecm.core.api.Constants.CORE_FACADE_TESTS_BUNDLE;
+import static org.nuxeo.ecm.core.api.Constants.SCHEMA_BUNDLE;
+import static org.nuxeo.ecm.core.api.security.SecurityConstants.ADMINISTRATOR;
+import static org.nuxeo.ecm.core.api.security.SecurityConstants.ANONYMOUS;
+import static org.nuxeo.ecm.core.api.security.SecurityConstants.READ;
+import static org.nuxeo.ecm.core.api.security.SecurityConstants.READ_WRITE;
+import static org.nuxeo.ecm.core.api.security.SecurityConstants.WRITE;
+import static org.nuxeo.ecm.core.api.security.SecurityConstants.WRITE_PROPERTIES;
+
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
@@ -38,27 +48,26 @@ import org.nuxeo.runtime.test.NXRuntimeTestCase;
  */
 public class TestSecurityPolicyService extends NXRuntimeTestCase {
 
-    private final static String REPO_NAME = "default";
+    private static final String REPO_NAME = "default";
 
     @Override
-    protected void setUp() throws Exception {
+    public void setUp() throws Exception {
         super.setUp();
-        deployBundle(CoreFacadeTestConstants.SCHEMA_BUNDLE);
-        deployContrib(CoreFacadeTestConstants.CORE_BUNDLE,
-                "OSGI-INF/CoreService.xml");
-        deployContrib(CoreFacadeTestConstants.CORE_BUNDLE,
-                "OSGI-INF/SecurityService.xml");
-        deployContrib(CoreFacadeTestConstants.CORE_BUNDLE,
-                "OSGI-INF/RepositoryService.xml");
-        deployContrib(CoreFacadeTestConstants.CORE_FACADE_TESTS_BUNDLE,
-                "test-CoreExtensions.xml");
-        deployContrib(CoreFacadeTestConstants.CORE_FACADE_TESTS_BUNDLE,
-                "DemoRepository.xml");
-    }
+        deployBundle(SCHEMA_BUNDLE);
 
-    @Override
-    protected void tearDown() throws Exception {
-        super.tearDown();
+        deployContrib(CORE_BUNDLE,
+                "OSGI-INF/CoreService.xml");
+        deployContrib(CORE_BUNDLE,
+                "OSGI-INF/SecurityService.xml");
+        deployContrib(CORE_BUNDLE,
+                "OSGI-INF/RepositoryService.xml");
+
+        deployContrib(CORE_FACADE_TESTS_BUNDLE,
+                "test-CoreExtensions.xml");
+        deployContrib(CORE_FACADE_TESTS_BUNDLE,
+                "DemoRepository.xml");
+
+        deployBundle("org.nuxeo.ecm.core.event");
     }
 
     private static CoreSession openSession(String user) throws ClientException {
@@ -67,7 +76,7 @@ public class TestSecurityPolicyService extends NXRuntimeTestCase {
         return CoreInstance.getInstance().open(REPO_NAME, ctx);
     }
 
-    private static void saveAndcloseSession(CoreSession session)
+    private static void saveAndCloseSession(CoreSession session)
             throws ClientException {
         session.save();
         CoreInstance.getInstance().close(session);
@@ -75,7 +84,7 @@ public class TestSecurityPolicyService extends NXRuntimeTestCase {
 
     private static void setTestPermissions(String user, String... perms)
             throws ClientException {
-        CoreSession session = openSession("system");
+        CoreSession session = openSession(SecurityConstants.SYSTEM_USERNAME);
         DocumentModel doc = session.getRootDocument();
         ACP acp = doc.getACP();
         if (acp == null) {
@@ -87,79 +96,60 @@ public class TestSecurityPolicyService extends NXRuntimeTestCase {
         }
         acp.setRules("test", new UserEntry[] { userEntry });
         doc.setACP(acp, true);
-        saveAndcloseSession(session);
+        saveAndCloseSession(session);
     }
 
-    public void checkCorePolicy() throws Exception {
+    public static void checkCorePolicy() throws Exception {
         // create document
-        CoreSession session = openSession(SecurityConstants.ADMINISTRATOR);
-        setTestPermissions(SecurityConstants.ANONYMOUS, SecurityConstants.READ);
+        CoreSession session = openSession(ADMINISTRATOR);
+        setTestPermissions(ANONYMOUS, READ);
         DocumentModel root = session.getRootDocument();
         DocumentModel folder = new DocumentModelImpl(root.getPathAsString(),
                 "folder#1", "Folder");
         // set access security
-        folder.setProperty("secupolicy", "securityLevel", Long.valueOf(4));
+        folder.setProperty("secupolicy", "securityLevel", 4L);
         folder = session.createDocument(folder);
-        saveAndcloseSession(session);
+        saveAndCloseSession(session);
 
         // open session as anonymous and set access on user info
-        session = openSession(SecurityConstants.ANONYMOUS);
+        session = openSession(ANONYMOUS);
         DocumentModelImpl documentModelImpl = new DocumentModelImpl("User");
         Map<String, Object> data = new HashMap<String, Object>();
-        data.put("accessLevel", Long.valueOf(3));
+        data.put("accessLevel", 3L);
         documentModelImpl.addDataModel(new DataModelImpl("user", data));
         ((NuxeoPrincipal) session.getPrincipal()).setModel(documentModelImpl);
         // access level is too low for this doc
-        assertFalse(session.hasPermission(folder.getRef(),
-                SecurityConstants.READ));
+        assertFalse(session.hasPermission(folder.getRef(), READ));
         // change user access level => can read
         ((NuxeoPrincipal) session.getPrincipal()).getModel().setProperty(
-                "user", "accessLevel", Long.valueOf(5));
-        assertTrue(session.hasPermission(folder.getRef(),
-                SecurityConstants.READ));
-        saveAndcloseSession(session);
-    }
-
-    public void testOldCorePolicy() throws Exception {
-        // standard permissions
-        deployContrib(CoreFacadeTestConstants.CORE_BUNDLE,
-                "OSGI-INF/permissions-contrib.xml");
-        // deploy custom security policy
-        deployContrib(CoreFacadeTestConstants.CORE_FACADE_TESTS_BUNDLE,
-                "PolicyService.xml");
-        checkCorePolicy();
+                "user", "accessLevel", 5L);
+        assertTrue(session.hasPermission(folder.getRef(), READ));
+        saveAndCloseSession(session);
     }
 
     public void testNewSecurityPolicy() throws Exception {
         // standard permissions
-        deployContrib(CoreFacadeTestConstants.CORE_BUNDLE,
-                "OSGI-INF/permissions-contrib.xml");
+        deployContrib(CORE_BUNDLE, "OSGI-INF/permissions-contrib.xml");
         // deploy custom security policy
-        deployContrib(CoreFacadeTestConstants.CORE_FACADE_TESTS_BUNDLE,
-                "test-security-policy-contrib.xml");
+        deployContrib(CORE_FACADE_TESTS_BUNDLE, "test-security-policy-contrib.xml");
         checkCorePolicy();
     }
 
-    public void checkLockPermissions(CoreSession session, DocumentRef docRef,
+    public static void checkLockPermissions(CoreSession session, DocumentRef docRef,
             boolean canWrite) throws ClientException {
-        assertEquals(canWrite, session.hasPermission(docRef,
-                SecurityConstants.WRITE));
+        assertEquals(canWrite, session.hasPermission(docRef, WRITE));
         // test WRITE_PROPERTIES as it used to be granted when locked
-        assertEquals(canWrite, session.hasPermission(docRef,
-                SecurityConstants.WRITE_PROPERTIES));
-        assertEquals(true,
-                session.hasPermission(docRef, SecurityConstants.READ));
+        assertEquals(canWrite, session.hasPermission(docRef, WRITE_PROPERTIES));
+        assertTrue(session.hasPermission(docRef, READ));
     }
 
     public void testLockSecurityPolicy() throws Exception {
         // deploy standard contribs
-        deployContrib(CoreFacadeTestConstants.CORE_BUNDLE,
-                "OSGI-INF/permissions-contrib.xml");
-        deployContrib(CoreFacadeTestConstants.CORE_BUNDLE,
-                "OSGI-INF/security-policy-contrib.xml");
+        deployContrib(CORE_BUNDLE, "OSGI-INF/permissions-contrib.xml");
+        deployContrib(CORE_BUNDLE, "OSGI-INF/security-policy-contrib.xml");
 
         // create document
-        CoreSession session = openSession(SecurityConstants.ADMINISTRATOR);
+        CoreSession session = openSession(ADMINISTRATOR);
         DocumentModel root = session.getRootDocument();
         DocumentModel folder = new DocumentModelImpl(root.getPathAsString(),
                 "folder#1", "Folder");
@@ -170,12 +160,11 @@ public class TestSecurityPolicyService extends NXRuntimeTestCase {
         checkLockPermissions(session, docRef, true);
 
         // add read/write to anonymous
-        setTestPermissions(SecurityConstants.ANONYMOUS,
-                SecurityConstants.READ_WRITE);
+        setTestPermissions(ANONYMOUS, READ_WRITE);
 
-        saveAndcloseSession(session);
+        saveAndCloseSession(session);
 
-        session = openSession(SecurityConstants.ANONYMOUS);
+        session = openSession(ANONYMOUS);
         // write granted to anonymous
         checkLockPermissions(session, docRef, true);
 
@@ -187,11 +176,12 @@ public class TestSecurityPolicyService extends NXRuntimeTestCase {
         // write still granted
         checkLockPermissions(session, docRef, true);
 
-        saveAndcloseSession(session);
+        saveAndCloseSession(session);
 
         // write denied to admin
-        session = openSession(SecurityConstants.ADMINISTRATOR);
+        session = openSession(ADMINISTRATOR);
         checkLockPermissions(session, docRef, false);
-        saveAndcloseSession(session);
+        saveAndCloseSession(session);
     }
+
 }

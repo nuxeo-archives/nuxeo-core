@@ -33,12 +33,15 @@ import org.nuxeo.ecm.core.api.impl.DataModelImpl;
 import org.nuxeo.ecm.core.api.impl.DocumentModelImpl;
 import org.nuxeo.ecm.core.api.model.DocumentPart;
 import org.nuxeo.ecm.core.api.model.impl.DocumentPartImpl;
+import org.nuxeo.ecm.core.api.repository.cache.DirtyUpdateChecker;
 import org.nuxeo.ecm.core.lifecycle.LifeCycleException;
 import org.nuxeo.ecm.core.model.Document;
+import org.nuxeo.ecm.core.model.NoSuchPropertyException;
 import org.nuxeo.ecm.core.model.Property;
 import org.nuxeo.ecm.core.model.Repository;
 import org.nuxeo.ecm.core.model.Session;
 import org.nuxeo.ecm.core.schema.DocumentType;
+import org.nuxeo.ecm.core.schema.FacetNames;
 import org.nuxeo.ecm.core.schema.PrefetchInfo;
 import org.nuxeo.ecm.core.schema.TypeConstants;
 import org.nuxeo.ecm.core.schema.types.ComplexType;
@@ -58,16 +61,20 @@ public class DocumentModelFactory {
 
     private static final SecureRandom random = new SecureRandom();
 
+    // Utility class.
+    private DocumentModelFactory() {
+    }
+
     public static DocumentModel newDocument(DocumentModel parent, String type) {
-        DocumentType docType = ((DocumentModelImpl) parent).getClient().getDocumentType(
-                type);
+        DocumentType docType;
+        docType = parent.getCoreSession().getDocumentType(type);
         return newDocument(parent, docType);
     }
 
     public static DocumentModel newDocument(DocumentModel parent, String name,
             String type) {
-        DocumentType docType = ((DocumentModelImpl) parent).getClient().getDocumentType(
-                type);
+        DocumentType docType;
+        docType = parent.getCoreSession().getDocumentType(type);
         return newDocument(parent, name, docType);
     }
 
@@ -77,6 +84,7 @@ public class DocumentModelFactory {
                 + Long.toHexString(random.nextLong()), type);
     }
 
+    // XXX: parameter 'name' not used. Refactor?
     public static DocumentModel newDocument(DocumentModel parent, String name,
             DocumentType type) {
         return new DocumentModelImpl(null, type.getName(), null,
@@ -86,7 +94,7 @@ public class DocumentModelFactory {
     }
 
     public static DocumentModelImpl createDocumentModel(Document doc)
-            throws DocumentException {
+    throws DocumentException {
         DocumentType docType = doc.getType();
         String[] schemas;
         if (docType == null) {
@@ -110,7 +118,12 @@ public class DocumentModelFactory {
                 String typeName = field.getDeclaringType().getName();
                 String typeLocalName = field.getName().getLocalName();
                 String fieldName = typeName + '.' + typeLocalName;
-                Object value = docModel.getProperty(typeName, typeLocalName);
+                Object value;
+                try {
+                    value = docModel.getProperty(typeName, typeLocalName);
+                } catch (ClientException e) {
+                    continue;
+                }
                 prefetchMap.put(fieldName, (Serializable) value);
             }
         }
@@ -136,22 +149,23 @@ public class DocumentModelFactory {
             parentRef = new IdRef(parent.getUUID());
         }
 
+        // Compute document source id if exists
+        Document sourceDoc = doc.getSourceDocument();
+        String sourceId = sourceDoc == null ? null : sourceDoc.getUUID();
+
+        // Immutable flag
+        boolean immutable = doc.isVersion()
+        || (doc.isProxy() && sourceDoc.isVersion());
+
         Set<String> typeFacets = type.getFacets();
-        if (doc.isProxy() || doc.isVersion()) {
+        if (immutable) {
+            // clone facets to avoid modifying doc type facets
             if (typeFacets != null) {
-                // clone facets to avoid modifying doc type facets
                 typeFacets = new HashSet<String>(typeFacets);
             } else {
                 typeFacets = new HashSet<String>();
             }
-            typeFacets.add("Immutable");
-        }
-
-        // Compute document source id if exists.
-        String sourceId = null;
-        Document sourceDoc = doc.getSourceDocument();
-        if (sourceDoc != null) {
-            sourceId = sourceDoc.getUUID();
+            typeFacets.add(FacetNames.IMMUTABLE);
         }
 
         // Compute repository name.
@@ -160,10 +174,13 @@ public class DocumentModelFactory {
         if (repository != null) {
             repositoryName = repository.getName();
         }
+        String p = doc.getPath();
+
+        // versions being imported before their live doc don't have a path
+        Path path = p == null ? null : new Path(p);
         DocumentModelImpl docModel = new DocumentModelImpl(sid, type.getName(),
-                doc.getUUID(), new Path(doc.getPath()), doc.getLock(), docRef,
-                parentRef, type.getSchemaNames(), typeFacets, sourceId,
-                repositoryName);
+                doc.getUUID(), path, doc.getLock(), docRef, parentRef,
+                type.getSchemaNames(), typeFacets, sourceId, repositoryName);
 
         if (doc.isVersion()) {
             docModel.setIsVersion(true);
@@ -172,6 +189,9 @@ public class DocumentModelFactory {
         }
         if (doc.isProxy()) {
             docModel.setIsProxy(true);
+        }
+        if (immutable) {
+            docModel.setIsImmutable(true);
         }
 
         // populate models
@@ -189,7 +209,9 @@ public class DocumentModelFactory {
                     Object value = doc.getPropertyValue(field.getName().getPrefixedName());
                     docModel.prefetchProperty(
                             field.getDeclaringType().getName() + '.'
-                                    + field.getName().getLocalName(), value);
+                            + field.getName().getLocalName(), value);
+                } catch (NoSuchPropertyException e) {
+                    // skip
                 } catch (DocumentException e) {
                     log.error("Error while building prefetch fields, "
                             + "check the document configuration", e);
@@ -198,9 +220,12 @@ public class DocumentModelFactory {
         }
 
         if (schemas != null) {
-            for (String schema : schemas) {
-                DataModel dataModel = exportSchema(sid, docRef, doc,
-                        type.getSchema(schema));
+            for (String schemaName : schemas) {
+                Schema schema = type.getSchema(schemaName);
+                if (schema == null) {
+                    continue;
+                }
+                DataModel dataModel = exportSchema(sid, docRef, doc, schema);
                 docModel.addDataModel(dataModel);
             }
         } else if (prefetchSchemas != null && prefetchSchemas.length > 0) {
@@ -221,6 +246,8 @@ public class DocumentModelFactory {
                     + ". Error: " + e.getMessage());
         }
 
+        DirtyUpdateChecker.check(docModel);
+
         return docModel;
     }
 
@@ -233,7 +260,7 @@ public class DocumentModelFactory {
      * @throws DocumentException
      */
     public static DocumentModelImpl createDocumentModel(DocumentType docType)
-            throws DocumentException {
+    throws DocumentException {
         return createDocumentModel(null, docType);
     }
 
@@ -248,12 +275,15 @@ public class DocumentModelFactory {
      */
     public static DocumentModelImpl createDocumentModel(String sessionId,
             DocumentType docType) throws DocumentException {
+        Set<String> facets = docType.getFacets();
+        String[] schemas = docType.getSchemaNames();
         DocumentModelImpl docModel = new DocumentModelImpl(sessionId,
-                docType.getName());
+                docType.getName(), null, null, null, null, schemas, facets);
         for (Schema schema : docType.getSchemas()) {
             DataModel dataModel = exportSchema(null, null, null, schema);
             docModel.addDataModel(dataModel);
         }
+
         return docModel;
     }
 
@@ -270,7 +300,7 @@ public class DocumentModelFactory {
      */
     public static DocumentModelImpl createDocumentModel(String parentPath,
             String id, DocumentType docType, String[] schemas)
-            throws DocumentException {
+    throws DocumentException {
         DocumentModelImpl docModel = new DocumentModelImpl(parentPath, id,
                 docType.getName());
         // populate models
@@ -302,6 +332,7 @@ public class DocumentModelFactory {
         return new DataModelImpl(schema.getName(), map);
     }
 
+    // XXX: parameter 'sid' not used.
     public static DataModel exportSchema(String sid, DocumentRef docRef,
             Document doc, Schema schema) throws DocumentException {
         DocumentPart part = new DocumentPartImpl(schema);
@@ -334,12 +365,15 @@ public class DocumentModelFactory {
             Type type, Property prop) throws DocumentException {
         if (type.isSimpleType() || type.isListType()) {
             return prop.getValue();
-        } else if (type.getName().equals(TypeConstants.CONTENT)) {
+        } else if (TypeConstants.isContentType(type)) {
             // TODO Do not use at core level the ContentSourceObject ->
             // use only complex types!
             // TODO by default all content types are lazy see later how
             // to define them at type manager level
             return prop.getValue();
+        } else if (TypeConstants.isExternalContentType(type)) {
+            // don't know what to do => export complex prop as is (?)
+            return exportComplexProperty(sid, docRef, prop);
         } else {
             return exportComplexProperty(sid, docRef, prop);
         }

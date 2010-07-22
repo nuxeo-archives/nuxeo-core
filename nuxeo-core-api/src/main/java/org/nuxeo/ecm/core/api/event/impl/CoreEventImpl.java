@@ -44,7 +44,7 @@ public class CoreEventImpl implements CoreEvent {
     protected final Date date;
 
     protected final Principal principal;
-    
+
     protected final String category;
 
     protected final String comment;
@@ -70,13 +70,13 @@ public class CoreEventImpl implements CoreEvent {
             this.info = new HashMap<String, Object>(info);
         }
         this.principal = principal;
-     
+
         // CB: NXP-2253 - Values passed as parameters will be put into the info
         // map only if the map doesn't contain the corresponding keys.
-        if (!((Map) this.info).containsKey(COMMENT_ATTRIBUTE)) {
+        if (!this.info.containsKey(COMMENT_ATTRIBUTE)) {
             ((Map) this.info).put(COMMENT_ATTRIBUTE, comment);
         }
-        if (!((Map) this.info).containsKey(CATEGORY_ATTRIBUTE)) {
+        if (!this.info.containsKey(CATEGORY_ATTRIBUTE)) {
             ((Map) this.info).put(CATEGORY_ATTRIBUTE, category);
         }
 
@@ -108,7 +108,7 @@ public class CoreEventImpl implements CoreEvent {
         if (category != null) {
             return category;
         } else {
-            Object categoryObj = this.info.get(CATEGORY_ATTRIBUTE);
+            Object categoryObj = info.get(CATEGORY_ATTRIBUTE);
             if (categoryObj instanceof String) {
                 return (String) categoryObj;
             } else {
@@ -121,7 +121,7 @@ public class CoreEventImpl implements CoreEvent {
         if (comment != null) {
             return comment;
         } else {
-            Object commentObj = this.info.get(COMMENT_ATTRIBUTE);
+            Object commentObj = info.get(COMMENT_ATTRIBUTE);
             if (commentObj instanceof String) {
                 return (String) commentObj;
             } else {

@@ -27,6 +27,7 @@ import org.nuxeo.ecm.core.schema.TypeRef;
  * A Type object is used to describe some ECM content.
  * <p>
  * There are two groups of content types:
+ *
  * <ul>
  * <li> primitive types - these are builtin types used to describe simple values
  * like string, integers, dates etc
@@ -34,6 +35,7 @@ import org.nuxeo.ecm.core.schema.TypeRef;
  * </ul>
  *
  * Custom types are structured in two groups:
+ *
  * <ul>
  * <li> simple types - constrained primitive types. Constraints are specific to
  * each primitive type. <br>
@@ -52,6 +54,7 @@ import org.nuxeo.ecm.core.schema.TypeRef;
  * derived)
  * <p>
  * On top of this typing system there are two high level content types:
+ *
  * <ul>
  * <li> schemas - a schema is a complex that can be used to form composite types
  * <br>
@@ -94,11 +97,10 @@ public interface Type extends Serializable, ValueConverter {
      */
     Schema getSchema();
 
-
     /**
      * Get the type helper. Must never return null
      * <p>
-     * The type helper is used to handle operations on value of that type
+     * The type helper is used to handle operations on value of that type.
      *
      * @return the type helper
      */
@@ -227,20 +229,6 @@ public interface Type extends Serializable, ValueConverter {
      *         cannot be converted
      */
     String encode(Object object);
-
-    /**
-     * Sets the value converter to be used by this type.
-     *
-     * @param converter the value converter
-     */
-    void setConverter(ValueConverter converter);
-
-    /**
-     * Gets the value converter used on this type.
-     *
-     * @return the valuer converter
-     */
-    ValueConverter getConverter();
 
     /**
      * Creates a new instance according to this type and filled with default
