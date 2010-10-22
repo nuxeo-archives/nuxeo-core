@@ -312,13 +312,14 @@ public class DialectSQLServer extends Dialect {
         String scoreAlias = "_nxscore" + nthSuffix;
         FulltextMatchInfo info = new FulltextMatchInfo();
         // there are two left joins here
-        info.leftJoin = String.format(
-                "%s ON %s = %s" //
-                        + " LEFT JOIN "
-                        + "CONTAINSTABLE(%s, *, ?, LANGUAGE %s) AS %s" //
-                        + " ON %s = %s.[KEY]", //
-                ft.getQuotedName(), ftMain.getFullQuotedName(),
-                mainColumn.getFullQuotedName(), //
+        if (nthMatch == 1) {
+            // Need only one JOIN involving the fulltext table
+            info.leftJoin = String.format("%s ON %s = %s", ft.getQuotedName(),
+                    ftMain.getFullQuotedName(), mainColumn.getFullQuotedName());
+        }
+        info.leftJoin = String.format(" LEFT JOIN "
+                + "CONTAINSTABLE(%s, *, ?, LANGUAGE %s) AS %s" //
+                + " ON %s = %s.[KEY]", //
                 ft.getQuotedName(), getQuotedFulltextAnalyzer(), tableAlias, //
                 ftMain.getFullQuotedName(), tableAlias);
         info.leftJoinParam = fulltextQuery;

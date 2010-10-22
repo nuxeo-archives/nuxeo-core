@@ -344,10 +344,13 @@ public class DialectOracle extends Dialect {
                 + indexSuffix);
         String score = String.format("SCORE(%d)", nthMatch);
         FulltextMatchInfo info = new FulltextMatchInfo();
-        info.join = String.format(
-                "%s ON %s = %s", //
-                ft.getQuotedName(), ftMain.getFullQuotedName(),
-                mainColumn.getFullQuotedName());
+        if (nthMatch == 1) {
+            // Need only one JOIN involving the fulltext table
+            info.join = String.format(
+                    "%s ON %s = %s", //
+                    ft.getQuotedName(), ftMain.getFullQuotedName(),
+                    mainColumn.getFullQuotedName());
+        }
         info.whereExpr = String.format("CONTAINS(%s, ?, %d) > 0",
                 ftColumn.getFullQuotedName(), nthMatch);
         info.whereExprParam = fulltextQuery;

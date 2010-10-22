@@ -300,10 +300,13 @@ public class DialectPostgreSQL extends Dialect {
         String queryAlias = "_nxquery" + nthSuffix;
         String scoreAlias = "_nxscore" + nthSuffix;
         FulltextMatchInfo info = new FulltextMatchInfo();
-        info.join = String.format(
-                "%s ON %s = %s", //
-                ft.getQuotedName(), ftMain.getFullQuotedName(),
-                mainColumn.getFullQuotedName());
+        if (nthMatch == 1) {
+            // Need only one JOIN involving the fulltext table
+            info.join = String.format(
+                    "%s ON %s = %s", //
+                    ft.getQuotedName(), ftMain.getFullQuotedName(),
+                    mainColumn.getFullQuotedName());
+        }
         info.implicitJoin = String.format("TO_TSQUERY('%s', ?) AS %s",
                 fulltextAnalyzer, queryAlias);
         info.implicitJoinParam = fulltextQuery;

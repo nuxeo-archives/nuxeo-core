@@ -283,10 +283,13 @@ public class DialectMySQL extends Dialect {
         String match = String.format("MATCH (%s, %s)",
                 stColumn.getFullQuotedName(), btColumn.getFullQuotedName());
         FulltextMatchInfo info = new FulltextMatchInfo();
-        info.join = String.format(
-                "%s ON %s = %s", //
-                ft.getQuotedName(), ftMain.getFullQuotedName(),
-                mainColumn.getFullQuotedName());
+        if (nthMatch == 1) {
+         // Need only one JOIN involving the fulltext table
+            info.join = String.format(
+                    "%s ON %s = %s", //
+                    ft.getQuotedName(), ftMain.getFullQuotedName(),
+                    mainColumn.getFullQuotedName());
+        }
         info.whereExpr = String.format("%s AGAINST (? IN BOOLEAN MODE)", match);
         info.whereExprParam = fulltextQuery;
         // Note: using the boolean query in non-boolean mode gives approximate
