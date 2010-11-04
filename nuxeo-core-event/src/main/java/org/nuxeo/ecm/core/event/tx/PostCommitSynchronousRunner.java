@@ -28,6 +28,7 @@ import org.nuxeo.ecm.core.event.ReconnectedEventBundle;
 import org.nuxeo.ecm.core.event.impl.EventListenerDescriptor;
 import org.nuxeo.ecm.core.event.impl.ReconnectedEventBundleImpl;
 import org.nuxeo.ecm.core.event.jmx.EventStatsHolder;
+import org.nuxeo.ecm.core.event.tx.EventBundleTransactionHandler;
 
 /**
  *
@@ -78,10 +79,12 @@ public class PostCommitSynchronousRunner {
         Thread runner = new Thread(getExecutor());
         runner.start();
         try {
+
             runner.join(timeout);
             if (runner.isAlive()) {
                 handleUnfinishedThread(runner);
             }
+
         } catch (InterruptedException e) {
             log.error("Exit before the end of processing", e);
         }
@@ -93,10 +96,12 @@ public class PostCommitSynchronousRunner {
         return new MonoThreadExecutor();
     }
 
-    protected class MonoThreadExecutor implements Runnable {
+    protected class MonoThreadExecutor implements Runnable,
+            Thread.UncaughtExceptionHandler {
+
+        protected EventBundleTransactionHandler txh = new EventBundleTransactionHandler();
 
         public void run() {
-            EventBundleTransactionHandler txh = new EventBundleTransactionHandler();
             long t0 = System.currentTimeMillis();
             log.debug("Start post commit sync execution in Thread "
                     + Thread.currentThread().getId());
@@ -105,11 +110,13 @@ public class PostCommitSynchronousRunner {
                     long t1 = System.currentTimeMillis();
                     txh.beginNewTransaction();
                     listener.asPostCommitListener().handleEvent(event);
+                    event.disconnect();
                     txh.commitOrRollbackTransaction();
                     EventStatsHolder.logAsyncExec(listener, System.currentTimeMillis()-t1);
                     log.debug("End of post commit sync execution for listener " + listener.getName() + " " +
                             + (System.currentTimeMillis() - t1) + "ms");
                 } catch (Throwable t) {
+                    event.disconnect();
                     txh.rollbackTransaction();
                 }
             }
@@ -117,6 +124,11 @@ public class PostCommitSynchronousRunner {
                     + (System.currentTimeMillis() - t0) + "ms");
         }
 
+        public void uncaughtException(Thread t, Throwable e) {
+            event.disconnect();
+            txh.rollbackTransaction();
+        }
+        
     }
 
 }
