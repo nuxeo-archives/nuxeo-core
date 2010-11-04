@@ -148,7 +148,7 @@
       <dependency>
         <groupId>org.nuxeo.ecm.core</groupId>
         <artifactId>nuxeo-core-event</artifactId>
-        <version>${nuxeo.core.version}</version>
+        <version>${nuxeo.core.version}-NXP-5419</version>
       </dependency>
       <dependency>
         <groupId>org.nuxeo.ecm.core</groupId>
