@@ -8,6 +8,7 @@
   </parent>
   <artifactId>nuxeo-core-event</artifactId>
   <name>Nuxeo Core Event</name>
+  <version>1.6.2-I20100610_0115-NXP-5419</version>
   <description>Core Events model and implementation</description>
   <dependencies>
     <dependency>
