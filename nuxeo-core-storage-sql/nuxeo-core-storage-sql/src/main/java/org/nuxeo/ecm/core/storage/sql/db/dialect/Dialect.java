@@ -280,6 +280,28 @@ public abstract class Dialect {
             String fulltextQuery, Column mainColumn, Model model,
             Database database);
 
+    
+    /**
+     * Indicates if dialect supports paging
+     * 
+     * @return
+     */
+    public boolean supportsPaging() {
+        return false;
+    }
+
+    /**
+     * 
+     * Get paging clause to be appended at the end of select statement
+     * 
+     * @param limit
+     * @param offset
+     * @return
+     */
+    public String getPagingClause(long limit, long offset) {
+        throw new UnsupportedOperationException("paging is not supported");
+    }
+    
     /**
      * Gets the type of a fulltext column has known by JDBC.
      * <p>

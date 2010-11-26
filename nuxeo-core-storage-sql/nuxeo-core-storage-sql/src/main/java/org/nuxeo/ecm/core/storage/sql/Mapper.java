@@ -1956,9 +1956,21 @@ public class Mapper {
             }
             logSQL(sql, q.selectParams);
         }
+        
+        final Dialect dialect = session.getModel().getDialect();
+
+        String sql = q.selectInfo.sql;
+
+        if (!countTotal && limit > 0 && dialect.supportsPaging()) {
+            // full results set not needed for counting
+            sql += " " + dialect.getPagingClause(limit, offset);
+            limit = 0;
+            offset = 0;
+        } 
+        
         PreparedStatement ps = null;
         try {
-            ps = connection.prepareStatement(q.selectInfo.sql,
+            ps = connection.prepareStatement(sql,
                     ResultSet.TYPE_SCROLL_INSENSITIVE,
                     ResultSet.CONCUR_READ_ONLY);
             int i = 1;

@@ -562,4 +562,14 @@ public class DialectMySQL extends Dialect {
         return "DELETE FROM cluster_invals WHERE nodeid = @@PSEUDO_THREAD_ID";
     }
 
+    @Override
+    public boolean supportsPaging() {
+        return true;
+    }
+
+    @Override
+    public String getPagingClause(long limit, long offset) {
+        return String.format("LIMIT %d OFFSET %d", limit, offset);
+    }
+    
 }
