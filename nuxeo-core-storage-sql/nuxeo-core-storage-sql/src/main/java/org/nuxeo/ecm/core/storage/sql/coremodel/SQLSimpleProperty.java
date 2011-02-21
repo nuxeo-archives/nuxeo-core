@@ -71,7 +71,8 @@ public class SQLSimpleProperty extends SQLBaseProperty {
     }
 
     public void setValue(Object value) throws DocumentException {
-        if (!VERSION_WRITABLE_PROPS.contains(getName())) {
+        if (!VERSION_WRITABLE_PROPS.contains(getName())
+                && !getName().startsWith(Model.FULLTEXT_BINARYTEXT_PROP)) {
             checkWritable();
         }
         if (value != null && !(value instanceof Serializable)) {
