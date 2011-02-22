@@ -10,7 +10,7 @@
 
   <groupId>org.nuxeo.ecm.core</groupId>
   <artifactId>nuxeo-core-parent</artifactId>
-  <version>1.6.1-CP11</version>
+  <version>1.6.1-CP12</version>
   <name>Nuxeo Core Parent</name>
   <packaging>pom</packaging>
   <description>
@@ -167,7 +167,7 @@
       <dependency>
         <groupId>org.nuxeo.ecm.core</groupId>
         <artifactId>nuxeo-core-event</artifactId>
-        <version>${nuxeo.core.version}</version>
+        <version>${nuxeo.core.version}-CP12</version>
       </dependency>
       <dependency>
         <groupId>org.nuxeo.ecm.core</groupId>
