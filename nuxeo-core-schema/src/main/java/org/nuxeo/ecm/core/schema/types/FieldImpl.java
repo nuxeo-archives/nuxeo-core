@@ -29,14 +29,20 @@ public class FieldImpl implements Field {
 
     private static final long serialVersionUID = 1031109949712043501L;
 
+    private static final Integer DEFAULT_LENGTH= 255;
+    
     private QName name;
     private TypeRef<? extends Type> type;
     private TypeRef<? extends Type> declaringType;
+
+    
     private int flags;
 
     private int maxOccurs = 1;
     private int minOccurs = 1;
-
+    
+    private Integer length;
+    
     private String defaultValue;
 
 
@@ -58,12 +64,24 @@ public class FieldImpl implements Field {
     }
 
     public FieldImpl(QName name, TypeRef<? extends Type> declaringType,
-            TypeRef<? extends Type> type, String defaultValue, int flags) {
+            TypeRef<? extends Type> type, String defaultValue, int flags){
+        this(name,declaringType,type,null,0,null);
+    }
+    
+    public FieldImpl(QName name, TypeRef<? extends Type> declaringType,
+            TypeRef<? extends Type> type, String defaultValue, int flags, Integer length) {
         this.name = name;
         this.type = type;
+        
         this.declaringType = declaringType;
         this.defaultValue = defaultValue;
         this.flags = flags;
+        
+        // set the default length if not provided
+        if(null==length){
+            length=DEFAULT_LENGTH;
+        }
+        this.length = length;
     }
 
 
@@ -123,6 +141,11 @@ public class FieldImpl implements Field {
     @Override
     public int getMaxOccurs() {
         return maxOccurs;
+    }
+    
+    @Override
+    public Integer getLength() {
+        return length;
     }
 
     @Override

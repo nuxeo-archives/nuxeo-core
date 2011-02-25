@@ -31,7 +31,7 @@ import org.nuxeo.ecm.core.schema.TypeRef;
 
 /**
  * @author <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
- *
+ * 
  */
 public class ComplexTypeImpl extends AbstractType implements ComplexType {
 
@@ -131,26 +131,27 @@ public class ComplexTypeImpl extends AbstractType implements ComplexType {
 
     @Override
     public Field addField(String name, TypeRef<? extends Type> type) {
-        return addField(QName.valueOf(name, ns.prefix), type, null, 0);
+        return addField(QName.valueOf(name, ns.prefix), type, null, 0,
+                null);
     }
 
     @Override
     public Field addField(QName name, TypeRef<? extends Type> type) {
-        return addField(name, type, null, 0);
+        return addField(name, type, null, 0, null);
     }
 
     @Override
     public Field addField(String name, TypeRef<? extends Type> type,
-            String defaultValue, int flags) {
+            String defaultValue, int flags, Integer fieldLength) {
         return addField(QName.valueOf(name, ns.prefix), type, defaultValue,
-                flags);
+                flags, fieldLength);
     }
 
     @Override
     public Field addField(QName name, TypeRef<? extends Type> type,
-            String defaultValue, int flags) {
+            String defaultValue, int flags, Integer fieldLength) {
         FieldImpl field = new FieldImpl(name, getRef(), type, defaultValue,
-                flags);
+                flags, fieldLength);
         fields.put(name, field);
         return field;
     }

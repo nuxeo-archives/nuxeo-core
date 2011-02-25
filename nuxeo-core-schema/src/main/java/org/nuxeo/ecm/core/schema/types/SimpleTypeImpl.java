@@ -23,7 +23,7 @@ import org.nuxeo.ecm.core.schema.TypeRef;
 
 /**
  * @author <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
- *
+ * 
  */
 public class SimpleTypeImpl extends AbstractType implements SimpleType {
 
@@ -33,12 +33,12 @@ public class SimpleTypeImpl extends AbstractType implements SimpleType {
 
     private SimpleType primitiveType;
 
-
     public SimpleTypeImpl(SimpleType superType, String schema, String name) {
-        this (superType == null ? null : superType.getRef(), schema, name);
+        this(superType == null ? null : superType.getRef(), schema, name);
     }
 
-    public SimpleTypeImpl(TypeRef<? extends SimpleType> superType, String schema, String name) {
+    public SimpleTypeImpl(TypeRef<? extends SimpleType> superType,
+            String schema, String name) {
         super(superType, schema, name);
         // simple types must have a not null super type
         // for example a primitive type or another simple type
@@ -72,6 +72,11 @@ public class SimpleTypeImpl extends AbstractType implements SimpleType {
 
     public void setConstraints(Constraint[] constraints) {
         this.constraints = constraints;
+    }
+
+    
+    public Constraint[] getConstraints() {
+        return constraints;
     }
 
     @Override

@@ -49,4 +49,14 @@ public class StringLengthConstraint implements Constraint {
         return len <= max && len >= min;
     }
 
+    public int getMin() {
+        return min;
+    }
+
+    public int getMax() {
+        return max;
+    }
+
+
+    
 }

@@ -101,9 +101,10 @@ public interface ComplexType extends Type {
      * @param type the field type
      * @param defaultValue an optional default value (null if none)
      * @param flags optional flags
+     * @param fieldLength the field length
      * @return the created field
      */
-    Field addField(String name, TypeRef<? extends Type> type, String defaultValue, int flags);
+    Field addField(String name, TypeRef<? extends Type> type, String defaultValue, int flags, Integer fieldLength);
 
     /**
      * Adds a field to this complex type.
@@ -119,6 +120,7 @@ public interface ComplexType extends Type {
      *
      * @param name the field name
      * @param type the field type
+     * @param fieldLength the field length
      * @param defaultValue an optional default value (null if none)
      * @param flags optional flags
      *
@@ -129,7 +131,7 @@ public interface ComplexType extends Type {
      * </ul>
      * @return the created field
      */
-    Field addField(QName name, TypeRef<? extends Type> type, String defaultValue, int flags);
+    Field addField(QName name, TypeRef<? extends Type> type, String defaultValue, int flags, Integer fieldLength);
 
     /**
      * Tests whether this type defines the given field name.

@@ -75,6 +75,13 @@ public interface Field extends Serializable {
     boolean isNillable();
 
     /**
+     * Gets the field length
+     *
+     * @return field length
+     */
+    Integer getLength();
+
+    /**
      * Checks whether this field is constant (is read only).
      *
      * @return true if the field is constant false otherwise
