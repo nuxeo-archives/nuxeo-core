@@ -4,9 +4,8 @@
   <parent>
     <groupId>org.nuxeo.ecm.core</groupId>
     <artifactId>nuxeo-core-parent</artifactId>
-    <version>5.4.1-HF09</version>
+    <version>5.4.1.1-NXP-7170-SNAPSHOT</version>
   </parent>
-  <version>5.4.1-HF09-7170-7356</version>
   <artifactId>nuxeo-core-event</artifactId>
   <name>Nuxeo Core Event</name>
   <description>Core Events model and implementation</description>
