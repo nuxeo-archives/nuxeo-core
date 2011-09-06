@@ -651,6 +651,8 @@ public class PersistenceContext {
     protected void removeNode(Fragment hierFragment) throws StorageException {
         hierContext.removeNode(hierFragment);
 
+        removeFragment(hierFragment);
+        
         if (!isAllowedDeleteNonHierarchyFragments) {
         	return;
         }
