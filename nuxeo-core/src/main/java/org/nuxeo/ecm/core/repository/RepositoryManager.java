@@ -24,11 +24,13 @@ import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.nuxeo.ecm.core.api.ClientException;
+import org.nuxeo.ecm.core.api.UnrestrictedSessionRunner;
 import org.nuxeo.ecm.core.model.Repository;
 
 /**
  * @author <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
- *
+ * 
  */
 public class RepositoryManager {
 
@@ -57,7 +59,7 @@ public class RepositoryManager {
      * Gets a repository given its name.
      * <p>
      * Null is returned if no repository with that name was registered.
-     *
+     * 
      * @param name the repository name
      * @return the repository instance or null if no repository with that name
      *         was registered
@@ -84,7 +86,7 @@ public class RepositoryManager {
      * <p>
      * When the repository reference count becomes 0, the repository is
      * shutdown.
-     *
+     * 
      * @param name the repository name
      */
     public void releaseRepository(String name) {
@@ -98,6 +100,17 @@ public class RepositoryManager {
         if (ref != null) {
             ref.release();
         }
+    }
+
+    public boolean isInitialized(String name) {
+        if (!repositories.containsKey(name)) {
+            return false;
+        }
+        Ref ref = repositories.get(name);
+        if (ref == null) {
+            return false;
+        }
+        return ref.isInitialized();
     }
 
     public Collection<RepositoryDescriptor> getDescriptors() {
@@ -179,6 +192,29 @@ public class RepositoryManager {
         }
     }
 
+    public static class Initializer extends UnrestrictedSessionRunner {
+
+        public Initializer(String name) {
+            super(name);
+        }
+
+        @Override
+        public void run() throws ClientException {
+            RepositoryInitializationHandler handler = RepositoryInitializationHandler.getInstance();
+            if (handler == null) {
+                return;
+            }
+            try {
+                handler.initializeRepository(session);
+            } catch (ClientException e) {
+                // shouldn't remove the root? ... to restart with
+                // an empty repository
+                log.error("Failed to initialize repository content", e);
+            }
+        }
+
+    }
+    
     public static final class Ref {
         private int refcnt;
 
@@ -194,6 +230,8 @@ public class RepositoryManager {
             if (repository == null) {
                 refcnt = 0;
                 repository = descriptor.create();
+                repository.initialize();
+                new Initializer(descriptor.getName()).runUnrestricted();
             }
             refcnt++;
             return repository;
@@ -208,6 +246,10 @@ public class RepositoryManager {
             }
         }
 
+        public synchronized boolean isInitialized() {
+            return repository != null;
+        }
+        
         public void dispose() {
             if (repository != null) {
                 repository.shutdown();
