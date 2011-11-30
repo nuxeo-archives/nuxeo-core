@@ -82,10 +82,7 @@ public class RepositoryManager {
     }
 
     /**
-     * Releases the reference to the repository.
-     * <p>
-     * When the repository reference count becomes 0, the repository is
-     * shutdown.
+     * Shutdown and releases the reference to the repository.
      * 
      * @param name the repository name
      */
@@ -214,9 +211,8 @@ public class RepositoryManager {
         }
 
     }
-    
+
     public static final class Ref {
-        private int refcnt;
 
         private RepositoryDescriptor descriptor;
 
@@ -226,36 +222,36 @@ public class RepositoryManager {
             this.descriptor = descriptor;
         }
 
-        public synchronized Repository get() throws Exception {
+        public Repository get() throws Exception {
             if (repository == null) {
-                refcnt = 0;
-                repository = descriptor.create();
-                repository.initialize();
-                new Initializer(descriptor.getName()).runUnrestricted();
+                synchronized (this) {
+                    repository = descriptor.create();
+                    repository.initialize();
+                    new Initializer(descriptor.getName()).runUnrestricted();
+                }
             }
-            refcnt++;
             return repository;
         }
 
-        public synchronized void release() {
-            if (repository != null) {
-                if (--refcnt == 0) {
-                    repository.shutdown();
-                    repository = null;
-                }
+        public void release() {
+            if (repository == null) {
+                return;
+            }
+            synchronized (this) {
+                repository.shutdown();
+                repository = null;
             }
         }
 
-        public synchronized boolean isInitialized() {
+        public  boolean isInitialized() {
             return repository != null;
         }
-        
+
         public void dispose() {
             if (repository != null) {
                 repository.shutdown();
                 repository = null;
             }
-            refcnt = 0;
             descriptor = null;
         }
     }
