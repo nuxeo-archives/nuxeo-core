@@ -1,0 +1,7 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 1
+Bundle-Name: Nuxeo core EhCache
+Bundle-SymbolicName: org.nuxeo.ecm.core.ehcache;singleton:=true
+Bundle-Version: 1.0.0
+Bundle-Vendor: Nuxeo
+Nuxeo-Component: OSGI-INF/ehcache-actions-contrib.xml

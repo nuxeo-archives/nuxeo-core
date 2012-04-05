@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- ======================================================================= 
+    =    PARENT
+    =========================================================================-->
+    <parent>
+        <groupId>org.nuxeo.ecm.core</groupId>
+        <artifactId>nuxeo-core-parent</artifactId>
+        <version>5.6-SNAPSHOT</version>
+    </parent>
+  
+   
+    <!-- ======================================================================= 
+    =    MODULE INFOS
+    =========================================================================-->
+    <artifactId>nuxeo-core-ehcache</artifactId>
+    <name>Nuxeo Core EhCache</name>
+    <description>Nuxeo Core EhCache: Seam Cache manager</description>
+
+
+    <!-- ======================================================================= 
+    =    DEPENDENCIES
+    =========================================================================-->
+    <dependencies>
+
+        <!--****************** NUXEO DEPENDENCIES  **************************-->
+        <dependency>
+            <groupId>org.nuxeo.ecm.core</groupId>
+            <artifactId>nuxeo-core-api</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.nuxeo.ecm.core</groupId>
+            <artifactId>nuxeo-core-event</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>net.sf.ehcache</groupId>
+            <artifactId>ehcache</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--***************** OTHERS DEPENDENCIES  **************************-->
+        <dependency>
+            <groupId>org.jboss.seam</groupId>
+            <artifactId>jboss-seam</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>commons-lang</groupId>
+            <artifactId>commons-lang</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>
