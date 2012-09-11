@@ -224,4 +224,28 @@ public class TestSchemaManager extends NXRuntimeTestCase {
         checkInheritanceCache();
     }
 
+    @Test
+    public void testFacetOverridWithInheritanceRegistration() {
+        SchemaDescriptor[] schemas = new SchemaDescriptor[0];
+        DocumentTypeDescriptor dtd;
+
+        dtd = new DocumentTypeDescriptor(TypeConstants.DOCUMENT, "BaseType",
+                schemas, new String[0]);
+        schemaManager.registerDocumentType(dtd);
+
+        dtd = new DocumentTypeDescriptor("BaseType", "SubType", schemas,
+                new String[0]);
+        schemaManager.registerDocumentType(dtd);
+
+        // override base type to add facet
+        dtd = new DocumentTypeDescriptor(TypeConstants.DOCUMENT, "BaseType",
+                schemas, new String[] { "SomeFacet" });
+        schemaManager.registerDocumentType(dtd);
+
+        // the facet should be available on the derived subtype
+        DocumentType subtype = schemaManager.getDocumentType("SubType");
+        Set<String> facets = subtype.getFacets();
+        assertEquals(facets.size(), 1);
+        assertEquals(facets.iterator().next(), "SomeFacet");
+    }
 }
