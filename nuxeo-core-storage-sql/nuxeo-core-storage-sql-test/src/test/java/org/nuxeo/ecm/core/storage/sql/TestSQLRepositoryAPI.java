@@ -38,21 +38,7 @@ import org.nuxeo.common.collections.ScopeType;
 import org.nuxeo.common.collections.ScopedMap;
 import org.nuxeo.common.utils.FileUtils;
 import org.nuxeo.common.utils.Path;
-import org.nuxeo.ecm.core.api.Blob;
-import org.nuxeo.ecm.core.api.ClientException;
-import org.nuxeo.ecm.core.api.ClientRuntimeException;
-import org.nuxeo.ecm.core.api.CoreSession;
-import org.nuxeo.ecm.core.api.DataModel;
-import org.nuxeo.ecm.core.api.DocumentModel;
-import org.nuxeo.ecm.core.api.DocumentModelIterator;
-import org.nuxeo.ecm.core.api.DocumentModelList;
-import org.nuxeo.ecm.core.api.DocumentRef;
-import org.nuxeo.ecm.core.api.Filter;
-import org.nuxeo.ecm.core.api.IdRef;
-import org.nuxeo.ecm.core.api.ListDiff;
-import org.nuxeo.ecm.core.api.PathRef;
-import org.nuxeo.ecm.core.api.VersionModel;
-import org.nuxeo.ecm.core.api.VersioningOption;
+import org.nuxeo.ecm.core.api.*;
 import org.nuxeo.ecm.core.api.facet.VersioningDocument;
 import org.nuxeo.ecm.core.api.impl.DocumentModelImpl;
 import org.nuxeo.ecm.core.api.impl.FacetFilter;
@@ -1239,9 +1225,31 @@ public class TestSQLRepositoryAPI extends SQLRepositoryTestCase {
     }
 
     @Test
-    @Ignore
-    public void testGetFoldersDocumentRefFilterSorter() {
-        // not used at the moment
+    public void testGetFoldersDocumentRefFilterSorter() throws ClientException {
+        DocumentModel root = session.getRootDocument();
+        // init children
+        DocumentModel childFolder1 = new DocumentModelImpl(root.getPathAsString(), "folder1#" + generateUnique(), "Folder");
+        DocumentModel childFolder2 = new DocumentModelImpl(root.getPathAsString(), "folder2#" + generateUnique(), "Folder");
+        DocumentModel childFolder3 = new DocumentModelImpl(root.getPathAsString(), "folder3#" + generateUnique(), "OrderedFolder");
+
+        // persist
+        List<DocumentModel> childDocs = new ArrayList<DocumentModel>();
+        childDocs.add(childFolder1);
+        childDocs.add(childFolder2);
+        childDocs.add(childFolder3);
+        List<DocumentModel> returnedChildDocs = createChildDocuments(childDocs);
+
+        // test no filter, no sorter
+        List<DocumentModel> folders = session.getFolders(root.getRef(), null, null);
+        assertNotNull(folders);
+        assertEquals(childDocs.size(), folders.size());
+
+        // test with filter, no sorter
+        Filter filter = new FacetFilter(FacetNames.ORDERABLE, true);
+        folders = session.getFolders(root.getRef(), filter, null);
+        assertNotNull(folders);
+        assertEquals(1, folders.size());
+        assertEquals(childDocs.get(childDocs.indexOf(childFolder3)).getName(), folders.get(0).getName());
     }
 
     @Test
