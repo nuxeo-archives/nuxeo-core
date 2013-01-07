@@ -24,6 +24,8 @@ import org.nuxeo.ecm.core.api.CoreSession;
 import org.nuxeo.ecm.core.api.DocumentModel;
 import org.nuxeo.ecm.core.api.DocumentModelList;
 import org.nuxeo.ecm.core.api.LifeCycleConstants;
+import org.nuxeo.ecm.core.api.event.DocumentEventTypes;
+import org.nuxeo.ecm.core.api.impl.DocumentModelListImpl;
 import org.nuxeo.ecm.core.event.Event;
 import org.nuxeo.ecm.core.event.EventBundle;
 import org.nuxeo.ecm.core.event.EventContext;
@@ -42,6 +44,9 @@ import org.nuxeo.ecm.core.event.impl.DocumentEventContext;
  * Undelete transitions are not processed, but this listener instead looks for a
  * specific documentUndeleted event. This is because we want to undelete
  * documents (parents) under which we don't want to recurse.
+ * <p>
+ * Reinit document copy lifeCycle (BulkLifeCycleChangeListener is bound to the
+ * event documentCreatedByCopy)
  */
 public class BulkLifeCycleChangeListener implements PostCommitEventListener {
 
@@ -50,13 +55,15 @@ public class BulkLifeCycleChangeListener implements PostCommitEventListener {
     @Override
     public void handleEvent(EventBundle events) throws ClientException {
         if (!events.containsEventName(LifeCycleConstants.TRANSITION_EVENT)
-                && !events.containsEventName(LifeCycleConstants.DOCUMENT_UNDELETED)) {
+                && !events.containsEventName(LifeCycleConstants.DOCUMENT_UNDELETED)
+                && !events.containsEventName(DocumentEventTypes.DOCUMENT_CREATED_BY_COPY)) {
             return;
         }
         for (Event event : events) {
             String name = event.getName();
             if (LifeCycleConstants.TRANSITION_EVENT.equals(name)
-                    || LifeCycleConstants.DOCUMENT_UNDELETED.equals(name)) {
+                    || LifeCycleConstants.DOCUMENT_UNDELETED.equals(name)
+                    || DocumentEventTypes.DOCUMENT_CREATED_BY_COPY.equals(name)) {
                 processTransition(event);
             }
         }
@@ -70,7 +77,8 @@ public class BulkLifeCycleChangeListener implements PostCommitEventListener {
         }
         DocumentEventContext docCtx = (DocumentEventContext) ctx;
         DocumentModel doc = docCtx.getSourceDocument();
-        if (!doc.isFolder()) {
+        if (!doc.isFolder()
+                && !DocumentEventTypes.DOCUMENT_CREATED_BY_COPY.equals(event.getName())) {
             return;
         }
         CoreSession session = docCtx.getCoreSession();
@@ -80,6 +88,17 @@ public class BulkLifeCycleChangeListener implements PostCommitEventListener {
         }
         String transition;
         String targetState;
+        if (DocumentEventTypes.DOCUMENT_CREATED_BY_COPY.equals(event.getName())) {
+            try {
+                DocumentModelList docs = new DocumentModelListImpl();
+                docs.add(doc);
+                reinitDocumentsLifeCyle(session, docs);
+                session.save();
+            } catch (ClientException e) {
+                log.error("Unable to get children", e);
+                return;
+            }
+        }
         if (LifeCycleConstants.TRANSITION_EVENT.equals(event.getName())) {
             transition = (String) docCtx.getProperty(LifeCycleConstants.TRANSTION_EVENT_OPTION_TRANSITION);
             if (isNonRecursiveTransition(transition, doc.getType())) {
@@ -103,6 +122,17 @@ public class BulkLifeCycleChangeListener implements PostCommitEventListener {
         } catch (ClientException e) {
             log.error("Unable to get children", e);
             return;
+        }
+    }
+
+    protected void reinitDocumentsLifeCyle(CoreSession documentManager,
+            DocumentModelList docs) throws ClientException {
+        for (DocumentModel docMod : docs) {
+            documentManager.reinitLifeCycleState(docMod.getRef());
+            if (docMod.isFolder()) {
+                reinitDocumentsLifeCyle(documentManager,
+                        documentManager.getChildren(docMod.getRef()));
+            }
         }
     }
 
@@ -149,5 +179,4 @@ public class BulkLifeCycleChangeListener implements PostCommitEventListener {
             }
         }
     }
-
 }
