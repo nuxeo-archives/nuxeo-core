@@ -92,36 +92,39 @@ public class BulkLifeCycleChangeListener implements PostCommitEventListener {
             try {
                 DocumentModelList docs = new DocumentModelListImpl();
                 docs.add(doc);
-                reinitDocumentsLifeCyle(session, docs);
+                if (session.exists(doc.getRef())) {
+                    reinitDocumentsLifeCyle(session, docs);
+                    session.save();
+                }
+            } catch (ClientException e) {
+                log.error("Unable to get children", e);
+                return;
+            }
+        } else {
+            if (LifeCycleConstants.TRANSITION_EVENT.equals(event.getName())) {
+                transition = (String) docCtx.getProperty(LifeCycleConstants.TRANSTION_EVENT_OPTION_TRANSITION);
+                if (isNonRecursiveTransition(transition, doc.getType())) {
+                    // transition should not recurse into children
+                    return;
+                }
+                if (LifeCycleConstants.UNDELETE_TRANSITION.equals(transition)) {
+                    // not processed (as we can undelete also parents)
+                    // a specific event documentUndeleted will be used instead
+                    return;
+                }
+                targetState = (String) docCtx.getProperty(LifeCycleConstants.TRANSTION_EVENT_OPTION_TO);
+            } else { // LifeCycleConstants.DOCUMENT_UNDELETED
+                transition = LifeCycleConstants.UNDELETE_TRANSITION;
+                targetState = ""; // unused
+            }
+            try {
+                DocumentModelList docs = session.getChildren(doc.getRef());
+                changeDocumentsState(session, docs, transition, targetState);
                 session.save();
             } catch (ClientException e) {
                 log.error("Unable to get children", e);
                 return;
             }
-        }
-        if (LifeCycleConstants.TRANSITION_EVENT.equals(event.getName())) {
-            transition = (String) docCtx.getProperty(LifeCycleConstants.TRANSTION_EVENT_OPTION_TRANSITION);
-            if (isNonRecursiveTransition(transition, doc.getType())) {
-                // transition should not recurse into children
-                return;
-            }
-            if (LifeCycleConstants.UNDELETE_TRANSITION.equals(transition)) {
-                // not processed (as we can undelete also parents)
-                // a specific event documentUndeleted will be used instead
-                return;
-            }
-            targetState = (String) docCtx.getProperty(LifeCycleConstants.TRANSTION_EVENT_OPTION_TO);
-        } else { // LifeCycleConstants.DOCUMENT_UNDELETED
-            transition = LifeCycleConstants.UNDELETE_TRANSITION;
-            targetState = ""; // unused
-        }
-        try {
-            DocumentModelList docs = session.getChildren(doc.getRef());
-            changeDocumentsState(session, docs, transition, targetState);
-            session.save();
-        } catch (ClientException e) {
-            log.error("Unable to get children", e);
-            return;
         }
     }
 
