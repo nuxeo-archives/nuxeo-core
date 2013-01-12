@@ -30,4 +30,7 @@ public interface Thumbnail {
     public abstract Blob getThumbnail(CoreSession session)
             throws ClientException;
 
+    public abstract String getDigest()
+            throws ClientException;
+
 }

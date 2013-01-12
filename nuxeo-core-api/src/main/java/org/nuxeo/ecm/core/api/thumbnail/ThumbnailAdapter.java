@@ -22,6 +22,7 @@ import org.nuxeo.ecm.core.api.Blob;
 import org.nuxeo.ecm.core.api.ClientException;
 import org.nuxeo.ecm.core.api.CoreSession;
 import org.nuxeo.ecm.core.api.DocumentModel;
+import org.nuxeo.ecm.core.api.blobholder.BlobHolder;
 import org.nuxeo.runtime.api.Framework;
 
 /**
@@ -49,6 +50,15 @@ public class ThumbnailAdapter implements Thumbnail {
 
     public String getId() {
         return doc.getId();
+    }
+
+    @Override
+    public String getDigest() throws ClientException {
+        BlobHolder bh = doc.getAdapter(BlobHolder.class);
+        if (bh != null && bh.getBlob() != null) {
+            return bh.getBlob().getDigest();
+        }
+        return null;
     }
 
 }
