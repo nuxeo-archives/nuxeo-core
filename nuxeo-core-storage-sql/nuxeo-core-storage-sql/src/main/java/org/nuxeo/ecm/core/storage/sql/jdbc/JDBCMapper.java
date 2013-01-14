@@ -599,7 +599,7 @@ public class JDBCMapper extends JDBCRowMapper implements Mapper {
             }
             PreparedStatement ps = connection.prepareStatement(sql);
             try {
-                ps.setObject(1, repositoryId);
+                ps.setObject(1, repositoryId, Types.OTHER);
                 ResultSet rs = ps.executeQuery();
                 countExecute();
                 if (!rs.next()) {
@@ -791,7 +791,7 @@ public class JDBCMapper extends JDBCRowMapper implements Mapper {
                             (Object[]) object, connection);
                     ps.setArray(i++, array);
                 } else {
-                    ps.setObject(i++, object);
+                    ps.setObject(i++, object, Types.OTHER);
                 }
             }
             ResultSet rs = ps.executeQuery();
@@ -908,7 +908,7 @@ public class JDBCMapper extends JDBCRowMapper implements Mapper {
             Column what = select.whatColumns.get(0);
             ps = connection.prepareStatement(select.sql);
             if (whereIds instanceof String[]) {
-                Array array = sqlInfo.dialect.createArrayOf(Types.VARCHAR,
+                Array array = sqlInfo.dialect.createArrayOf(Types.OTHER,
                         (Object[]) whereIds, connection);
                 ps.setArray(1, array);
             } else {
