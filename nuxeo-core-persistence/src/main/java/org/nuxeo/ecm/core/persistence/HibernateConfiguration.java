@@ -36,7 +36,6 @@ import org.hibernate.HibernateException;
 import org.hibernate.cfg.Environment;
 import org.hibernate.ejb.Ejb3Configuration;
 import org.hibernate.ejb.HibernatePersistence;
-import org.hibernate.ejb.transaction.JoinableCMTTransactionFactory;
 import org.hibernate.transaction.JDBCTransactionFactory;
 import org.hibernate.transaction.TransactionManagerLookup;
 import org.nuxeo.common.xmap.XMap;
@@ -129,8 +128,9 @@ public class HibernateConfiguration implements EntityManagerFactoryProvider {
                 // Hibernate 4.1
                 klass = Class.forName("org.hibernate.engine.transaction.internal.jta.CMTTransactionFactory");
             } catch (ClassNotFoundException e) {
-                // Hibernate 3.4
-                klass = JoinableCMTTransactionFactory.class;
+                // Hibernate 3.4 with Nuxeo specific workaround to disable autocommit on the JDBC connection
+                // managed by the transaction
+                klass = NuxeoTransactionFactory.class;
             }
             properties.put(Environment.TRANSACTION_STRATEGY, klass.getName());
             properties.put(Environment.TRANSACTION_MANAGER_STRATEGY, NuxeoTransactionManagerLookup.class.getName());

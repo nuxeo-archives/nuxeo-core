@@ -16,6 +16,9 @@
  */
 package org.nuxeo.ecm.core.persistence;
 
+import java.sql.Connection;
+import java.sql.SQLException;
+
 import javax.persistence.EntityManager;
 import javax.persistence.EntityManagerFactory;
 import javax.persistence.EntityTransaction;
@@ -23,6 +26,8 @@ import javax.persistence.TransactionRequiredException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.hibernate.Session;
+import org.hibernate.jdbc.Work;
 import org.nuxeo.ecm.core.api.ClientException;
 
 /**
@@ -92,6 +97,7 @@ public class PersistenceProvider {
         EntityTransaction et = getTransaction(em);
         if (et != null) {
             et.begin();
+            checkAutoCommit(em, false);
         }
     }
 
@@ -119,6 +125,21 @@ public class PersistenceProvider {
             return;
         }
         et.rollback();
+    }
+
+    protected void checkAutoCommit(EntityManager em, final boolean autocommit) {
+        Session session = (Session)em.getDelegate();
+        session.doWork(new Work() {
+
+            @Override
+            public void execute(Connection connection) throws SQLException {
+                if (connection.getAutoCommit() != autocommit) {
+                    throw new AssertionError("expected autocommit " + autocommit);
+                }
+            }
+
+        });
+
     }
 
     protected void releaseEntityManager(EntityManager em) {
