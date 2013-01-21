@@ -50,6 +50,16 @@ public interface VersioningService {
     String VERSIONING_OPTION = "VersioningOption";
 
     /**
+     * Context data to disable auto-checkout of checked-in documents at pre-save
+     * time. This option should only be used when updating a facet that's
+     * considered pure metadata and holds information about the document but
+     * external to it. Value is a {@link Boolean}.
+     *
+     * @since 5.7, 5.6.0-HF09
+     */
+    String DISABLE_AUTO_CHECKOUT = "DisableAutoCheckOut";
+
+    /**
      * Context data to provide a checkin comment for operations that potentially
      * check in (save, publish, checkin).
      */
@@ -82,6 +92,23 @@ public interface VersioningService {
             throws DocumentException;
 
     /**
+     * Checks if {@link #doPreSave} will do a checkout when called with the
+     * same arguments.
+     * <p>
+     * Needed to be able to send "about to checkin" events.
+     *
+     * @param doc the document
+     * @param isDirty {@code true} if there is actual data to save
+     * @param option an option chosen by the user or framework
+     * @param options map event info and options
+     * @return {@code true} if {@link #doPreSave} will do a checkout
+     * @throws DocumentException
+     */
+    boolean isPreSaveDoingCheckOut(Document doc, boolean isDirty,
+            VersioningOption option, Map<String, Serializable> options)
+            throws DocumentException;
+
+    /**
      * Applies versioning options before document save.
      *
      * @param doc the document
@@ -93,6 +120,18 @@ public interface VersioningService {
      */
     VersioningOption doPreSave(Document doc, boolean isDirty,
             VersioningOption option, String checkinComment,
+            Map<String, Serializable> options) throws DocumentException;
+
+    /**
+     * Checks if {@link #doPostSave} will do a checkin when called with the same arguments.
+     *
+     * @param doc the document
+     * @param option an option chosen by the user or framework
+     * @param options map event info
+     * @return {@code true} if {@link #doPostSave} will do a checkin
+     * @throws DocumentException
+     */
+    boolean isPostSaveDoingCheckIn(Document doc, VersioningOption option,
             Map<String, Serializable> options) throws DocumentException;
 
     /**

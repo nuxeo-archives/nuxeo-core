@@ -82,6 +82,7 @@ import org.nuxeo.ecm.core.storage.EventConstants;
 import org.nuxeo.ecm.core.storage.sql.coremodel.BinaryTextListener;
 import org.nuxeo.ecm.core.storage.sql.listeners.DummyBeforeModificationListener;
 import org.nuxeo.ecm.core.storage.sql.listeners.DummyTestListener;
+import org.nuxeo.ecm.core.versioning.VersioningService;
 import org.nuxeo.runtime.api.Framework;
 
 /**
@@ -2181,6 +2182,66 @@ public class TestSQLRepositoryAPI extends SQLRepositoryTestCase {
     }
 
     @Test
+    public void testFacetRefresh() throws Exception {
+        DocumentModel doc = new DocumentModelImpl("/", "foo", "File");
+        doc = session.createDocument(doc);
+        assertFalse(doc.hasFacet("Aged"));
+
+        // fetch another DocumentModel instance of the same doc
+        DocumentModel doc2 = session.getDocument(doc.getRef());
+        // facet not yet present
+        assertFalse(doc2.hasFacet("Aged"));
+        // cannot write property
+        try {
+            doc2.setPropertyValue("age:age", "123");
+            fail();
+        } catch (PropertyNotFoundException e) {
+            // ok
+        }
+
+        // add facet in first doc
+        assertTrue(doc.addFacet("Aged"));
+        assertTrue(doc.hasFacet("Aged"));
+        doc.setPropertyValue("age:age", "123");
+        doc = session.saveDocument(doc);
+
+        // after refresh should be also visible in second doc
+        doc2.refresh();
+        assertTrue(doc2.hasFacet("Aged"));
+        assertEquals("123", doc2.getPropertyValue("age:age"));
+
+        // change value in first doc
+        doc.setPropertyValue("age:age", "456");
+        doc = session.saveDocument(doc);
+
+        // after refresh should be also visible in second doc
+        doc2.refresh();
+        assertTrue(doc2.hasFacet("Aged"));
+        assertEquals("456", doc2.getPropertyValue("age:age"));
+
+        // remove facet in first doc
+        assertTrue(doc.removeFacet("Aged"));
+        doc = session.saveDocument(doc);
+
+        // after refresh should be removed in second doc
+        doc2.refresh();
+        assertFalse(doc2.hasFacet("Aged"));
+        try {
+            doc2.setPropertyValue("age:age", "123");
+            fail();
+        } catch (PropertyNotFoundException e) {
+            // ok
+        }
+
+        // check immutable facet
+        DocumentRef verRef = doc.checkIn(VersioningOption.MINOR, null);
+        DocumentModel version = session.getDocument(verRef);
+        assertTrue(version.hasFacet(FacetNames.IMMUTABLE));
+        version.refresh();
+        assertTrue(version.hasFacet(FacetNames.IMMUTABLE));
+    }
+
+    @Test
     public void testLifeCycleAPI() throws ClientException {
         DocumentModel root = session.getRootDocument();
         DocumentModel childFile = new DocumentModelImpl(root.getPathAsString(),
@@ -3532,7 +3593,7 @@ public class TestSQLRepositoryAPI extends SQLRepositoryTestCase {
         folder = session.createDocument(folder);
 
         DummyTestListener.EVENTS_RECEIVED.clear();
-        session.checkIn(doc.getRef(), null, null);
+        DocumentRef verRef = session.checkIn(doc.getRef(), null, null);
         assertEvents(DummyTestListener.EVENTS_RECEIVED, //
                 "aboutToCheckIn", //
                 "documentCheckedIn", //
@@ -3554,12 +3615,49 @@ public class TestSQLRepositoryAPI extends SQLRepositoryTestCase {
         DummyTestListener.EVENTS_RECEIVED.clear();
         session.publishDocument(doc, folder, false);
         assertEvents(DummyTestListener.EVENTS_RECEIVED, //
-                // "aboutToCheckIn", // TODO
+                "aboutToCheckIn", //
                 "documentCheckedIn", //
                 "documentCreated/v", //
                 "documentCreated/p", //
                 "documentProxyPublished/p", //
                 "sectionContentPublished/f");
+
+        // auto-checkout
+        DummyTestListener.EVENTS_RECEIVED.clear();
+        doc.setPropertyValue("dc:title", "title2");
+        doc = session.saveDocument(doc);
+        assertEvents(DummyTestListener.EVENTS_RECEIVED, //
+                "beforeDocumentModification", //
+                "aboutToCheckout", //
+                "documentCheckedOut", //
+                "documentModified");
+
+        // save with versioning
+        DummyTestListener.EVENTS_RECEIVED.clear();
+        doc.setPropertyValue("dc:title", "title2");
+        doc.putContextData(VersioningService.VERSIONING_OPTION,
+                VersioningOption.MINOR);
+        doc = session.saveDocument(doc);
+        assertEvents(DummyTestListener.EVENTS_RECEIVED, //
+                "beforeDocumentModification", //
+                "aboutToCheckIn", //
+                "documentCheckedIn", //
+                "documentCreated/v", //
+                "documentModified");
+
+        doc.checkOut();
+
+        // restore to version
+        DummyTestListener.EVENTS_RECEIVED.clear();
+        session.restoreToVersion(doc.getRef(), verRef, false, false);
+        assertEvents(DummyTestListener.EVENTS_RECEIVED, //
+                "aboutToCheckIn", //
+                "documentCheckedIn", //
+                "documentCreated/v", //
+                "beforeRestoringDocument", //
+                "documentRestored", //
+                "aboutToCheckout", //
+                "documentCheckedOut");
     }
 
     @SuppressWarnings("unchecked")
