@@ -948,7 +948,7 @@ RETURNS void
 AS $$
 -- Upgrade versions: label, islatest, islatestmajor
 DECLARE
-  series ${idType} := '-';
+  series ${idType} := '${idNotPresent}';
   latest boolean := false;
   latestmajor boolean := false;
   major boolean;
