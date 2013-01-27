@@ -100,6 +100,7 @@ public class TestSQLRepositoryFulltextConfig extends SQLRepositoryTestCase {
         file4 = session.createDocument(file4);
 
         session.save();
+        waitForFulltextIndexing();
     }
 
     @Test

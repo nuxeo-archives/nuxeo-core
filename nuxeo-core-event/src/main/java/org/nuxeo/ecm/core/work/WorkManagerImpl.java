@@ -404,7 +404,7 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
                     try {
                         Transaction transaction = transactionManager.getTransaction();
                         if (transaction != null
-                                && transaction.getStatus() != Status.STATUS_MARKED_ROLLBACK) {
+                                && transaction.getStatus() == Status.STATUS_ACTIVE) {
                             transaction.registerSynchronization(new WorkSchedulingSynchronization(
                                     work, this));
                             synchronized (monitor) {
@@ -759,6 +759,7 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
             throw new IllegalStateException(String.valueOf(work.getState()));
         }
         String queueId = getCategoryQueueId(work.getCategory());
+        log.debug("Scheduling work: " + work + " using queue: " + queueId);
         WorkThreadPoolExecutor executor = getExecutor(queueId);
         switch (scheduling) {
         case ENQUEUE:
