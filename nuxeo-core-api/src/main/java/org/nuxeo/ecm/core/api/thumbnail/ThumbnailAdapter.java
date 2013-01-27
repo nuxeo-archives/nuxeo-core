@@ -51,4 +51,9 @@ public class ThumbnailAdapter implements Thumbnail {
         return doc.getId();
     }
 
+    public Blob computeThumbnail(CoreSession session) throws ClientException {
+        ThumbnailService thumbnailService = Framework.getLocalService(ThumbnailService.class);
+        return thumbnailService.computeThumbnail(doc, session);
+    }
+
 }

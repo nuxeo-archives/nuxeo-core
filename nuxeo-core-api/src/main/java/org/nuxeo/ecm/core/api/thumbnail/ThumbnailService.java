@@ -23,7 +23,16 @@ import org.nuxeo.ecm.core.api.DocumentModel;
  */
 public interface ThumbnailService {
 
+    /**
+     * Get the document thumbnail (related to the doc type/facet)
+     */
     public Blob getThumbnail(DocumentModel doc, CoreSession session)
+            throws ClientException;
+
+    /**
+     * Compute the thumbnail (related to the document type/facet)
+     */
+    public Blob computeThumbnail(DocumentModel doc, CoreSession session)
             throws ClientException;
 
 }

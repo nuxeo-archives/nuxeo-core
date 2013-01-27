@@ -25,4 +25,6 @@ public interface ThumbnailFactory {
 
     public Blob getThumbnail(DocumentModel doc, CoreSession session)
             throws ClientException;
+
+    public Blob computeThumbnail(DocumentModel doc, CoreSession session);
 }

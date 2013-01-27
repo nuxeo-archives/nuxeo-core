@@ -86,22 +86,35 @@ public class ThumbnailServiceImpl extends DefaultComponent implements
         return defaultFactory;
     }
 
+    @Override
     public Blob getThumbnail(DocumentModel doc, CoreSession session)
             throws ClientException {
+        ThumbnailFactory factory = getThumbnailFactory(doc, session);
+        return factory.getThumbnail(doc, session);
+    }
+
+    @Override
+    public Blob computeThumbnail(DocumentModel doc, CoreSession session)
+            throws ClientException {
+        ThumbnailFactory factory = getThumbnailFactory(doc, session);
+        return factory.computeThumbnail(doc, session);
+    }
+
+    public ThumbnailFactory getThumbnailFactory(DocumentModel doc,
+            CoreSession session) throws ClientException {
         if (factoriesByDocType.containsKey(doc.getType())) {
             ThumbnailFactory factory = factoriesByDocType.get(doc.getType());
-            return factory.getThumbnail(doc, session);
+            return factory;
         }
         for (Map.Entry<String, ThumbnailFactory> entry : factoriesByFacets.entrySet()) {
             if (doc.hasFacet(entry.getKey())) {
-                return entry.getValue().getThumbnail(doc, session);
+                return entry.getValue();
             }
         }
         if (defaultFactory == null) {
             throw new ClientException(
                     "Please contribute a default thumbnail factory");
         }
-        return defaultFactory.getThumbnail(doc, session);
+        return defaultFactory;
     }
-
 }
