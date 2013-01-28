@@ -139,6 +139,9 @@ public class RepositoryDescriptor {
     @XNode("proxies@enabled")
     public boolean proxiesEnabled = true;
 
+    @XNode("idType")
+    public String idType; // "uuid";
+
     @XNode("clustering@enabled")
     public boolean clusteringEnabled;
 
