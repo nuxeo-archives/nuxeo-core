@@ -203,7 +203,8 @@ public class SessionImpl implements Session, XAResource {
     /**
      * Generates a new id, or used a pre-generated one (import).
      */
-    protected Serializable generateNewId(Serializable id) {
+    protected Serializable generateNewId(Serializable id)
+            throws StorageException {
         return context.generateNewId(id);
     }
 
@@ -418,7 +419,7 @@ public class SessionImpl implements Session, XAResource {
                 continue;
             }
             node.getSimpleProperty(Model.FULLTEXT_JOBID_PROP).setValue(
-                    node.getId());
+                    model.idToString(node.getId()));
         }
 
         log.debug("Queued documents for asynchronous fulltext extraction: "
@@ -465,6 +466,9 @@ public class SessionImpl implements Session, XAResource {
     /**
      * Collect modified document IDs into two separate set, one for the docs and
      * the other for parents
+     * <p>
+     * Collects ids as Strings (not Serializables) as these are then sent to
+     * high-level event code.
      *
      * @param invalidations
      * @param docs
@@ -476,10 +480,10 @@ public class SessionImpl implements Session, XAResource {
             return;
         }
         for (RowId rowId : invalidations.modified) {
-            String id = (String) rowId.id;
-            String docId;
+            Serializable id = rowId.id;
+            Serializable docId;
             try {
-                docId = (String) getContainingDocument(id);
+                docId = getContainingDocument(id);
             } catch (StorageException e) {
                 log.error("Cannot get containing document for: " + id, e);
                 docId = null;
@@ -489,12 +493,12 @@ public class SessionImpl implements Session, XAResource {
             }
             if (Invalidations.PARENT.equals(rowId.tableName)) {
                 if (docId.equals(id)) {
-                    parents.add(docId);
+                    parents.add(model.idToString(docId));
                 } else { // complex prop added/removed
-                    docs.add(docId);
+                    docs.add(model.idToString(docId));
                 }
             } else {
-                docs.add(docId);
+                docs.add(model.idToString(docId));
             }
         }
     }
@@ -523,7 +527,7 @@ public class SessionImpl implements Session, XAResource {
         if (!repository.repositoryDescriptor.sendInvalidationEvents) {
             return;
         }
-        // compute modified doc ids and parent ids
+        // compute modified doc ids and parent ids (as strings)
         HashSet<String> modifiedDocIds = new HashSet<String>();
         HashSet<String> modifiedParentIds = new HashSet<String>();
 
@@ -1052,7 +1056,7 @@ public class SessionImpl implements Session, XAResource {
             Serializable versionSeriesId;
             if (document.isProxy()) {
                 versionSeriesId = document.getSimpleProperty(
-                        model.PROXY_VERSIONABLE_PROP).getString();
+                        model.PROXY_VERSIONABLE_PROP).getValue();
             } else {
                 versionSeriesId = document.getId();
             }

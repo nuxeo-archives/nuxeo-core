@@ -140,7 +140,7 @@ public class RepositoryDescriptor {
     public boolean proxiesEnabled = true;
 
     @XNode("idType")
-    public String idType; // "uuid";
+    public String idType; // "varchar", "uuid", "sequence"
 
     @XNode("clustering@enabled")
     public boolean clusteringEnabled;

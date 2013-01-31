@@ -12,7 +12,6 @@
  */
 package org.nuxeo.ecm.core.storage.sql.coremodel;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -84,7 +83,7 @@ public class BinaryTextListener implements PostCommitEventListener {
         CoreSession session = null;
         ModelFulltext fulltextInfo = null;
         FulltextParser fulltextParser = null;
-        Set<Serializable> ids = new HashSet<Serializable>();
+        Set<String> ids = new HashSet<String>();
         for (Event event : eventBundle) {
             if (!event.getName().equals(EVENT_NAME)) {
                 continue;
@@ -112,8 +111,8 @@ public class BinaryTextListener implements PostCommitEventListener {
         // we have all the info from the bundle, now do the extraction
         boolean save = false;
         BlobsExtractor extractor = new BlobsExtractor();
-        for (Serializable id : ids) {
-            IdRef docRef = new IdRef((String) id);
+        for (String id : ids) {
+            IdRef docRef = new IdRef(id);
             // if the runtime has shutdown (normally because tests are finished)
             // this can happen, see NXP-4009
             if (session.getPrincipal() == null) {
@@ -147,7 +146,7 @@ public class BinaryTextListener implements PostCommitEventListener {
                         fulltextInfo.propPathsExcludedByIndexBinary.get(indexName),
                         fulltextInfo.indexesAllBinary.contains(indexName));
                 List<Blob> blobs = extractor.getBlobs(indexedDoc);
-                String text = blobsToText(blobs, (String) id);
+                String text = blobsToText(blobs, id);
                 fulltextParser.setStrings(new ArrayList<String>());
                 fulltextParser.parse(text, null);
                 text = StringUtils.join(fulltextParser.getStrings(), " ");
@@ -179,8 +178,8 @@ public class BinaryTextListener implements PostCommitEventListener {
     }
 
     @SuppressWarnings("unchecked")
-    protected Set<Serializable> getIdsFromEventContext(EventContext eventContext) {
-        return (Set<Serializable>) eventContext.getArguments()[0];
+    protected Set<String> getIdsFromEventContext(EventContext eventContext) {
+        return (Set<String>) eventContext.getArguments()[0];
     }
 
     protected ModelFulltext getFulltextInfoFromEventContext(
