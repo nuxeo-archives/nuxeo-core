@@ -42,13 +42,11 @@ import org.apache.lucene.search.Hit;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Searcher;
 import org.apache.lucene.store.LockObtainFailedException;
-import org.h2.api.CloseListener;
-import org.h2.message.Message;
-import org.h2.store.fs.FileSystem;
+import org.h2.message.DbException;
+import org.h2.store.fs.FileUtils;
 import org.h2.tools.SimpleResultSet;
 import org.h2.util.IOUtils;
 import org.h2.util.StringUtils;
-import org.h2.value.DataType;
 
 /**
  * An optimized Lucene-based fulltext indexing trigger and search.
@@ -201,7 +199,7 @@ public class H2Fulltext {
     private static void indexExistingRows(Connection conn, String schema,
             String table) throws SQLException {
         Trigger trigger = new Trigger();
-        trigger.init(conn, schema, null, table, false, Trigger.INSERT);
+        trigger.init(conn, schema, null, table, false, org.h2.api.Trigger.INSERT);
         Statement st = conn.createStatement();
         ResultSet rs = st.executeQuery("SELECT * FROM "
                 + StringUtils.quoteIdentifier(schema) + '.'
@@ -435,7 +433,7 @@ public class H2Fulltext {
                 throw convertException(e);
             }
         }
-        FileSystem.getInstance(path).deleteRecursive(path);
+        FileUtils.deleteRecursive(path, false);
     }
 
     private static SQLException convertException(Exception e) {
@@ -450,7 +448,7 @@ public class H2Fulltext {
         }
         switch (type) {
         case Types.BIT:
-        case DataType.TYPE_BOOLEAN:
+        case Types.BOOLEAN:
         case Types.INTEGER:
         case Types.BIGINT:
         case Types.DECIMAL:
@@ -474,7 +472,7 @@ public class H2Fulltext {
                 }
                 return IOUtils.readStringAndClose((Reader) data, -1);
             } catch (IOException e) {
-                throw Message.convert(e);
+                throw DbException.convert(e);
             }
         case Types.VARBINARY:
         case Types.LONGVARBINARY:
@@ -486,7 +484,7 @@ public class H2Fulltext {
         case Types.REF:
         case Types.NULL:
         case Types.ARRAY:
-        case DataType.TYPE_DATALINK:
+        case Types.DATALINK:
         case Types.DISTINCT:
             throw new SQLException("Unsupported column data type: " + type);
         default:
@@ -516,7 +514,7 @@ public class H2Fulltext {
     /**
      * Trigger used to update the lucene index upon row change.
      */
-    public static class Trigger implements org.h2.api.Trigger, CloseListener {
+    public static class Trigger implements org.h2.api.Trigger {
 
         private String indexPath;
 
