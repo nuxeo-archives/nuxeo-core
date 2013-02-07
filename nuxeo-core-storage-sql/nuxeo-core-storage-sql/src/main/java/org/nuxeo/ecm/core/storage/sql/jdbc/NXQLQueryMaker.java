@@ -60,6 +60,7 @@ import org.nuxeo.ecm.core.query.sql.model.WhereClause;
 import org.nuxeo.ecm.core.schema.FacetNames;
 import org.nuxeo.ecm.core.storage.StorageException;
 import org.nuxeo.ecm.core.storage.sql.ColumnType;
+import org.nuxeo.ecm.core.storage.sql.ColumnType.WrappedId;
 import org.nuxeo.ecm.core.storage.sql.Model;
 import org.nuxeo.ecm.core.storage.sql.ModelProperty;
 import org.nuxeo.ecm.core.storage.sql.PropertyType;
@@ -1133,6 +1134,9 @@ public class NXQLQueryMaker implements QueryMaker {
 
         protected FulltextMatchInfo ftMatchInfo;
 
+        // true when visiting the rvalue of an id expression
+        protected boolean visitingId;
+
         public WhereBuilder(boolean isProxies) {
             this.isProxies = isProxies;
         }
@@ -1398,7 +1402,10 @@ public class NXQLQueryMaker implements QueryMaker {
                     } else {
                         visitReference(info.column, cast);
                         directOp.accept(this);
+                        boolean oldVisitingId = visitingId;
+                        visitingId = info.column.getType().isId();
                         rvalue.accept(this);
+                        visitingId = oldVisitingId;
                     }
                     allowSubSelect = false;
                     generateExistsEnd(buf);
@@ -1884,7 +1891,18 @@ public class NXQLQueryMaker implements QueryMaker {
 
         @Override
         public void visitStringLiteral(StringLiteral node) {
-            visitStringLiteral(node.value);
+            if (visitingId) {
+                visitId(node.value);
+            } else {
+                visitStringLiteral(node.value);
+            }
+        }
+
+        // wrap the string so that the mapper can detect it
+        // and map to an actual database id
+        protected void visitId(String string) {
+            buf.append('?');
+            whereParams.add(new WrappedId(string));
         }
 
         public void visitStringLiteral(String string) {
