@@ -1079,14 +1079,10 @@ public class NXQLQueryMaker implements QueryMaker {
 
         public final boolean needsSubSelect;
 
-        public final boolean isBoolean;
-
-        public ColumnInfo(Column column, boolean isArrayElement,
-                PropertyType propertyType) {
+        public ColumnInfo(Column column, boolean isArrayElement, boolean isArray) {
             this.column = column;
             this.isArrayElement = isArrayElement;
-            this.needsSubSelect = !isArrayElement && propertyType.isArray();
-            this.isBoolean = propertyType == PropertyType.BOOLEAN;
+            this.needsSubSelect = !isArrayElement && isArray;
         }
     }
 
@@ -1139,23 +1135,6 @@ public class NXQLQueryMaker implements QueryMaker {
 
         public WhereBuilder(boolean isProxies) {
             this.isProxies = isProxies;
-        }
-
-        public Column findColumn(String name, boolean allowSubSelect,
-                boolean inOrderBy) {
-            Column column;
-            if (name.startsWith(NXQL.ECM_PREFIX)) {
-                column = getSpecialColumn(name);
-            } else {
-                ColumnInfo info = getColumnInfo(name); // may throw
-                if (info.needsSubSelect && !allowSubSelect) {
-                    String msg = inOrderBy ? "Cannot use collection %s in ORDER BY clause"
-                            : "Can only use collection %s with =, <>, IN or NOT IN clause";
-                    throw new QueryMakerException(String.format(msg, name));
-                }
-                column = info.column;
-            }
-            return column;
         }
 
         protected Column getSpecialColumn(String name) {
@@ -1214,7 +1193,19 @@ public class NXQLQueryMaker implements QueryMaker {
         }
 
         /**
-         * Gets column information for a property.
+         * Finds info about column (special or not).
+         */
+        public ColumnInfo getColumnInfo(String name) {
+            if (name.startsWith(NXQL.ECM_PREFIX)) {
+                Column column = getSpecialColumn(name);
+                return new ColumnInfo(column, false, false);
+            } else {
+                return getRegularColumnInfo(name);
+            }
+        }
+
+        /**
+         * Gets column information for a regular property.
          * <p>
          * Accumulates info about joins needed to get to this property.
          * <p>
@@ -1223,7 +1214,7 @@ public class NXQLQueryMaker implements QueryMaker {
          *
          * @throws QueryMakerException if the property doesn't exist
          */
-        protected ColumnInfo getColumnInfo(String xpath) {
+        protected ColumnInfo getRegularColumnInfo(String xpath) {
             Table hier = dataHierTable;
             Table contextHier = hier;
             xpath = canonicalXPath(xpath);
@@ -1308,7 +1299,7 @@ public class NXQLQueryMaker implements QueryMaker {
                     Table table = getFragmentTable(contextHier, contextKey,
                             prop.fragmentName, index, skipJoin);
                     return new ColumnInfo(table.getColumn(prop.fragmentKey),
-                            isArrayElement, prop.propertyType);
+                            isArrayElement, prop.propertyType.isArray());
                 }
             }
             throw new AssertionError("not reached");
@@ -1379,8 +1370,7 @@ public class NXQLQueryMaker implements QueryMaker {
             } else if ((op == Operator.EQ || op == Operator.NOTEQ
                     || op == Operator.IN || op == Operator.NOTIN
                     || op == Operator.LIKE || op == Operator.NOTLIKE
-                    || op == Operator.ILIKE || op == Operator.NOTILIKE)
-                    && name != null && !name.startsWith(NXQL.ECM_PREFIX)) {
+                    || op == Operator.ILIKE || op == Operator.NOTILIKE)) {
                 ColumnInfo info = getColumnInfo(name);
                 // node.lvalue must not be accepted from now on
                 if (info.needsSubSelect) {
@@ -1397,44 +1387,19 @@ public class NXQLQueryMaker implements QueryMaker {
                     }
                     generateExistsStart(buf, info.column.getTable());
                     allowSubSelect = true;
-                    if (directOp == Operator.ILIKE) {
-                        visitExpressionIlike(info.column, directOp, rvalue);
-                    } else {
-                        visitReference(info.column, cast);
-                        directOp.accept(this);
-                        boolean oldVisitingId = visitingId;
-                        visitingId = info.column.getType().isId();
-                        rvalue.accept(this);
-                        visitingId = oldVisitingId;
-                    }
+                    visitColumnExpression(info.column, directOp, rvalue, cast);
                     allowSubSelect = false;
                     generateExistsEnd(buf);
                 } else {
                     // boolean literals have to be translated according the
                     // database dialect
-                    if (info.isBoolean) {
-                        if (!(rvalue instanceof IntegerLiteral)) {
-                            throw new QueryMakerException(
-                                    "Boolean expressions require literal 0 or 1 as right argument");
-                        }
-                        long v = ((IntegerLiteral) rvalue).value;
-                        if (v != 0 && v != 1) {
-                            throw new QueryMakerException(
-                                    "Boolean expressions require literal 0 or 1 as right argument");
-                        }
-                        rvalue = new BooleanLiteral(v == 1);
+                    if (info.column.getType() == ColumnType.BOOLEAN) {
+                        rvalue = getBooleanLiteral(rvalue);
                     }
-                    // use normal processing
-                    if (op == Operator.ILIKE || op == Operator.NOTILIKE) {
-                        visitExpressionIlike(info.column, op, rvalue);
-                    } else {
-                        visitReference(info.column, cast);
-                        op.accept(this);
-                        rvalue.accept(this);
-                    }
+                    visitColumnExpression(info.column, op, rvalue, cast);
                 }
-            } else if (node.operator == Operator.BETWEEN
-                    || node.operator == Operator.NOTBETWEEN) {
+            } else if (op == Operator.BETWEEN
+                    || op == Operator.NOTBETWEEN) {
                 LiteralList l = (LiteralList) rvalue;
                 if (DATE_CAST.equals(cast)) {
                     checkDateLiteralForCast(l.get(0), node);
@@ -1442,7 +1407,7 @@ public class NXQLQueryMaker implements QueryMaker {
                 }
                 node.lvalue.accept(this);
                 buf.append(' ');
-                node.operator.accept(this);
+                op.accept(this);
                 buf.append(' ');
                 l.get(0).accept(this);
                 buf.append(" AND ");
@@ -1451,6 +1416,33 @@ public class NXQLQueryMaker implements QueryMaker {
                 super.visitExpression(node);
             }
             buf.append(')');
+        }
+
+        protected Operand getBooleanLiteral(Operand rvalue) {
+            if (!(rvalue instanceof IntegerLiteral)) {
+                throw new QueryMakerException(
+                        "Boolean expressions require literal 0 or 1 as right argument");
+            }
+            long v = ((IntegerLiteral) rvalue).value;
+            if (v != 0 && v != 1) {
+                throw new QueryMakerException(
+                        "Boolean expressions require literal 0 or 1 as right argument");
+            }
+            return new BooleanLiteral(v == 1);
+        }
+
+        protected void visitColumnExpression(Column column, Operator op,
+                Operand rvalue, String cast) {
+            if (op == Operator.ILIKE || op == Operator.NOTILIKE) {
+                visitExpressionIlike(column, op, rvalue);
+            } else {
+                visitReference(column, cast);
+                op.accept(this);
+                boolean oldVisitingId = visitingId;
+                visitingId = column.getType().isId();
+                rvalue.accept(this);
+                visitingId = oldVisitingId;
+            }
         }
 
         /**
@@ -1831,12 +1823,17 @@ public class NXQLQueryMaker implements QueryMaker {
         @Override
         public void visitReference(Reference node) {
             String name = node.name;
-            Column column = findColumn(name, allowSubSelect, inOrderBy);
+            ColumnInfo info = getColumnInfo(name);
+            if (info.needsSubSelect && !allowSubSelect) {
+                String msg = inOrderBy ? "Cannot use collection %s in ORDER BY clause"
+                        : "Can only use collection %s with =, <>, IN or NOT IN clause";
+                throw new QueryMakerException(String.format(msg, name));
+            }
             if (inSelect) {
-                whatColumns.add(column);
+                whatColumns.add(info.column);
                 whatKeys.add(name);
             } else {
-                visitReference(column, node.cast);
+                visitReference(info.column, node.cast);
             }
         }
 
