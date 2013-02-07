@@ -37,6 +37,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
@@ -66,6 +67,7 @@ import org.nuxeo.ecm.core.storage.sql.jdbc.JDBCConnection;
 import org.nuxeo.ecm.core.storage.sql.jdbc.JDBCConnectionPropagator;
 import org.nuxeo.ecm.core.storage.sql.jdbc.JDBCMapper;
 import org.nuxeo.ecm.core.storage.sql.jdbc.JDBCRowMapper;
+import org.nuxeo.ecm.core.storage.sql.jdbc.dialect.Dialect;
 import org.nuxeo.runtime.api.Framework;
 
 public class TestSQLBackend extends SQLBackendTestCase {
@@ -363,6 +365,9 @@ public class TestSQLBackend extends SQLBackendTestCase {
 
     @Test
     public void testBasicsUpgrade() throws Exception {
+        if ("sequence".equals(DatabaseHelper.DEF_ID_TYPE)) {
+            return;
+        }
         JDBCMapper.testProps.put(JDBCMapper.TEST_UPGRADE, Boolean.TRUE);
         try {
             testBasics();
@@ -1629,16 +1634,16 @@ public class TestSQLBackend extends SQLBackendTestCase {
         assertEquals(Boolean.TRUE,
                 nodea.getSimpleProperty("ecm:isCheckedIn").getValue());
         assertEquals(version.getId(),
-                nodea.getSimpleProperty("ecm:baseVersion").getString());
+                nodea.getSimpleProperty("ecm:baseVersion").getValue());
         // the version info
         assertEquals("node_a", version.getName()); // keeps name
         assertNull(session.getParentNode(version));
         assertEquals("hello world",
                 version.getSimpleProperty("tst:title").getString());
-        assertNull(version.getSimpleProperty("ecm:baseVersion").getString());
+        assertNull(version.getSimpleProperty("ecm:baseVersion").getValue());
         assertNull(version.getSimpleProperty("ecm:isCheckedIn").getValue());
         assertEquals(nodea.getId(),
-                version.getSimpleProperty("ecm:versionableId").getString());
+                version.getSimpleProperty("ecm:versionableId").getValue());
         // assertEquals(Long.valueOf(1), version.getSimpleProperty(
         // "ecm:majorVersion").getLong());
         // assertEquals(Long.valueOf(0), version.getSimpleProperty(
@@ -1660,7 +1665,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
         assertEquals(Boolean.FALSE,
                 nodea.getSimpleProperty("ecm:isCheckedIn").getValue());
         assertEquals(version.getId(),
-                nodea.getSimpleProperty("ecm:baseVersion").getString());
+                nodea.getSimpleProperty("ecm:baseVersion").getValue());
         nodea.setSimpleProperty("tst:title", "blorp");
         nodea.setCollectionProperty("tst:subjects", new String[] { "x", "y" });
         Node nodeac2 = session.getChildNode(nodea, "node_a_complex", true);
@@ -2157,7 +2162,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
         ids.add(node1.getId());
         int size = 2000; // > dialect.getMaximumArgsForIn()
         for (int i = 0; i < size; i++) {
-            ids.add("nosuchid-" + i);
+            ids.add(generateMissingId(root, i));
         }
         List<Node> nodes = session.getNodesByIds(ids);
         assertEquals(2 + size, nodes.size());
@@ -2165,6 +2170,23 @@ public class TestSQLBackend extends SQLBackendTestCase {
         assertEquals(node1.getId(), nodes.get(1).getId());
         for (int i = 0; i < size; i++) {
             assertNull(nodes.get(2 + i));
+        }
+    }
+
+    private Serializable generateMissingId(Node root, int i) {
+        if (root.getId() instanceof String) {
+            if (Dialect.DEBUG_UUIDS) {
+                if (Dialect.DEBUG_REAL_UUIDS) {
+                    return String.format("00000000-ffff-ffff-0000-%012x",
+                            Integer.valueOf(i));
+                } else {
+                    return "NO_SUCH_UUID_" + i;
+                }
+            } else {
+                return UUID.randomUUID().toString();
+            }
+        } else { // Long
+            return Long.valueOf(9999900000L + i);
         }
     }
 
@@ -2240,73 +2262,6 @@ public class TestSQLBackend extends SQLBackendTestCase {
         assertEquals(1, res.list.size());
     }
 
-    @Test
-    public void testTagsUpgrade() throws Exception {
-        if (this instanceof TestSQLBackendNet
-                || this instanceof ITSQLBackendNet) {
-            return;
-        }
-        JDBCMapper.testProps.put(JDBCMapper.TEST_UPGRADE, Boolean.TRUE);
-        try {
-            Session session = repository.getConnection();
-
-            PartialList<Serializable> res;
-
-            res = session.query("SELECT * FROM Tag WHERE ecm:isProxy = 0",
-                    QueryFilter.EMPTY, false);
-            assertEquals(2, res.list.size());
-            String tagId = "11111111-2222-3333-4444-555555555555";
-            Serializable tagId1 = res.list.get(0);
-            Serializable tagId2 = res.list.get(1);
-            if (tagId.equals(tagId2)) {
-                // swap
-                Serializable t = tagId1;
-                tagId1 = tagId2;
-                tagId2 = t;
-            }
-            assertEquals(tagId, tagId1);
-            Node tag1 = session.getNodeById(tagId1);
-            assertEquals("mytag",
-                    tag1.getSimpleProperty("tag:label").getString());
-            assertEquals("mytag",
-                    tag1.getSimpleProperty("dc:title").getString());
-            assertEquals("Administrator",
-                    tag1.getSimpleProperty("dc:creator").getString());
-            assertEquals("mytag", tag1.getName());
-
-            Node tag2 = session.getNodeById(tagId2);
-            assertEquals("othertag",
-                    tag2.getSimpleProperty("tag:label").getString());
-            assertEquals("othertag",
-                    tag2.getSimpleProperty("dc:title").getString());
-            assertEquals("Administrator",
-                    tag2.getSimpleProperty("dc:creator").getString());
-            assertEquals("othertag", tag2.getName());
-
-            res = session.query("SELECT * FROM Tagging", QueryFilter.EMPTY,
-                    false);
-            assertEquals(1, res.list.size());
-            Serializable taggingId = res.list.get(0);
-            Node tagging = session.getNodeById(taggingId);
-            assertEquals("dddddddd-dddd-dddd-dddd-dddddddddddd",
-                    tagging.getSimpleProperty("relation:source").getValue());
-            assertEquals(tagId,
-                    tagging.getSimpleProperty("relation:target").getValue());
-            assertEquals("mytag",
-                    tagging.getSimpleProperty("dc:title").getString());
-            assertEquals("Administrator",
-                    tagging.getSimpleProperty("dc:creator").getString());
-            assertEquals("mytag", tagging.getName());
-            assertNotNull(tagging.getSimpleProperty("dc:created").getValue());
-
-            // hidden tags root is gone
-            Node tags = session.getNodeByPath("/tags", null);
-            assertNull(tags);
-        } finally {
-            JDBCMapper.testProps.clear();
-        }
-    }
-
     protected static boolean isLatestVersion(Node node) throws Exception {
         Boolean b = (Boolean) node.getSimpleProperty(
                 Model.VERSION_IS_LATEST_PROP).getValue();
@@ -2325,6 +2280,9 @@ public class TestSQLBackend extends SQLBackendTestCase {
 
     @Test
     public void testVersionsUpgrade() throws Exception {
+        if ("sequence".equals(DatabaseHelper.DEF_ID_TYPE)) {
+            return;
+        }
         if (this instanceof TestSQLBackendNet
                 || this instanceof ITSQLBackendNet) {
             return;
@@ -2374,6 +2332,9 @@ public class TestSQLBackend extends SQLBackendTestCase {
 
     @Test
     public void testLastContributorUpgrade() throws StorageException {
+        if ("sequence".equals(DatabaseHelper.DEF_ID_TYPE)) {
+            return;
+        }
         if (this instanceof TestSQLBackendNet
                 || this instanceof ITSQLBackendNet) {
             return;
@@ -2857,6 +2818,9 @@ public class TestSQLBackend extends SQLBackendTestCase {
 
     @Test
     public void testLocksUpgrade() throws Exception {
+        if ("sequence".equals(DatabaseHelper.DEF_ID_TYPE)) {
+            return;
+        }
         if (this instanceof TestSQLBackendNet
                 || this instanceof ITSQLBackendNet) {
             return;

@@ -10,7 +10,6 @@
  *     Florent Guillaume
  *     Benoit Delbosc
  */
-
 package org.nuxeo.ecm.core.storage.sql.jdbc.dialect;
 
 import java.io.Serializable;
@@ -44,7 +43,6 @@ import org.nuxeo.ecm.core.storage.sql.jdbc.db.Column;
 import org.nuxeo.ecm.core.storage.sql.jdbc.db.Database;
 import org.nuxeo.ecm.core.storage.sql.jdbc.db.Join;
 import org.nuxeo.ecm.core.storage.sql.jdbc.db.Table;
-import org.nuxeo.ecm.core.storage.sql.jdbc.db.Table.IndexType;
 
 /**
  * Microsoft SQL Server-specific dialect.
@@ -59,7 +57,10 @@ public class DialectSQLServer extends Dialect {
 
     private static final String DEFAULT_FULLTEXT_CATALOG = "nuxeo";
 
-    private static final String CLUSTERED = "CLUSTERED";
+    /**
+     * Column containing an IDENTITY used to create a clustered index.
+     */
+    public static final String CLUSTER_INDEX_COL = "_oid";
 
     protected final String fulltextAnalyzer;
 
@@ -68,6 +69,10 @@ public class DialectSQLServer extends Dialect {
     private static final String DEFAULT_USERS_SEPARATOR = "|";
 
     protected final String usersSeparator;
+
+    protected final DialectIdType idType;
+
+    protected String idSequenceName;
 
     protected boolean pathOptimizationsEnabled;
 
@@ -110,6 +115,21 @@ public class DialectSQLServer extends Dialect {
                         : repositoryDescriptor.usersSeparatorKey;
         pathOptimizationsEnabled = repositoryDescriptor == null ? false
                 : repositoryDescriptor.pathOptimizationsEnabled;
+        String idt = repositoryDescriptor == null ? null : repositoryDescriptor.idType;
+        if (idt == null || "".equals(idt) || "varchar".equalsIgnoreCase(idt)) {
+            idType = DialectIdType.VARCHAR;
+        } else if (idt.toLowerCase().startsWith("sequence")) {
+            idType = DialectIdType.SEQUENCE;
+            if (idt.toLowerCase().startsWith("sequence:")) {
+                String[] split = idt.split(":");
+                idSequenceName = split[1];
+            } else {
+                idSequenceName = "hierarchy_seq";
+            }
+        } else {
+            throw new StorageException("Unknown id type: '" + idt + "'");
+        }
+
     }
 
     @Override
@@ -222,7 +242,12 @@ public class DialectSQLServer extends Dialect {
         case NODEIDFKNULL:
         case NODEIDPK:
         case NODEVAL:
-            return jdbcInfo("VARCHAR(36)", Types.VARCHAR);
+            switch (idType) {
+            case VARCHAR:
+                return jdbcInfo("VARCHAR(36)", Types.VARCHAR);
+            case SEQUENCE:
+                return jdbcInfo("BIGINT", Types.BIGINT);
+            }
         case SYSNAME:
         case SYSNAMEARRAY:
             return jdbcInfo("VARCHAR(256)", Types.VARCHAR);
@@ -274,6 +299,19 @@ public class DialectSQLServer extends Dialect {
             return true;
         }
         return false;
+    }
+
+    @Override
+    public void setId(PreparedStatement ps, int index, Serializable value)
+            throws SQLException {
+        switch (idType) {
+        case VARCHAR:
+            ps.setObject(index, value, Types.VARCHAR);
+            break;
+        case SEQUENCE:
+            ps.setObject(index, value);
+            break;
+        }
     }
 
     @Override
@@ -329,23 +367,6 @@ public class DialectSQLServer extends Dialect {
     @Override
     protected int getMaxNameSize() {
         return 128;
-    }
-
-    @Override
-    public String getCreateIndexPrefixSql(IndexType indexType,
-            List<Column> columns) {
-        if (!azure) {
-            return "";
-        }
-        if (indexType == IndexType.MAIN_NON_PRIMARY) {
-            return CLUSTERED;
-        }
-        if (columns.size() == 1 && columns.get(0).getKey().equals("id")) {
-            // creates index on id for collection tables
-            // as there is no primary key, create a clustered index for this one
-            return CLUSTERED;
-        }
-        return "";
     }
 
     @Override
@@ -508,8 +529,20 @@ public class DialectSQLServer extends Dialect {
     public Map<String, Serializable> getSQLStatementsProperties(Model model,
             Database database) {
         Map<String, Serializable> properties = new HashMap<String, Serializable>();
-        properties.put("idType", "VARCHAR(36)");
-        properties.put("clusteredIndex", azure ? CLUSTERED : "");
+        switch (idType) {
+        case VARCHAR:
+            properties.put("idType", "VARCHAR(36)");
+            properties.put("idTypeParam", "VARCHAR");
+            properties.put("idNotPresent", "'-'");
+            properties.put("sequenceEnabled", Boolean.FALSE);
+            break;
+        case SEQUENCE:
+            properties.put("idType", "BIGINT");
+            properties.put("idTypeParam", "BIGINT");
+            properties.put("idNotPresent", "-1");
+            properties.put("sequenceEnabled", Boolean.TRUE);
+            properties.put("idSequenceName", idSequenceName);
+        }
         properties.put("md5HashString", getMd5HashString());
         properties.put("reseedAclrModified", azure ? ""
                 : "DBCC CHECKIDENT('aclr_modified', RESEED, 0);");
@@ -620,6 +653,23 @@ public class DialectSQLServer extends Dialect {
         return usersSeparator;
     }
 
+    @Override
+    public Serializable getGeneratedId(Connection connection)
+            throws SQLException {
+        if (idType != DialectIdType.SEQUENCE) {
+            return super.getGeneratedId(connection);
+        }
+        String sql = String.format("SELECT NEXT VALUE FOR [%s]", idSequenceName);
+        Statement s = connection.createStatement();
+        try {
+            ResultSet rs = s.executeQuery(sql);
+            rs.next();
+            return Long.valueOf(rs.getLong(1));
+        } finally {
+            s.close();
+        }
+    }
+
     /**
      * Set transaction isolation level to snapshot
      *
@@ -648,6 +698,66 @@ public class DialectSQLServer extends Dialect {
             return "CONVERT(DATETIME, CONVERT(VARCHAR, %s, 112), 112)";
         }
         return super.getDateCast();
+    }
+
+    @Override
+    public String castIdToVarchar(String expr) {
+        switch (idType) {
+        case VARCHAR:
+            return expr;
+        case SEQUENCE:
+            return "CONVERT(VARCHAR, " + expr + ")";
+        default:
+            throw new AssertionError("Unknown id type: " + idType);
+        }
+    }
+
+    @Override
+    public DialectIdType getIdType() {
+        return idType;
+    }
+
+    @Override
+    public List<String> getIgnoredColumns(Table table) {
+        return Collections.singletonList(CLUSTER_INDEX_COL);
+    }
+
+    /**
+     * Tables created for directories don't need a clustered column
+     * automatically defined.
+     */
+    protected boolean needsClusteredColumn(Table table) {
+        if (idType == DialectIdType.SEQUENCE) {
+            // good enough for a clustered index
+            // no need to add another column
+            return false;
+        }
+        for (Column col : table.getColumns()) {
+            if (col.getType().isId()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public String getCustomColumnDefinition(Table table) {
+        if (!needsClusteredColumn(table)) {
+            return null;
+        }
+        return String.format("[%s] INT NOT NULL IDENTITY", CLUSTER_INDEX_COL);
+    }
+
+    @Override
+    public List<String> getCustomPostCreateSqls(Table table) {
+        if (!needsClusteredColumn(table)) {
+            return Collections.emptyList();
+        }
+        String quotedIndexName = getIndexName(table.getKey(),
+                Collections.singletonList(CLUSTER_INDEX_COL));
+        String sql = String.format("CREATE UNIQUE CLUSTERED INDEX [%s] ON %s ([%s])",
+                quotedIndexName, table.getQuotedName(), CLUSTER_INDEX_COL);
+        return Collections.singletonList(sql);
     }
 
 }
