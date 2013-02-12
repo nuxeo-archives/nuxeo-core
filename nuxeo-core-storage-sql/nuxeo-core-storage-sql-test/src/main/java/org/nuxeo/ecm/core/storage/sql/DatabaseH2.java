@@ -23,7 +23,11 @@ import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.h2.util.JdbcUtils;
+import org.nuxeo.ecm.core.storage.sql.ra.PoolingRepositoryFactory;
 import org.nuxeo.runtime.api.Framework;
+import org.nuxeo.runtime.datasource.h2.DatabaseH2Starter;
+import org.nuxeo.runtime.datasource.h2.JdbcDataSource;
 
 /**
  * @author Florent Guillaume
@@ -37,15 +41,21 @@ public class DatabaseH2 extends DatabaseHelper {
     /** This directory will be deleted and recreated. */
     protected static final String DIRECTORY = "target/test/h2";
 
+    protected static final String TCP_PORT_PROPERTY = "nuxeo.test.vcs.h2.port";
+
     protected static final String DEF_USER = "sa";
 
     protected static final String DEF_PASSWORD = "";
 
+    protected static final String DEF_TCP_PORT = "9092";
+
     protected static final String CONTRIB_XML = "OSGI-INF/test-repo-repository-h2-contrib.xml";
+
+    protected static final String POOLING_CONTRIB_XML = "OSGI-INF/test-pooling-h2-contrib.xml";
 
     protected static final String DRIVER = "org.h2.Driver";
 
-    protected static final String URL_FORMAT = "jdbc:h2:%s/%s";
+    protected static final String URL_FORMAT = "jdbc:h2:tcp://localhost:%s/%s/%s;MVCC=TRUE;DB_CLOSE_DELAY=-1";
 
     protected String h2Path;
 
@@ -57,21 +67,24 @@ public class DatabaseH2 extends DatabaseHelper {
 
     protected Error owner;
 
-    protected void setProperties() {
-        url = String.format(URL_FORMAT, h2Path, databaseName);
-        origUrl = setProperty(URL_PROPERTY, url);
+    protected DatabaseH2Starter starter;
 
+    protected void setProperties() {
         Framework.getProperties().setProperty(REPOSITORY_PROPERTY,
                 repositoryName);
         setProperty(DATABASE_PROPERTY, databaseName);
         setProperty(USER_PROPERTY, DEF_USER);
+        setProperty(PORT_PROPERTY, DEF_TCP_PORT);
         setProperty(PASSWORD_PROPERTY, DEF_PASSWORD);
         // for sql directory tests
         setProperty(DRIVER_PROPERTY, DRIVER);
+
+        url = String.format(URL_FORMAT, System.getProperty(PORT_PROPERTY), h2Path, databaseName);
+        origUrl = setProperty(URL_PROPERTY, url);
     }
 
     protected void setProperties2() {
-        url2 = String.format(URL_FORMAT, h2Path, databaseName + "2");
+        url2 = String.format(URL_FORMAT, System.getProperty(PORT_PROPERTY), h2Path, databaseName + "2");
         setProperty(URL_PROPERTY + "2", url2);
         Framework.getProperties().setProperty(REPOSITORY_PROPERTY + "2",
                 repositoryName + "2");
@@ -87,11 +100,15 @@ public class DatabaseH2 extends DatabaseHelper {
         }
         owner = new Error("Database not released");
         Class.forName(DRIVER);
-        File dir = new File(DIRECTORY);
-        FileUtils.deleteQuietly(dir);
-        dir.mkdirs();
+        File dir = new File(DIRECTORY).getAbsoluteFile();
+        FileUtils.deleteDirectory(dir);
+        if (dir.mkdirs() == false) {
+            throw new AssertionError("Directory was still there");
+        }
         h2Path = new File(dir, getId()).getAbsolutePath();
         setProperties();
+        starter = new DatabaseH2Starter(Integer.getInteger(PORT_PROPERTY));
+        starter.start();
     }
 
     public void setUp2() throws Exception {
@@ -116,7 +133,11 @@ public class DatabaseH2 extends DatabaseHelper {
                 tearDownDatabase(url2);
             }
         } finally {
-            super.tearDown();
+            try {
+                starter.stop();
+            } finally {
+                super.tearDown();
+            }
         }
     }
 
@@ -124,23 +145,29 @@ public class DatabaseH2 extends DatabaseHelper {
         Connection connection = DriverManager.getConnection(url,
                 System.getProperty(USER_PROPERTY),
                 System.getProperty(PASSWORD_PROPERTY));
-        Statement st = connection.createStatement();
-        String sql = "SHUTDOWN";
-        log.trace(sql);
-        st.execute(sql);
-        st.close();
-        connection.close();
+        try {
+            Statement st = connection.createStatement();
+            try {
+                String sql = "SHUTDOWN";
+                log.trace(sql);
+                st.execute(sql);
+            } finally {
+                JdbcUtils.closeSilently(st);
+            }
+        } finally {
+            JdbcUtils.closeSilently(connection);
+        }
     }
 
     @Override
     public String getDeploymentContrib() {
-        return CONTRIB_XML;
+        return PoolingRepositoryFactory.class.isAssignableFrom(repositoryFactory) ? POOLING_CONTRIB_XML : CONTRIB_XML;
     }
 
     @Override
     public RepositoryDescriptor getRepositoryDescriptor() {
         RepositoryDescriptor descriptor = new RepositoryDescriptor();
-        descriptor.xaDataSourceName = "org.h2.jdbcx.JdbcDataSource";
+        descriptor.xaDataSourceName = JdbcDataSource.class.getName();
         Map<String, String> properties = new HashMap<String, String>();
         properties.put("URL", url);
         properties.put("User", System.getProperty(USER_PROPERTY));

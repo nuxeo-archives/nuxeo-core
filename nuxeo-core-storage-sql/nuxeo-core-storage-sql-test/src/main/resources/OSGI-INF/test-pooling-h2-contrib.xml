@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <component name="org.nuxeo.ecm.core.storage.sql.test.repo.repository.${nuxeo.test.vcs.repository}">
   <extension target="org.nuxeo.runtime.datasource" point="datasources">
-    <datasource name="jdbc/nuxeo" xaDataSource="org.h2.jdbcx.JdbcDataSource"
+    <datasource name="jdbc/nuxeo" xaDataSource="org.nuxeo.runtime.datasource.h2.JdbcDataSource"
       maxActive="20" minIdle="5" maxIdle="5">
-        <property name="URL">${nuxeo.test.vcs.url};MVCC=TRUE</property>
+        <property name="URL">${nuxeo.test.vcs.url}</property>
         <property name="User">${nuxeo.test.vcs.user}</property>
         <property name="Password">${nuxeo.test.vcs.password}</property> 
     </datasource>

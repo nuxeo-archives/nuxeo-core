@@ -26,7 +26,7 @@ import org.nuxeo.runtime.test.runner.FeaturesRunner;
 import org.nuxeo.runtime.test.runner.SimpleFeature;
 import org.nuxeo.runtime.transaction.TransactionHelper;
 
-@Deploy({ "org.nuxeo.runtime.jtajca" })
+@Deploy({ "org.nuxeo.runtime.jtajca", "org.nuxeo.runtime.datasource" })
 @RepositoryConfig(cleanup=Granularity.METHOD, repositoryFactoryClass=PoolingRepositoryFactory.class)
 public class TransactionalFeature extends SimpleFeature {
 

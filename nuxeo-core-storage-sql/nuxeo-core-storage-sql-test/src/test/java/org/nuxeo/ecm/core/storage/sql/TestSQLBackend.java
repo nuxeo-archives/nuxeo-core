@@ -194,7 +194,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
     public void testChildrenRemoval() throws Exception {
         Session session = repository.getConnection();
         Node root = session.getRootNode();
-        Serializable fooId = session.addChildNode(root, "foo", null, "TestDoc",
+        Serializable fooId = session.addChildNode(root, "zoo", null, "TestDoc",
                 false).getId();
         Serializable barId = session.addChildNode(root, "bar", null, "TestDoc",
                 false).getId();
@@ -1067,7 +1067,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
 
         ClusterTestJob r1 = new ClusterTestJob(repository, repository2);
         ClusterTestJob r2 = new ClusterTestJob(repository, repository2);
-        ClusterTestJob.run(r1, r2);
+        LockStepJob.run(r1, r2);
         repository = null; // already closed
         repository2 = null; // already closed
     }

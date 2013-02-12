@@ -43,7 +43,7 @@ public abstract class DatabaseHelper {
 
     public static final String DB_CLASS_NAME_BASE = "org.nuxeo.ecm.core.storage.sql.Database";
 
-    protected static final Class<? extends RepositoryFactory> defaultRepositoryFactory = SQLRepositoryFactory.class;
+    protected static final Class<? extends RepositoryFactory> DEFAULT_REPOSITORY_FACTORY = SQLRepositoryFactory.class;
 
     static {
         setProperty(DB_PROPERTY, DB_DEFAULT);
@@ -52,7 +52,7 @@ public abstract class DatabaseHelper {
             className = DB_CLASS_NAME_BASE + className;
         }
         setDatabaseForTests(className);
-        setRepositoryFactory(defaultRepositoryFactory);
+        setRepositoryFactory(DEFAULT_REPOSITORY_FACTORY);
         setSingleDataSourceMode();
     }
 
@@ -96,7 +96,7 @@ public abstract class DatabaseHelper {
     protected String databaseName = DEFAULT_DATABASE_NAME;
 
     public void setDatabaseName(String name) {
-        this.databaseName = name;
+        databaseName = name;
     }
 
     public static final String DEFAULT_REPOSITORY_NAME = "test";
@@ -104,7 +104,7 @@ public abstract class DatabaseHelper {
     public String repositoryName = DEFAULT_REPOSITORY_NAME;
 
     public void setRepositoryName(String name) {
-        this.repositoryName = name;
+        repositoryName = name;
     }
 
     /**
@@ -196,11 +196,14 @@ public abstract class DatabaseHelper {
     public void tearDown() throws SQLException {
         setDatabaseName(DEFAULT_DATABASE_NAME);
         setRepositoryName(DEFAULT_REPOSITORY_NAME);
-        setRepositoryFactory(defaultRepositoryFactory);
+        setRepositoryFactory(DEFAULT_REPOSITORY_FACTORY);
     }
+
+    protected static Class<? extends RepositoryFactory> repositoryFactory = DEFAULT_REPOSITORY_FACTORY;
 
     public static void setRepositoryFactory(
             Class<? extends RepositoryFactory> factoryClass) {
+        repositoryFactory = factoryClass;
         System.setProperty("nuxeo.test.vcs.repository-factory",
                 factoryClass.getName());
     }
