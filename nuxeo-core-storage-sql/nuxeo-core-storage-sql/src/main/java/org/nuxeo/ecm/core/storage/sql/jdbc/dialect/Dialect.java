@@ -67,7 +67,7 @@ public abstract class Dialect {
     public static final boolean DEBUG_UUIDS = false;
 
     // if true then debug UUIDs (above) are actual UUIDs, not short strings
-    public static final boolean DEBUG_REAL_UUIDS = true;
+    public static final boolean DEBUG_REAL_UUIDS = false;
 
     // for debug
     private final AtomicLong temporaryIdCounter = new AtomicLong(0);
@@ -284,6 +284,28 @@ public abstract class Dialect {
     public void setId(PreparedStatement ps, int index, Serializable value)
             throws SQLException {
         ps.setObject(index, value);
+    }
+
+    /**
+     * Sets a long id (sequence) from a value that may be a String or already a
+     * Long.
+     */
+    public void setIdLong(PreparedStatement ps, int index, Serializable value)
+            throws SQLException {
+        long l;
+        if (value instanceof String) {
+            try {
+                l = Long.parseLong((String) value);
+            } catch (NumberFormatException e) {
+                throw new SQLException("Invalid long id: " + value);
+            }
+        } else if (value instanceof Long) {
+            l = ((Long) value).longValue();
+        } else {
+            throw new SQLException("Unsupported class for long id, class: "
+                    + value.getClass() + " value: " + value);
+        }
+        ps.setLong(index, l);
     }
 
     public abstract void setToPreparedStatement(PreparedStatement ps,

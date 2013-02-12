@@ -53,9 +53,13 @@ public class FulltextExtractorWork extends AbstractWork {
 
     private static final String ANY2TEXT = "any2text";
 
+    protected static final String CATEGORY = "fulltextExtractor";
+
+    protected static final String TITLE = "fulltextExtractor";
+
     protected String repositoryName;
 
-    protected final Set<String> ids;
+    protected Set<String> ids;
 
     protected ModelFulltext fulltextInfo;
 
@@ -70,12 +74,12 @@ public class FulltextExtractorWork extends AbstractWork {
 
     @Override
     public String getCategory() {
-        return "fulltextExtractor";
+        return CATEGORY;
     }
 
     @Override
     public String getTitle() {
-        return "Fulltext Extractor";
+        return TITLE;
     }
 
     @Override
@@ -160,6 +164,15 @@ public class FulltextExtractorWork extends AbstractWork {
             Framework.getLocalService(WorkManager.class).schedule(work);
         }
         setStatus(null);
+    }
+
+    @Override
+    public void cleanUp(boolean ok, Exception e) {
+        super.cleanUp(ok, e);
+        fulltextInfo = null;
+        fulltextParser = null;
+        fulltextParserClass = null;
+        ids = null;
     }
 
     protected void initFulltextParser() {
