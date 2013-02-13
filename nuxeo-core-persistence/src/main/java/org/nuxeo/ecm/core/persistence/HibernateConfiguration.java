@@ -67,13 +67,17 @@ public class HibernateConfiguration implements EntityManagerFactoryProvider {
 
     @XNode("datasource")
     public void setDatasource(String name) {
-        String expandedValue = Framework.expandVars(name);
-        if (expandedValue.startsWith("$")) {
+        name = Framework.expandVars(name);
+        if (name.startsWith("$")) {
             throw new PersistenceError("Cannot expand " + name
                     + " for datasource");
         }
+        name = DataSourceHelper.getDataSourceJNDIName(name);
+//        if (name.startsWith("java:comp/")) {
+//            name = "java:/comp/" + name.substring(10);
+//        }
         hibernateProperties.put("hibernate.connection.datasource",
-                DataSourceHelper.getDataSourceJNDIName(name));
+                name);
     }
 
     @XNodeMap(value = "properties/property", key = "@name", type = Properties.class, componentType = String.class)
@@ -159,21 +163,7 @@ public class HibernateConfiguration implements EntityManagerFactoryProvider {
     // so we use a new thread
     protected EntityManagerFactory createEntityManagerFactory(
             final Map<String, String> properties) {
-        final EntityManagerFactory[] emf = new EntityManagerFactory[1];
-        Thread t = new Thread("persistence-init-"+name) {
-            @SuppressWarnings("deprecation")
-            @Override
-            public void run() {
-                emf[0] = cfg.createEntityManagerFactory(properties);
-            };
-        };
-        try {
-            t.start();
-            t.join();
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-        return emf[0];
+        return cfg.createEntityManagerFactory(properties);
     }
 
     /**

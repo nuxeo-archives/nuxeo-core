@@ -10,8 +10,10 @@
  */
 package org.nuxeo.ecm.core.storage.sql.db;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
+import java.lang.reflect.Constructor;
 import java.sql.Clob;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -23,7 +25,6 @@ import java.sql.Types;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -34,14 +35,18 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.IndexWriter.MaxFieldLength;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.queryParser.QueryParser;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
-import org.apache.lucene.search.Hit;
 import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.Searcher;
-import org.apache.lucene.store.LockObtainFailedException;
+import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.util.Version;
 import org.h2.message.DbException;
 import org.h2.store.fs.FileUtils;
 import org.h2.tools.SimpleResultSet;
@@ -293,7 +298,6 @@ public class H2Fulltext {
      * @param text the search query
      * @return the result set
      */
-    @SuppressWarnings("unchecked")
     public static ResultSet search(Connection conn, String indexName,
             String text) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
@@ -326,22 +330,26 @@ public class H2Fulltext {
         String indexPath = getIndexPath(conn);
         try {
             BooleanQuery query = new BooleanQuery();
-            QueryParser parser = new QueryParser(fieldForIndex(indexName),
+            QueryParser parser = new QueryParser(Version.LUCENE_35, fieldForIndex(indexName),
                     getAnalyzer(analyzer));
             query.add(parser.parse(text), BooleanClause.Occur.MUST);
 
-            getIndexWriter(indexPath, analyzer).flush();
-            Searcher searcher = new IndexSearcher(indexPath);
-            Iterator<Hit> it = searcher.search(query).iterator();
-            for (; it.hasNext();) {
-                Hit hit = it.next();
-                Object key = asObject(hit.get(FIELD_KEY), type);
-                rs.addRow(new Object[] { key });
+            IndexWriter writer = getIndexWriter(indexPath, analyzer);
+            writer.commit();
+            Searcher searcher = new IndexSearcher(writer.getDirectory(), true);
+            try {
+                TopDocs docs = searcher.search(query, null, Integer.MAX_VALUE);
+                for (ScoreDoc scoredDoc : docs.scoreDocs) {
+                    Document doc = searcher.doc(scoredDoc.doc);
+                    Object key = asObject(doc.get(FIELD_KEY), type);
+                    rs.addRow(new Object[] { key });
+                }
+            } finally {
+                // TODO keep it open if possible
+                searcher.close();
             }
-            // TODO keep it open if possible
-            searcher.close();
         } catch (Exception e) {
-            throw convertException(e);
+            throw convertException("Cannot search index " + indexPath, e);
         }
         return rs;
     }
@@ -377,9 +385,11 @@ public class H2Fulltext {
 
     private static Analyzer getAnalyzer(String analyzer) throws SQLException {
         try {
-            return (Analyzer) Class.forName(analyzer).newInstance();
+            Class<?> clazz = Class.forName(analyzer);
+            Constructor<?> constructor = clazz.getConstructor(Version.class);
+            return (Analyzer)constructor.newInstance(Version.LUCENE_35);
         } catch (Exception e) {
-            throw new SQLException(e.toString());
+            throw new SQLException("Cannot create lucene analyzer " + analyzer, e);
         }
     }
 
@@ -393,29 +403,30 @@ public class H2Fulltext {
                     "Fulltext search for in-memory databases is not supported.");
         }
         st.close();
-        return path + ".lucene";
+        return path;
     }
 
     private static IndexWriter getIndexWriter(String indexPath, String analyzer)
             throws SQLException {
+        Directory dir;
+        try {
+            dir = FSDirectory.open(new File(indexPath));
+        } catch (IOException e) {
+            throw convertException("Cannot access to index " + indexPath, e);
+        }
         IndexWriter indexWriter = indexWriters.get(indexPath);
         if (indexWriter == null) {
             synchronized (indexWriters) {
                 if (!indexWriters.containsKey(indexPath)) {
                     try {
-                        boolean recreate = !IndexReader.indexExists(indexPath);
-                        indexWriter = new IndexWriter(indexPath,
-                                getAnalyzer(analyzer), recreate);
-                    } catch (LockObtainFailedException e) {
-                        // log.error("Cannot open fulltext index", e);
-                        System.err.println("Cannot open fulltext index "
-                                + indexPath);
-                        e.printStackTrace();
-                        throw convertException(e);
-                    } catch (IOException e) {
-                        throw convertException(e);
+                        boolean recreate = !IndexReader.indexExists(dir);
+                        Analyzer analyzerInstance = getAnalyzer(analyzer);
+                        indexWriter = new IndexWriter(dir,
+                                analyzerInstance, recreate, MaxFieldLength.LIMITED);
+                    } catch (Exception e) {
+                        throw convertException("Cannot open index " + indexPath, e);
                     }
-                    indexWriters.put(indexPath, indexWriter);
+                    indexWriters.put(indexPath.toString(), indexWriter);
                 }
             }
         }
@@ -427,19 +438,17 @@ public class H2Fulltext {
         IndexWriter index = indexWriters.remove(path);
         if (index != null) {
             try {
-                index.flush();
+                index.commit();
                 index.close();
             } catch (IOException e) {
-                throw convertException(e);
+                throw convertException("Cannot remove index " + path, e);
             }
         }
         FileUtils.deleteRecursive(path, false);
     }
 
-    private static SQLException convertException(Exception e) {
-        SQLException e2 = new SQLException("Error while indexing document");
-        e2.initCause(e);
-        return e2;
+    private static SQLException convertException(String message, Exception e) {
+        return new SQLException(message, e);
     }
 
     protected static String asString(Object data, int type) throws SQLException {
@@ -541,73 +550,88 @@ public class H2Fulltext {
             // find primary key name
             String primaryKeyName = null;
             ResultSet rs = meta.getPrimaryKeys(null, schema, table);
-            while (rs.next()) {
-                if (primaryKeyName != null) {
-                    throw new SQLException(
-                            "Can only index primary keys on one column for: "
-                                    + schema + '.' + table);
+            try {
+                while (rs.next()) {
+                    if (primaryKeyName != null) {
+                        throw new SQLException(
+                                "Can only index primary keys on one column for: "
+                                        + schema + '.' + table);
+                    }
+                    primaryKeyName = rs.getString("COLUMN_NAME");
                 }
-                primaryKeyName = rs.getString("COLUMN_NAME");
+                if (primaryKeyName == null) {
+                    throw new SQLException("No primary key for " + schema + '.'
+                            + table);
+                }
+            } finally {
+                rs.close();
             }
-            if (primaryKeyName == null) {
-                throw new SQLException("No primary key for " + schema + '.'
-                        + table);
-            }
-            rs.close();
 
             // find primary key type
             rs = meta.getColumns(null, schema, table, primaryKeyName);
-            if (!rs.next()) {
-                throw new SQLException("No primary key for: " + schema + '.'
-                        + table);
+            try {
+                if (!rs.next()) {
+                    throw new SQLException("No primary key for: " + schema
+                            + '.' + table);
+                }
+                primaryKeyType = rs.getInt("DATA_TYPE");
+                primaryKeyIndex = rs.getInt("ORDINAL_POSITION") - 1;
+            } finally {
+                rs.close();
             }
-            primaryKeyType = rs.getInt("DATA_TYPE");
-            primaryKeyIndex = rs.getInt("ORDINAL_POSITION") - 1;
-            rs.close();
 
             // find all columns info
             Map<String, Integer> allColumnTypes = new HashMap<String, Integer>();
             Map<String, Integer> allColumnIndices = new HashMap<String, Integer>();
             rs = meta.getColumns(null, schema, table, null);
-            while (rs.next()) {
-                String name = rs.getString("COLUMN_NAME");
-                int type = rs.getInt("DATA_TYPE");
-                int index = rs.getInt("ORDINAL_POSITION") - 1;
-                allColumnTypes.put(name, Integer.valueOf(type));
-                allColumnIndices.put(name, Integer.valueOf(index));
+            try {
+                while (rs.next()) {
+                    String name = rs.getString("COLUMN_NAME");
+                    int type = rs.getInt("DATA_TYPE");
+                    int index = rs.getInt("ORDINAL_POSITION") - 1;
+                    allColumnTypes.put(name, Integer.valueOf(type));
+                    allColumnIndices.put(name, Integer.valueOf(index));
+                }
+            } finally {
+                rs.close();
             }
-            rs.close();
 
             // find columns configured for indexing
             PreparedStatement ps = conn.prepareStatement("SELECT NAME, COLUMNS, ANALYZER FROM "
                     + FT_TABLE + " WHERE SCHEMA = ? AND TABLE = ?");
-            ps.setString(1, schema);
-            ps.setString(2, table);
-            rs = ps.executeQuery();
-            columnTypes = new HashMap<String, int[]>();
-            columnIndices = new HashMap<String, int[]>();
-            while (rs.next()) {
-                String indexName = rs.getString(1);
-                String columns = rs.getString(2);
-                String analyzer = rs.getString(3);
-                List<String> columnNames = Arrays.asList(columns.split(","));
+            try {
+                ps.setString(1, schema);
+                ps.setString(2, table);
+                rs = ps.executeQuery();
+                try {
+                    columnTypes = new HashMap<String, int[]>();
+                    columnIndices = new HashMap<String, int[]>();
+                    while (rs.next()) {
+                        String indexName = rs.getString(1);
+                        String columns = rs.getString(2);
+                        String analyzer = rs.getString(3);
+                        List<String> columnNames = Arrays.asList(columns.split(","));
 
-                // find the columns' indices and types
-                int[] types = new int[columnNames.size()];
-                int[] indices = new int[columnNames.size()];
-                int i = 0;
-                for (String columnName : columnNames) {
-                    types[i] = allColumnTypes.get(columnName).intValue();
-                    indices[i] = allColumnIndices.get(columnName).intValue();
-                    i++;
+                        // find the columns' indices and types
+                        int[] types = new int[columnNames.size()];
+                        int[] indices = new int[columnNames.size()];
+                        int i = 0;
+                        for (String columnName : columnNames) {
+                            types[i] = allColumnTypes.get(columnName).intValue();
+                            indices[i] = allColumnIndices.get(columnName).intValue();
+                            i++;
+                        }
+                        columnTypes.put(indexName, types);
+                        columnIndices.put(indexName, indices);
+                        // only one call actually needed for this:
+                        indexWriter = getIndexWriter(indexPath, analyzer);
+                    }
+                } finally {
+                    rs.close();
                 }
-                columnTypes.put(indexName, types);
-                columnIndices.put(indexName, indices);
-                // only one call actually needed for this:
-                indexWriter = getIndexWriter(indexPath, analyzer);
+            } finally {
+                ps.close();
             }
-            rs.close();
-            ps.close();
         }
 
         /**
@@ -627,9 +651,9 @@ public class H2Fulltext {
             }
             try {
                 // need to flush otherwise some unit tests don't pass
-                indexWriter.flush();
+                indexWriter.commit();
             } catch (IOException e) {
-                throw convertException(e);
+                throw convertException("Cannot flush index " + indexPath, e);
             }
         }
 
@@ -637,7 +661,7 @@ public class H2Fulltext {
             Document doc = new Document();
             String key = asString(row[primaryKeyIndex], primaryKeyType);
             doc.add(new Field(FIELD_KEY, key, Field.Store.YES,
-                    Field.Index.UN_TOKENIZED));
+                    Field.Index.NOT_ANALYZED));
 
             // add fulltext for all indexes
             for (String indexName : columnTypes.keySet()) {
@@ -652,13 +676,13 @@ public class H2Fulltext {
                     buf.append(data);
                 }
                 doc.add(new Field(fieldForIndex(indexName), buf.toString(),
-                        Field.Store.NO, Field.Index.TOKENIZED));
+                        Field.Store.NO, Field.Index.ANALYZED));
             }
 
             try {
                 indexWriter.addDocument(doc);
             } catch (IOException e) {
-                throw convertException(e);
+                throw convertException("Cannot insert " + key + " into index " + indexPath, e);
             }
         }
 
@@ -667,7 +691,7 @@ public class H2Fulltext {
             try {
                 indexWriter.deleteDocuments(new Term(FIELD_KEY, primaryKey));
             } catch (IOException e) {
-                throw convertException(e);
+                throw convertException("Cannot remove " + primaryKey + " from index " + indexPath, e);
             }
         }
 
@@ -675,12 +699,12 @@ public class H2Fulltext {
         public void close() throws SQLException {
             if (indexWriter != null) {
                 try {
-                    indexWriter.flush();
+                    indexWriter.commit();
                     indexWriter.close();
                     indexWriter = null;
                     indexWriters.remove(indexPath);
                 } catch (Exception e) {
-                    throw convertException(e);
+                    throw convertException("Cannot close index " + indexPath, e);
                 }
             }
         }
