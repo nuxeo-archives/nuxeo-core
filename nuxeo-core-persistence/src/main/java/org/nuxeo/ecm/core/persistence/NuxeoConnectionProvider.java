@@ -18,12 +18,13 @@ package org.nuxeo.ecm.core.persistence;
 
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.Properties;
+import java.util.Map;
 
 import org.hibernate.HibernateException;
-import org.hibernate.cfg.Environment;
-import org.hibernate.connection.ConnectionProvider;
-import org.hibernate.connection.DatasourceConnectionProvider;
+import org.hibernate.cfg.AvailableSettings;
+import org.hibernate.service.jdbc.connections.internal.DatasourceConnectionProviderImpl;
+import org.hibernate.service.jdbc.connections.spi.ConnectionProvider;
+import org.hibernate.service.spi.Configurable;
 import org.nuxeo.runtime.api.ConnectionHelper;
 
 /**
@@ -33,13 +34,18 @@ import org.nuxeo.runtime.api.ConnectionHelper;
  *
  * @since 5.7
  */
-public class NuxeoConnectionProvider implements ConnectionProvider {
+public class NuxeoConnectionProvider implements ConnectionProvider, Configurable {
+
+    /**
+     *
+     */
+    private static final long serialVersionUID = 1L;
 
     /**
      * Delegate to do a standard Hibernate ConnectionProvider when no Nuxeo
      * connection is available.
      */
-    protected DatasourceConnectionProvider dscp;
+    protected DatasourceConnectionProviderImpl dscp;
 
     /**
      * The application-server-specific JNDI name for the datasource.
@@ -47,10 +53,10 @@ public class NuxeoConnectionProvider implements ConnectionProvider {
     protected String dataSourceName;
 
     @Override
-    public void configure(Properties props) throws HibernateException {
-        dscp = new DatasourceConnectionProvider();
+    public void configure(Map props) throws HibernateException {
+        dscp = new DatasourceConnectionProviderImpl();
         dscp.configure(props);
-        dataSourceName = props.getProperty(Environment.DATASOURCE);
+        dataSourceName = (String) props.get(AvailableSettings.DATASOURCE);
     }
 
     @Override
@@ -70,12 +76,18 @@ public class NuxeoConnectionProvider implements ConnectionProvider {
     }
 
     @Override
-    public void close() throws HibernateException {
+    public boolean supportsAggressiveRelease() {
+        return true;
     }
 
     @Override
-    public boolean supportsAggressiveRelease() {
-        return true;
+    public boolean isUnwrappableAs(Class unwrapType) {
+        return false;
+    }
+
+    @Override
+    public <T> T unwrap(Class<T> unwrapType) {
+        throw new UnsupportedOperationException();
     }
 
 }

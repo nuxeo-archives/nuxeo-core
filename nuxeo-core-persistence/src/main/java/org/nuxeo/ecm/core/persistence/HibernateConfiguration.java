@@ -33,11 +33,10 @@ import javax.transaction.TransactionManager;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.hibernate.HibernateException;
-import org.hibernate.cfg.Environment;
+import org.hibernate.ejb.AvailableSettings;
 import org.hibernate.ejb.Ejb3Configuration;
-import org.hibernate.ejb.HibernatePersistence;
-import org.hibernate.ejb.transaction.JoinableCMTTransactionFactory;
-import org.hibernate.transaction.JDBCTransactionFactory;
+import org.hibernate.engine.transaction.internal.jdbc.JdbcTransactionFactory;
+import org.hibernate.engine.transaction.internal.jta.CMTTransactionFactory;
 import org.hibernate.transaction.TransactionManagerLookup;
 import org.nuxeo.common.xmap.XMap;
 import org.nuxeo.common.xmap.annotation.XNode;
@@ -126,34 +125,26 @@ public class HibernateConfiguration implements EntityManagerFactoryProvider {
         if (txType == null) {
             txType = getTxType();
         }
-        properties.put(HibernatePersistence.TRANSACTION_TYPE, txType);
+        properties.put(AvailableSettings.TRANSACTION_TYPE, txType);
         if (txType.equals(JTA)) {
-            Class<?> klass;
-            try {
-                // Hibernate 4.1
-                klass = Class.forName("org.hibernate.engine.transaction.internal.jta.CMTTransactionFactory");
-            } catch (ClassNotFoundException e) {
-                // Hibernate 3.4
-                klass = JoinableCMTTransactionFactory.class;
-            }
-            properties.put(Environment.TRANSACTION_STRATEGY, klass.getName());
-            properties.put(Environment.TRANSACTION_MANAGER_STRATEGY, NuxeoTransactionManagerLookup.class.getName());
+            properties.put(org.hibernate.cfg.AvailableSettings.TRANSACTION_STRATEGY, CMTTransactionFactory.class.getName());
+            properties.put(org.hibernate.cfg.AvailableSettings.TRANSACTION_MANAGER_STRATEGY, NuxeoTransactionManagerLookup.class.getName());
         } else if (txType.equals(RESOURCE_LOCAL)) {
-            properties.put(Environment.TRANSACTION_STRATEGY, JDBCTransactionFactory.class.getName());
+            properties.put(org.hibernate.cfg.AvailableSettings.TRANSACTION_STRATEGY, JdbcTransactionFactory.class.getName());
         }
         if (cfg == null) {
             setupConfiguration(properties);
         }
         Properties props = cfg.getProperties();
-        if (props.get(Environment.URL) == null) {
+        if (0 != 0 && props.get(org.hibernate.cfg.AvailableSettings.URL) == null) {
             // don't set up our connection provider for unit tests
             // that use an explicit driver + connection URL and so use
             // a DriverManagerConnectionProvider
-            props.put(Environment.CONNECTION_PROVIDER,
+            props.put(org.hibernate.cfg.AvailableSettings.CONNECTION_PROVIDER,
                     NuxeoConnectionProvider.class.getName());
         }
         if (txType.equals(RESOURCE_LOCAL)) {
-            props.remove(Environment.DATASOURCE);
+            props.remove(org.hibernate.cfg.AvailableSettings.DATASOURCE);
         }
         return createEntityManagerFactory(properties);
     }
