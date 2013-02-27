@@ -36,7 +36,6 @@ import org.hibernate.HibernateException;
 import org.hibernate.ejb.AvailableSettings;
 import org.hibernate.ejb.Ejb3Configuration;
 import org.hibernate.engine.transaction.internal.jdbc.JdbcTransactionFactory;
-import org.hibernate.engine.transaction.internal.jta.CMTTransactionFactory;
 import org.hibernate.transaction.TransactionManagerLookup;
 import org.nuxeo.common.xmap.XMap;
 import org.nuxeo.common.xmap.annotation.XNode;
@@ -72,9 +71,6 @@ public class HibernateConfiguration implements EntityManagerFactoryProvider {
                     + " for datasource");
         }
         name = DataSourceHelper.getDataSourceJNDIName(name);
-//        if (name.startsWith("java:comp/")) {
-//            name = "java:/comp/" + name.substring(10);
-//        }
         hibernateProperties.put("hibernate.connection.datasource",
                 name);
     }
@@ -127,7 +123,7 @@ public class HibernateConfiguration implements EntityManagerFactoryProvider {
         }
         properties.put(AvailableSettings.TRANSACTION_TYPE, txType);
         if (txType.equals(JTA)) {
-            properties.put(org.hibernate.cfg.AvailableSettings.TRANSACTION_STRATEGY, CMTTransactionFactory.class.getName());
+            properties.put(org.hibernate.cfg.AvailableSettings.TRANSACTION_STRATEGY, NuxeoTransactionFactory.class.getName());
             properties.put(org.hibernate.cfg.AvailableSettings.TRANSACTION_MANAGER_STRATEGY, NuxeoTransactionManagerLookup.class.getName());
         } else if (txType.equals(RESOURCE_LOCAL)) {
             properties.put(org.hibernate.cfg.AvailableSettings.TRANSACTION_STRATEGY, JdbcTransactionFactory.class.getName());
