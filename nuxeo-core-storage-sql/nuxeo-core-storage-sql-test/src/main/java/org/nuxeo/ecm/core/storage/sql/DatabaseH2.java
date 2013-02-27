@@ -55,7 +55,7 @@ public class DatabaseH2 extends DatabaseHelper {
 
     protected static final String DRIVER = "org.h2.Driver";
 
-    protected static final String URL_FORMAT = "jdbc:h2:tcp://localhost:%s/%s/%s;MVCC=TRUE;DB_CLOSE_DELAY=-1";
+    protected static final String URL_FORMAT = "jdbc:h2:mem:junittests;MVCC=TRUE;DB_CLOSE_DELAY=-1";
 
     protected String h2Path;
 
@@ -107,9 +107,10 @@ public class DatabaseH2 extends DatabaseHelper {
         }
         h2Path = new File(dir, getId()).getAbsolutePath();
         setProperties();
-        starter = new DatabaseH2Starter(Integer.getInteger(PORT_PROPERTY));
-        starter.start();
+        startServer();
     }
+
+
 
     public void setUp2() throws Exception {
         setProperties2();
@@ -134,11 +135,20 @@ public class DatabaseH2 extends DatabaseHelper {
             }
         } finally {
             try {
-                starter.stop();
+                stopServer();
             } finally {
                 super.tearDown();
             }
         }
+    }
+
+    protected void startServer() throws SQLException {
+      starter = new DatabaseH2Starter(Integer.getInteger(PORT_PROPERTY));
+      starter.start();
+    }
+
+    protected void stopServer() throws SQLException {
+        starter.stop();
     }
 
     protected void tearDownDatabase(String url) throws SQLException {
