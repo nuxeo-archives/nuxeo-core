@@ -36,6 +36,7 @@ public class TestExportImportBlob extends SQLRepositoryTestCase {
 
     DocumentModel docToExport;
 
+    @Override
     @Before
     public void setUp() throws Exception {
         super.setUp();
@@ -45,6 +46,7 @@ public class TestExportImportBlob extends SQLRepositoryTestCase {
         openSession();
     }
 
+    @Override
     @After
     public void tearDown() throws Exception {
         closeSession();
@@ -70,6 +72,7 @@ public class TestExportImportBlob extends SQLRepositoryTestCase {
         docToExport = session.createDocument(docToExport);
 
         session.save();
+        waitForFulltextIndexing();
     }
 
     @Test
