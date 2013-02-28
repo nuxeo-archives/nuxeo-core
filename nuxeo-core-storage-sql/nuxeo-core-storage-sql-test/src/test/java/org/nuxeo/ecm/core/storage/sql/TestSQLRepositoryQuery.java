@@ -439,9 +439,6 @@ public class TestSQLRepositoryQuery extends SQLRepositoryTestCase {
 
         list = session.query("SELECT * FROM Document");
         assertEquals(1, list.size());
-        docModel = list.get(0);
-
-        session.removeDocument(docModel.getRef());
     }
 
     @Test
