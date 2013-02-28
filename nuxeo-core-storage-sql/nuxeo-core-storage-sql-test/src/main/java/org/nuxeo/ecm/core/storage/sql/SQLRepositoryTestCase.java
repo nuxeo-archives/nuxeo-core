@@ -89,7 +89,10 @@ public abstract class SQLRepositoryTestCase extends NXRuntimeTestCase {
     @After
     public void tearDown() throws Exception {
         try {
-            closeSession();
+            if (session != null) {
+                session.cancel();
+                closeSession();
+            }
             waitForAsyncCompletion();
         } finally {
             try {

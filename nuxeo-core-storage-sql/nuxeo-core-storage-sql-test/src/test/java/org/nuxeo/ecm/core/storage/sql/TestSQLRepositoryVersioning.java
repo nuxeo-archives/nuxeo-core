@@ -24,7 +24,6 @@ import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.nuxeo.common.collections.ScopeType;
@@ -48,6 +47,7 @@ import org.nuxeo.ecm.core.versioning.VersioningService;
 
 public class TestSQLRepositoryVersioning extends SQLRepositoryTestCase {
 
+    @Override
     @Before
     public void setUp() throws Exception {
         super.setUp();
@@ -56,12 +56,6 @@ public class TestSQLRepositoryVersioning extends SQLRepositoryTestCase {
         openSession();
     }
 
-    @After
-    public void tearDown() throws Exception {
-        session.cancel();
-        closeSession();
-        super.tearDown();
-    }
 
     /**
      * Sleep 1s, useful for stupid databases (like MySQL) that don't have
@@ -101,6 +95,8 @@ public class TestSQLRepositoryVersioning extends SQLRepositoryTestCase {
         file.putContextData(ScopeType.REQUEST,
                 VersioningDocument.CREATE_SNAPSHOT_ON_SAVE_KEY, Boolean.TRUE);
         file = session.saveDocument(file);
+
+        waitForFulltextIndexing();
 
         checkVersions(file, "0.1");
 
