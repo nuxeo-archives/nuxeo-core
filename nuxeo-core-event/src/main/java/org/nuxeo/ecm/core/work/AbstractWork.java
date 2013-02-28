@@ -96,14 +96,14 @@ public abstract class AbstractWork implements Work {
 
     protected CoreSession session;
 
-    protected final Throwable callingThreadThrowable;
+    protected Throwable ownerThreadContext;
 
 
     public AbstractWork() {
         state = SCHEDULED;
         progress = PROGRESS_INDETERMINATE;
         schedulingTime = System.currentTimeMillis();
-        callingThreadThrowable = new Throwable(toString());
+        ownerThreadContext = new Error(toString());
     }
 
     @Override
@@ -419,8 +419,13 @@ public abstract class AbstractWork implements Work {
     }
 
     @Override
-    public Throwable getCallingThreadThrowable() {
-        return callingThreadThrowable;
+    public Throwable getOwnerThreadContext() {
+        return ownerThreadContext;
+    }
+
+    @Override
+    public void setOwnerThreadContext(Throwable value) {
+        ownerThreadContext = value;
     }
 
     /**

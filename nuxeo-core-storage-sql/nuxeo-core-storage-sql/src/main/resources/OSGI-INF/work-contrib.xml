@@ -2,13 +2,13 @@
 
   <extension target="org.nuxeo.ecm.core.work.service" point="queues">
 
-    <queue id="fulltextUpdater">
+    <queue id="fulltext">
       <name>Fulltext queue</name>
       <!-- fulltext updates are single-threaded to avoid concurrent
         writes to the same column -->
       <maxThreads>1</maxThreads>
       <usePriority>true</usePriority>
-      <category>fulltext</category>
+      <category>fulltextUpdater</category>
       <!-- clear completed work quickly as it contains (potentially large)
         text data -->
       <clearCompletedAfterSeconds>600</clearCompletedAfterSeconds>

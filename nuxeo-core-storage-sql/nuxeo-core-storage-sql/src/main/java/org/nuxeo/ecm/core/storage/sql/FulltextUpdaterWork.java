@@ -189,9 +189,6 @@ public class FulltextUpdaterWork extends PrioritizedWork {
 
     @Override
     public void cleanUp(boolean ok, Exception e) {
-        if (e != null) {
-            log.error("Fulltext update aborted on " + this);
-        }
         super.cleanUp(ok, e);
         infos.clear();
         infos = null;

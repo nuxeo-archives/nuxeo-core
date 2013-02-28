@@ -287,10 +287,18 @@ public interface Work extends Runnable {
     Collection<DocumentLocation> getDocuments();
 
     /**
-     * Gets the calling thread context
-     * 
+     * Gets the owner thread context
+     *
      * @since 5.7
      * @return the context
      */
-    Throwable getCallingThreadThrowable();
+    Throwable getOwnerThreadContext();
+
+    /**
+     * Set the owner thread context
+     *
+     * @since 5.7
+     * @return the context
+     */
+    void setOwnerThreadContext(Throwable ownerThreadContext);
 }

@@ -464,7 +464,7 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
                     completed.add(work);
                 }
                 if (t != null) {
-                    log.error("work was aborted", work.getCallingThreadThrowable());
+                    log.error("work was aborted, cause set to caller context", new Exception(work.toString(), work.getOwnerThreadContext()));
                 }
             }
         }
