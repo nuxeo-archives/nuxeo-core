@@ -57,9 +57,12 @@ public class TestSQLRepositoryDirectBlob extends SQLRepositoryTestCase {
     @Override
     @After
     public void tearDown() throws Exception {
-        session.cancel();
-        closeSession();
-        super.tearDown();
+        try {
+            session.cancel();
+            closeSession();
+        } finally {
+            super.tearDown();
+        }
     }
 
     // ----- Third-party application -----

@@ -32,11 +32,6 @@ public abstract class CoreManagementTestCase extends SQLRepositoryTestCase {
         openSession();
     }
 
-    @Override
-    public void tearDown() throws Exception {
-        closeSession();
-        super.tearDown();
-    }
 
     protected void deployOtherBundles() {
     }

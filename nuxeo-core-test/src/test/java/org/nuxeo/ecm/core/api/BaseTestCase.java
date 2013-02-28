@@ -38,6 +38,7 @@ public abstract class BaseTestCase extends SQLRepositoryTestCase {
 
     protected DocumentModel root;
 
+    @Override
     @Before
     public void setUp() throws Exception {
         super.setUp();
@@ -45,11 +46,14 @@ public abstract class BaseTestCase extends SQLRepositoryTestCase {
         root = getRootDocument();
     }
 
+    @Override
     @After
     public void tearDown() throws Exception {
-        cleanUp(getRootDocument().getRef());
-        closeSession();
-        super.tearDown();
+        try {
+            cleanUp(getRootDocument().getRef());
+        } finally {
+            super.tearDown();
+        }
     }
 
     // Convenience methods

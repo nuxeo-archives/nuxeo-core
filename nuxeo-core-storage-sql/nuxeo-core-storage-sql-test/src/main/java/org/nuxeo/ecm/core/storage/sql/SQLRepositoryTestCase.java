@@ -88,36 +88,49 @@ public abstract class SQLRepositoryTestCase extends NXRuntimeTestCase {
     @Override
     @After
     public void tearDown() throws Exception {
-        waitForAsyncCompletion();
-        super.tearDown();
-        database.tearDown();
-        final CoreInstance core = CoreInstance.getInstance();
-        int finalOpenSessions = core.getNumberOfSessions();
-        int leakedOpenSessions = finalOpenSessions - initialOpenSessions;
-        if (leakedOpenSessions != 0) {
-            log.error(String.format(
-                    "There are %s open session(s) at tear down; it seems "
-                            + "the test leaked %s session(s).",
-                    Integer.valueOf(finalOpenSessions),
-                    Integer.valueOf(leakedOpenSessions)));
-            for (CoreInstance.RegistrationInfo info:core.getRegistrationInfos()) {
-                log.warn("Leaking session", info);
+        try {
+            closeSession();
+            waitForAsyncCompletion();
+        } finally {
+            try {
+                super.tearDown();
+            } finally {
+                try {
+                    database.tearDown();
+                } finally {
+                    final CoreInstance core = CoreInstance.getInstance();
+                    int finalOpenSessions = core.getNumberOfSessions();
+                    int leakedOpenSessions = finalOpenSessions
+                            - initialOpenSessions;
+                    if (leakedOpenSessions != 0) {
+                        log.error(String.format(
+                                "There are %s open session(s) at tear down; it seems "
+                                        + "the test leaked %s session(s).",
+                                Integer.valueOf(finalOpenSessions),
+                                Integer.valueOf(leakedOpenSessions)));
+                        for (CoreInstance.RegistrationInfo info : core.getRegistrationInfos()) {
+                            log.warn("Leaking session", info);
+                        }
+                    }
+                    int finalSingleConnections = ConnectionHelper.countConnectionReferences();
+                    int leakedSingleConnections = finalSingleConnections
+                            - initialSingleConnections;
+                    if (leakedSingleConnections > 0) {
+                        log.error(String.format(
+                                "There are %s single datasource connection(s) open at tear down; "
+                                        + "the test leaked %s connection(s).",
+                                Integer.valueOf(finalSingleConnections),
+                                Integer.valueOf(leakedSingleConnections)));
+                    }
+                    ConnectionHelper.clearConnectionReferences();
+                }
             }
         }
-        int finalSingleConnections = ConnectionHelper.countConnectionReferences();
-        int leakedSingleConnections = finalSingleConnections - initialSingleConnections;
-        if (leakedSingleConnections > 0) {
-            log.error(String.format(
-                    "There are %s single datasource connection(s) open at tear down; "
-                            + "the test leaked %s connection(s).",
-                    Integer.valueOf(finalSingleConnections),
-                    Integer.valueOf(leakedSingleConnections)));
-        }
-        ConnectionHelper.clearConnectionReferences();
     }
 
     public void waitForAsyncCompletion() {
-        Framework.getLocalService(EventService.class).waitForAsyncCompletion(60000);
+        Framework.getLocalService(EventService.class).waitForAsyncCompletion(
+                60000);
     }
 
     public void waitForFulltextIndexing() {
