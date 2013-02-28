@@ -20,7 +20,6 @@ package org.nuxeo.ecm.core.management.test.probes;
 import java.util.Collection;
 
 import org.junit.Before;
-import org.junit.After;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
@@ -32,6 +31,7 @@ import org.nuxeo.runtime.api.Framework;
 
 public class TestProbes extends SQLRepositoryTestCase {
 
+    @Override
     @Before
     public void setUp() throws Exception {
         super.setUp();
@@ -40,12 +40,6 @@ public class TestProbes extends SQLRepositoryTestCase {
         deployBundle("org.nuxeo.ecm.core.management.test");
         super.fireFrameworkStarted();
         openSession();
-    }
-
-    @After
-    public void tearDown() throws Exception {
-        closeSession();
-        super.tearDown();
     }
 
     @Test
