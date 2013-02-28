@@ -62,15 +62,24 @@ public class WorkManagerTXTest extends NXRuntimeTestCase {
     @Override
     @After
     public void tearDown() throws Exception {
-        if (!dontClearCompletedWork) {
-            service.clearCompletedWork(0);
+        try {
+            if (!dontClearCompletedWork) {
+                service.clearCompletedWork(0);
+            }
+        } finally {
+            try {
+                if (TransactionHelper.isTransactionActiveOrMarkedRollback()) {
+                    TransactionHelper.setTransactionRollbackOnly();
+                    TransactionHelper.commitOrRollbackTransaction();
+                }
+            } finally {
+                try {
+                    NuxeoContainer.uninstall();
+                } finally {
+                    super.tearDown();
+                }
+            }
         }
-        if (TransactionHelper.isTransactionActiveOrMarkedRollback()) {
-            TransactionHelper.setTransactionRollbackOnly();
-            TransactionHelper.commitOrRollbackTransaction();
-        }
-        NuxeoContainer.uninstall();
-        super.tearDown();
     }
 
     @Test
