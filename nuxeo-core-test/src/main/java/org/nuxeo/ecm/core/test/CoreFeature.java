@@ -136,7 +136,7 @@ public class CoreFeature extends SimpleFeature {
             // have to commit the transaction
             TransactionHelper.commitOrRollbackTransaction();
         }
-        Framework.getLocalService(EventService.class).waitForAsyncCompletion();
+        Framework.getLocalService(EventService.class).waitForAsyncCompletion(60000);
         if (tx || rb) {
             // restore previous tx status
             TransactionHelper.startTransaction();
