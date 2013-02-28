@@ -106,11 +106,14 @@ public class TestSQLRepositoryAPI extends SQLRepositoryTestCase {
     @Override
     @After
     public void tearDown() throws Exception {
-        session.save();
-        waitForAsyncCompletion();
-        closeSession();
-        DummyTestListener.clear();
-        super.tearDown();
+        try {
+            session.save();
+            waitForAsyncCompletion();
+            closeSession();
+            DummyTestListener.clear();
+        } finally {
+            super.tearDown();
+        }
     }
 
     @Test
