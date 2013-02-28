@@ -36,6 +36,15 @@ public class TestSQLRepositoryFulltextConfig extends SQLRepositoryTestCase {
         return cal;
     }
 
+    @Override
+    public void tearDown() throws Exception {
+        try {
+            closeSession();
+        } finally {
+            super.tearDown();
+        }
+    }
+
     protected void createDocs() throws Exception {
         DocumentModel folder1 = new DocumentModelImpl("/", "testfolder1",
                 "Folder");
