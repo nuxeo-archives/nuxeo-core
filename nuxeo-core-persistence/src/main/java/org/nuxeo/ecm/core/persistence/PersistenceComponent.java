@@ -64,6 +64,16 @@ public class PersistenceComponent extends DefaultComponent
         }
     }
 
+    @Override
+    public void unregisterContribution(Object contribution,
+            String extensionPoint, ComponentInstance contributor)
+            throws Exception {
+        if ("hibernate".equals(extensionPoint)) {
+            unregisterHibernateContribution((HibernateConfiguration) contribution, contributor.getName());
+        }
+    }
+
+
     protected void registerHibernateContribution(HibernateConfiguration contribution,
             ComponentName contributorName) {
         if (contribution.name == null) {
@@ -78,6 +88,11 @@ public class PersistenceComponent extends DefaultComponent
         } else {
             registry.get(contribution.name).merge(contribution);
         }
+    }
+
+    protected void unregisterHibernateContribution(
+            HibernateConfiguration contribution, ComponentName name) {
+        registry.remove(contribution.name);
     }
 
     protected void doPatchForTests(Properties hibernateProperties) {
