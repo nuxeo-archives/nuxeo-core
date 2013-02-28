@@ -65,6 +65,7 @@ public abstract class SQLRepositoryTestCase extends NXRuntimeTestCase {
         super(name);
     }
 
+    @Override
     @Before
     public void setUp() throws Exception {
         initialOpenSessions = CoreInstance.getInstance().getNumberOfSessions();
@@ -84,6 +85,7 @@ public abstract class SQLRepositoryTestCase extends NXRuntimeTestCase {
                 database.getDeploymentContrib());
     }
 
+    @Override
     @After
     public void tearDown() throws Exception {
         waitForAsyncCompletion();
@@ -115,7 +117,7 @@ public abstract class SQLRepositoryTestCase extends NXRuntimeTestCase {
     }
 
     public void waitForAsyncCompletion() {
-        Framework.getLocalService(EventService.class).waitForAsyncCompletion();
+        Framework.getLocalService(EventService.class).waitForAsyncCompletion(60000);
     }
 
     public void waitForFulltextIndexing() {

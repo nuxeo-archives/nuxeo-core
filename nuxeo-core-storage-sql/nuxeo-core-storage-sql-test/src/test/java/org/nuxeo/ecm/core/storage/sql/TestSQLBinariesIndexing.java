@@ -15,6 +15,7 @@ package org.nuxeo.ecm.core.storage.sql;
 import static org.junit.Assert.assertEquals;
 
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -27,7 +28,6 @@ import org.nuxeo.ecm.core.api.DocumentRef;
 import org.nuxeo.ecm.core.api.IdRef;
 import org.nuxeo.ecm.core.api.blobholder.BlobHolder;
 import org.nuxeo.ecm.core.api.impl.blob.StringBlob;
-import org.nuxeo.ecm.core.event.EventService;
 import org.nuxeo.ecm.core.work.AbstractWork;
 import org.nuxeo.ecm.core.work.api.WorkManager;
 import org.nuxeo.runtime.api.Framework;
@@ -68,7 +68,7 @@ public class TestSQLBinariesIndexing extends TXSQLRepositoryTestCase {
     }
 
     /**
-     * Work that waits in the fulltext updater queue, blocking other indexing
+     * Work that waits in the fulltext queue, blocking other indexing
      * work, until the main thread tells it to go ahead.
      */
     public static class BlockingWork extends AbstractWork {
@@ -79,7 +79,7 @@ public class TestSQLBinariesIndexing extends TXSQLRepositoryTestCase {
 
         @Override
         public String getCategory() {
-            return "fulltextUpdater";
+            return FulltextUpdaterWork.CATEGORY;
         }
 
         @Override
@@ -91,7 +91,9 @@ public class TestSQLBinariesIndexing extends TXSQLRepositoryTestCase {
         public void work() throws Exception {
             setStatus("Blocking");
             readyLatch.countDown();
-            startLatch.await();
+            if (!startLatch.await(10, TimeUnit.SECONDS)) {
+                throw new AssertionError("Blocking work not released");
+            }
             setStatus("Released");
         }
     }
@@ -99,7 +101,9 @@ public class TestSQLBinariesIndexing extends TXSQLRepositoryTestCase {
     protected void blockFulltextUpdating() throws InterruptedException {
         blockingWork = new BlockingWork();
         Framework.getLocalService(WorkManager.class).schedule(blockingWork);
-        blockingWork.readyLatch.await();
+        if (!blockingWork.readyLatch.await(10, TimeUnit.SECONDS)) {
+            throw new AssertionError("blocking work was not ready");
+        }
     }
 
     protected void allowFulltextUpdating() throws ClientException {
@@ -141,7 +145,6 @@ public class TestSQLBinariesIndexing extends TXSQLRepositoryTestCase {
     public void testBinariesAreIndexed() throws Exception {
         createDocument();
         blockFulltextUpdating();
-
         flush();
         assertEquals(1, jobDocs());
         assertEquals(0, indexedDocs());
