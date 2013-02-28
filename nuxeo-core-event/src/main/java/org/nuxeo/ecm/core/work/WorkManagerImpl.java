@@ -463,6 +463,9 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
                 } else {
                     completed.add(work);
                 }
+                if (t != null) {
+                    log.error("work was aborted", work.getCallingThreadThrowable());
+                }
             }
         }
 

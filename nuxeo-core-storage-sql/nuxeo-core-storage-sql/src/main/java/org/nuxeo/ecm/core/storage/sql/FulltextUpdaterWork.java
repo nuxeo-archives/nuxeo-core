@@ -166,7 +166,7 @@ public class FulltextUpdaterWork extends PrioritizedWork {
                             getFulltextPropertyName(info.indexName), info.text);
                     save = true;
                 } catch (DocumentException e) {
-                    log.error("Could not set fulltext on: " + doc.getId(), e);
+                    log.error("Could not set fulltext on: " + doc.getId() + "," + doc.getPathAsString(), e);
                     continue;
                 }
             }
@@ -189,8 +189,23 @@ public class FulltextUpdaterWork extends PrioritizedWork {
 
     @Override
     public void cleanUp(boolean ok, Exception e) {
+        if (e != null) {
+            log.error("Fulltext update aborted on " + this);
+        }
         super.cleanUp(ok, e);
         infos.clear();
         infos = null;
+    }
+
+    @Override
+    public String toString() {
+        StringBuffer buffer = new StringBuffer(super.toString());
+        if (infos != null) {
+            for (FulltextUpdaterInfo info:infos) {
+                buffer.append(',');
+                buffer.append(info.toString());
+            }
+        }
+        return buffer.toString();
     }
 }

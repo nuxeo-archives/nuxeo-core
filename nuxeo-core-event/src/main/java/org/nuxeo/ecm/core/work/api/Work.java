@@ -93,12 +93,12 @@ public interface Work extends Runnable {
 
         public Progress(float percent) {
             this.percent = percent > 100F ? 100F : percent;
-            this.current = CURRENT_INDETERMINATE;
-            this.total = 0;
+            current = CURRENT_INDETERMINATE;
+            total = 0;
         }
 
         public Progress(long current, long total) {
-            this.percent = PERCENT_INDETERMINATE;
+            percent = PERCENT_INDETERMINATE;
             this.current = current;
             this.total = total;
         }
@@ -286,4 +286,11 @@ public interface Work extends Runnable {
      */
     Collection<DocumentLocation> getDocuments();
 
+    /**
+     * Gets the calling thread context
+     * 
+     * @since 5.7
+     * @return the context
+     */
+    Throwable getCallingThreadThrowable();
 }

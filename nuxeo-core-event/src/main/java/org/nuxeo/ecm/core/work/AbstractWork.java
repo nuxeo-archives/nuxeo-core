@@ -96,10 +96,14 @@ public abstract class AbstractWork implements Work {
 
     protected CoreSession session;
 
+    protected final Throwable callingThreadThrowable;
+
+
     public AbstractWork() {
         state = SCHEDULED;
         progress = PROGRESS_INDETERMINATE;
         schedulingTime = System.currentTimeMillis();
+        callingThreadThrowable = new Throwable(toString());
     }
 
     @Override
@@ -412,6 +416,11 @@ public abstract class AbstractWork implements Work {
     @Override
     public Collection<DocumentLocation> getDocuments() {
         return Collections.emptyList();
+    }
+
+    @Override
+    public Throwable getCallingThreadThrowable() {
+        return callingThreadThrowable;
     }
 
     /**
