@@ -165,10 +165,10 @@ public interface Work extends Runnable {
      * Called by the thread pool executor after the work is run. Must set the
      * proper state (COMPLETED, SUSPENDED or FAILED).
      *
-     * @param ok {@code false} if there was an exception during task run and the
+     * @param error if there was an exception during task run and the
      *            state should be FAILED
      */
-    void afterRun(boolean ok);
+    void afterRun(Throwable error);
 
     /**
      * Gets the running state for this work instance.
@@ -286,19 +286,4 @@ public interface Work extends Runnable {
      */
     Collection<DocumentLocation> getDocuments();
 
-    /**
-     * Gets the owner thread context
-     *
-     * @since 5.7
-     * @return the context
-     */
-    Throwable getOwnerThreadContext();
-
-    /**
-     * Set the owner thread context
-     *
-     * @since 5.7
-     * @return the context
-     */
-    void setOwnerThreadContext(Throwable ownerThreadContext);
 }

@@ -456,15 +456,12 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
         protected void afterExecute(Runnable r, Throwable t) {
             synchronized (monitor) {
                 Work work = (Work) r;
-                work.afterRun(t == null); // change state
+                work.afterRun(t); // change state
                 running.remove(work);
                 if (work.getState() == State.SUSPENDED) {
                     suspended.add(work);
                 } else {
                     completed.add(work);
-                }
-                if (t != null) {
-                    log.error("work was aborted, cause set to caller context", new Exception(work.toString(), work.getOwnerThreadContext()));
                 }
             }
         }

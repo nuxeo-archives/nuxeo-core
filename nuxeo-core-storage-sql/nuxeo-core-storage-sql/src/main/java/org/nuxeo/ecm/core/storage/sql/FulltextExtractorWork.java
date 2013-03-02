@@ -161,7 +161,6 @@ public class FulltextExtractorWork extends AbstractWork {
         if (!infos.isEmpty()) {
             // false = binary text
             Work work = new FulltextUpdaterWork(false, repositoryName, infos);
-            work.setOwnerThreadContext(getOwnerThreadContext());
             Framework.getLocalService(WorkManager.class).schedule(work);
         }
         setStatus(null);

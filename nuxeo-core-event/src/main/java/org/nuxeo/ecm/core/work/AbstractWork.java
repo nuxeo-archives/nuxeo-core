@@ -96,14 +96,14 @@ public abstract class AbstractWork implements Work {
 
     protected CoreSession session;
 
-    protected Throwable ownerThreadContext;
+    protected final WorkTraceError trace;
 
 
     public AbstractWork() {
         state = SCHEDULED;
         progress = PROGRESS_INDETERMINATE;
         schedulingTime = System.currentTimeMillis();
-        ownerThreadContext = new Error(toString());
+        trace = WorkTraceError.newInstance(this);
     }
 
     @Override
@@ -162,6 +162,7 @@ public abstract class AbstractWork implements Work {
         }
         boolean ok = false;
         Exception err = null;
+        trace.handleEnter();
         try {
             work();
             ok = true;
@@ -173,6 +174,7 @@ public abstract class AbstractWork implements Work {
                 throw new RuntimeException(e);
             }
         } finally {
+            WorkTraceError.handleReturn();
             try {
                 cleanUp(ok, err);
             } finally {
@@ -210,10 +212,11 @@ public abstract class AbstractWork implements Work {
     // before this, state is RUNNING, SUSPENDED or SUSPENDING (and error)
     // after this, state is COMPLETED, SUSPENDED or FAILED
     @Override
-    public void afterRun(boolean ok) {
+    public void afterRun(Throwable error) {
         synchronized (stateMonitor) {
-            if (!ok) {
+            if (error != null) {
                 state = FAILED;
+                trace.logSelf("work failed");
             } else if (state == RUNNING || state == SUSPENDING) {
                 state = COMPLETED;
             }
@@ -418,15 +421,6 @@ public abstract class AbstractWork implements Work {
         return Collections.emptyList();
     }
 
-    @Override
-    public Throwable getOwnerThreadContext() {
-        return ownerThreadContext;
-    }
-
-    @Override
-    public void setOwnerThreadContext(Throwable value) {
-        ownerThreadContext = value;
-    }
 
     /**
      * Release the transaction resources by committing the existing transaction
