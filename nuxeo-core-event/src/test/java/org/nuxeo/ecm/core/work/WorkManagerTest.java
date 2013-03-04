@@ -32,9 +32,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.log4j.Level;
+import org.apache.log4j.spi.LoggingEvent;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
 import org.nuxeo.ecm.core.work.api.Work;
 import org.nuxeo.ecm.core.work.api.Work.Progress;
 import org.nuxeo.ecm.core.work.api.WorkManager;
@@ -42,7 +45,14 @@ import org.nuxeo.ecm.core.work.api.WorkManager.Scheduling;
 import org.nuxeo.ecm.core.work.api.WorkQueueDescriptor;
 import org.nuxeo.runtime.api.Framework;
 import org.nuxeo.runtime.test.NXRuntimeTestCase;
+import org.nuxeo.runtime.test.runner.Features;
+import org.nuxeo.runtime.test.runner.FeaturesRunner;
+import org.nuxeo.runtime.test.runner.LogCaptureFeature;
 
+import com.google.inject.Inject;
+
+@RunWith(FeaturesRunner.class)
+@Features(LogCaptureFeature.class)
 public class WorkManagerTest extends NXRuntimeTestCase {
 
     protected static final String CATEGORY = "SleepWork";
@@ -52,6 +62,9 @@ public class WorkManagerTest extends NXRuntimeTestCase {
     protected WorkManager service;
 
     protected boolean dontClearCompletedWork;
+
+    @Inject
+    protected LogCaptureFeature.Result capturedEvents;
 
     @Override
     @Before
@@ -92,7 +105,18 @@ public class WorkManagerTest extends NXRuntimeTestCase {
         assertEquals(duration, remaining);
     }
 
+    public static class FilterInterruptException implements LogCaptureFeature.Filter {
+
+        @Override
+        public boolean accept(LoggingEvent event) {
+            return Level.ERROR.equals(event.getLevel()) &&
+                    ((String)event.getMessage()).contains("Uncaught exception from thread Thread-2");
+        }
+
+    }
+
     @Test
+    @LogCaptureFeature.With(value=FilterInterruptException.class, includes=FeaturesRunner.class)
     public void testWorkSuspendFromThread() throws Exception {
         long duration = 5000; // 5s
         SleepWork work = new SleepWork(duration, true);
