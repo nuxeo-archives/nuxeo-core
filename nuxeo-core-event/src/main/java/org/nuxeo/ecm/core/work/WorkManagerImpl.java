@@ -17,6 +17,7 @@
 package org.nuxeo.ecm.core.work;
 
 import java.io.Serializable;
+import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -68,6 +69,15 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
     public static final String DEFAULT_CATEGORY = "default";
 
     protected static final String QUEUES_EP = "queues";
+
+    protected static final UncaughtExceptionHandler UNCAUGHT_EXCEPTION_HANDLER =  new UncaughtExceptionHandler() {
+
+        @Override
+        public void uncaughtException(Thread t, Throwable e) {
+            log.error("Uncaught exception in thread " + t.getName(), e);
+        }
+
+    };
 
     protected WorkQueueDescriptorRegistry workQueueDescriptors;
 
@@ -153,6 +163,7 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
         public Thread newThread(Runnable r) {
             String name = prefix + threadNumber.incrementAndGet();
             Thread thread = new Thread(group, r, name);
+            thread.setUncaughtExceptionHandler(UNCAUGHT_EXCEPTION_HANDLER);
             // do not set daemon
             thread.setPriority(Thread.NORM_PRIORITY);
             return thread;

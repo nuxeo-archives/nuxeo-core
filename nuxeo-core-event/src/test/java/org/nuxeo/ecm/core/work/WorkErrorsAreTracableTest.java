@@ -3,7 +3,6 @@ package org.nuxeo.ecm.core.work;
 import static org.junit.Assert.assertEquals;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.log4j.spi.LoggingEvent;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.nuxeo.ecm.core.work.api.Work;
@@ -20,7 +19,7 @@ import com.google.inject.Inject;
 @RunWith(FeaturesRunner.class)
 @Features({ RuntimeFeature.class, LogCaptureFeature.class })
 @Deploy({ "org.nuxeo.ecm.core.event" })
-@LogCaptureFeature.With(value=WorkErrorsAreTracableTest.ChainFilter.class, includes=WorkTraceError.class, excludes=AbstractWork.class)
+@LogCaptureFeature.With(includes=WorkTraceError.class, excludes={WorkManagerImpl.class, AbstractWork.class})
 public class WorkErrorsAreTracableTest {
 
     protected static class Fail extends AbstractWork {
@@ -31,7 +30,7 @@ public class WorkErrorsAreTracableTest {
 
         @Override
         public void work() throws Exception {
-            throw new Error();
+            throw new RuntimeException();
         }
 
         public static class Error extends java.lang.Error {
@@ -54,16 +53,6 @@ public class WorkErrorsAreTracableTest {
         public void work() throws Exception {
             sub = new Fail();
             manager.schedule(sub);
-        }
-
-    }
-
-    public static class ChainFilter implements LogCaptureFeature.Filter {
-
-        @Override
-        public boolean accept(LoggingEvent event) {
-            String category = event.getLogger().getName();
-            return category.startsWith(WorkTraceError.class.getName());
         }
 
     }
@@ -92,7 +81,7 @@ public class WorkErrorsAreTracableTest {
 
     protected WorkTraceError awaitFailure(Work work)
             throws InterruptedException, NoFilterError {
-        manager.awaitCompletion(100, TimeUnit.MILLISECONDS);
+        manager.awaitCompletion(1, TimeUnit.SECONDS);
         result.assertHasEvent();
         WorkTraceError error = (WorkTraceError) result.getCaughtEvents().get(0).getThrowableInformation().getThrowable();
         assertIsRootWork(work, error);
