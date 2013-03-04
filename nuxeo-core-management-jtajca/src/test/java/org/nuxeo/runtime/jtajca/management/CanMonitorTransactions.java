@@ -29,12 +29,13 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.nuxeo.ecm.core.management.jtajca.TransactionMonitor;
 import org.nuxeo.ecm.core.management.jtajca.TransactionStatistics;
+import org.nuxeo.ecm.core.management.jtajca.internal.DefaultTransactionMonitor;
 import org.nuxeo.ecm.core.test.TransactionalFeature;
 import org.nuxeo.runtime.test.runner.Deploy;
 import org.nuxeo.runtime.test.runner.Features;
 import org.nuxeo.runtime.test.runner.FeaturesRunner;
 import org.nuxeo.runtime.test.runner.LogCaptureFeature;
-import org.nuxeo.runtime.test.runner.LogCaptureFeature.NoLogCaptureFilterException;
+import org.nuxeo.runtime.test.runner.LogCaptureFeature.NoFilterError;
 import org.nuxeo.runtime.test.runner.RuntimeFeature;
 import org.nuxeo.runtime.transaction.TransactionHelper;
 
@@ -200,9 +201,9 @@ public class CanMonitorTransactions {
     LogCaptureFeature.Result logCaptureResults;
 
     @Test
-    @LogCaptureFeature.FilterWith(value = CanMonitorTransactions.LogRollbackTraceFilter.class)
+    @LogCaptureFeature.With(value = CanMonitorTransactions.LogRollbackTraceFilter.class)
     public void logContainsRollbackTrace() throws InterruptedException,
-            ExecutionException, NoLogCaptureFilterException {
+            ExecutionException, NoFilterError {
         FutureTask<Boolean> task = new FutureTask<Boolean>(
                 new TestLogRollbackTrace());
         executor.execute(task);
@@ -239,9 +240,9 @@ public class CanMonitorTransactions {
     }
 
     @Test
-    @LogCaptureFeature.FilterWith(value = CanMonitorTransactions.LogMessageFilter.class)
+    @LogCaptureFeature.With(value = CanMonitorTransactions.LogMessageFilter.class, includes=DefaultTransactionMonitor.class)
     public void logContainsTxKey() throws InterruptedException,
-            ExecutionException, NoLogCaptureFilterException {
+            ExecutionException, NoFilterError {
         FutureTask<Boolean> task = new FutureTask<Boolean>(
                 new TestLogRollbackTrace());
         executor.execute(task);

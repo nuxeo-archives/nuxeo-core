@@ -158,7 +158,7 @@ public class DefaultTransactionMonitor implements TransactionManagerMonitor,
         }
         tm.registerInterposedSynchronization(this); // register end status
         if (log.isTraceEnabled()) {
-            log.trace(info.toString());
+            log.trace(info);
         }
     }
 
@@ -233,7 +233,7 @@ public class DefaultTransactionMonitor implements TransactionManagerMonitor,
         Object key = tm.getTransactionKey();
         DefaultTransactionStatistics stats;
         synchronized (this) {
-            stats = (DefaultTransactionStatistics) activeStatistics.get(key);
+            stats = activeStatistics.get(key);
         }
         if (stats == null) {
             log.debug(key + " not found in active statistics map");
