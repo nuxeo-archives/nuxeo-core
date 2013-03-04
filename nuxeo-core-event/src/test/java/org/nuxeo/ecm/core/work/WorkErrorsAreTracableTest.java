@@ -1,16 +1,11 @@
 package org.nuxeo.ecm.core.work;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.logging.LogFactory;
 import org.apache.log4j.spi.LoggingEvent;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.nuxeo.ecm.core.work.AbstractWork;
-import org.nuxeo.ecm.core.work.WorkTraceError;
 import org.nuxeo.ecm.core.work.api.Work;
 import org.nuxeo.ecm.core.work.api.WorkManager;
 import org.nuxeo.runtime.test.runner.Deploy;
@@ -25,7 +20,7 @@ import com.google.inject.Inject;
 @RunWith(FeaturesRunner.class)
 @Features({ RuntimeFeature.class, LogCaptureFeature.class })
 @Deploy({ "org.nuxeo.ecm.core.event" })
-@LogCaptureFeature.With(includes=WorkTraceError.class, excludes=AbstractWork.class, additivity=false)
+@LogCaptureFeature.With(value=WorkErrorsAreTracableTest.ChainFilter.class, includes=WorkTraceError.class, excludes=AbstractWork.class)
 public class WorkErrorsAreTracableTest {
 
     protected static class Fail extends AbstractWork {
@@ -84,8 +79,7 @@ public class WorkErrorsAreTracableTest {
             InterruptedException {
         Fail work = new Fail();
         manager.schedule(work);
-        WorkTraceError error = awaitFailure(work);
-        assertNotNull(error);
+        awaitFailure(work);
     }
 
     @Test
@@ -93,9 +87,7 @@ public class WorkErrorsAreTracableTest {
             InterruptedException {
         Nest work = new Nest();
         manager.schedule(work);
-        WorkTraceError error = awaitFailure(work);
-        WorkTraceError cause = (WorkTraceError) error.getCause();
-        assertEquals(work, cause.work);
+        awaitFailure(work);
     }
 
     protected WorkTraceError awaitFailure(Work work)
