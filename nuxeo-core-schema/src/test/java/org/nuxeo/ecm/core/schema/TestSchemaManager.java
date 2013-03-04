@@ -25,17 +25,30 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.apache.log4j.Level;
+import org.apache.log4j.spi.LoggingEvent;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
 import org.nuxeo.ecm.core.schema.types.ComplexType;
 import org.nuxeo.ecm.core.schema.types.CompositeType;
 import org.nuxeo.ecm.core.schema.types.Schema;
 import org.nuxeo.ecm.core.schema.types.Type;
 import org.nuxeo.runtime.api.Framework;
 import org.nuxeo.runtime.test.NXRuntimeTestCase;
+import org.nuxeo.runtime.test.runner.Features;
+import org.nuxeo.runtime.test.runner.FeaturesRunner;
+import org.nuxeo.runtime.test.runner.LogCaptureFeature;
 
+import com.google.inject.Inject;
+
+@RunWith(FeaturesRunner.class)
+@Features(LogCaptureFeature.class)
 public class TestSchemaManager extends NXRuntimeTestCase {
+
+    @Inject
+    protected LogCaptureFeature.Result capturedEvents;
 
     SchemaManagerImpl schemaManager;
 
@@ -248,7 +261,20 @@ public class TestSchemaManager extends NXRuntimeTestCase {
         assertEquals(0, t.getFacets().size());
     }
 
+
+
+    public static class FilterInheritanceLoopError implements LogCaptureFeature.Filter {
+
+        @Override
+        public boolean accept(LoggingEvent event) {
+            return Level.ERROR.equals(event.getLevel()) &&
+                    ((String)event.getMessage()).contains("inheritance loop");
+        }
+
+    }
+
     @Test
+    @LogCaptureFeature.With(value=FilterInheritanceLoopError.class, includes=SchemaManagerImpl.class)
     public void testSupertypeLoop() throws Exception {
         deployContrib("org.nuxeo.ecm.core.schema.tests",
                 "OSGI-INF/test-supertype-loop.xml");
@@ -256,9 +282,21 @@ public class TestSchemaManager extends NXRuntimeTestCase {
         DocumentType t2 = schemaManager.getDocumentType("someDocInLoop2");
         assertEquals("someDocInLoop2", t.getSuperType().getName());
         assertNull(t2.getSuperType());
+        capturedEvents.assertHasEvent();
+    }
+
+    public static final class FilterNoSuchDocument implements LogCaptureFeature.Filter {
+
+        @Override
+        public boolean accept(LoggingEvent event) {
+            return Level.ERROR.equals(event.getLevel()) &&
+                    ((String)event.getMessage()).contains("noSuchDocumentType");
+        }
+
     }
 
     @Test
+    @LogCaptureFeature.With(value=FilterNoSuchDocument.class, includes=SchemaManagerImpl.class)
     public void testMissingSupertype() throws Exception {
         deployContrib("org.nuxeo.ecm.core.schema.tests",
                 "OSGI-INF/test-missing-supertype.xml");
@@ -266,15 +304,28 @@ public class TestSchemaManager extends NXRuntimeTestCase {
         DocumentType t2 = schemaManager.getDocumentType("someDoc2");
         assertNull(t.getSuperType());
         assertEquals("someDoc", t2.getSuperType().getName());
+        capturedEvents.assertHasEvent();
+    }
+
+    public static final class FilterUnknownSchema implements LogCaptureFeature.Filter {
+
+        @Override
+        public boolean accept(LoggingEvent event) {
+            return Level.ERROR.equals(event.getLevel()) &&
+                    ((String)event.getMessage()).contains("uses unknown schema");
+        }
+
     }
 
     @Test
+    @LogCaptureFeature.With(value=FilterUnknownSchema.class, includes=SchemaManagerImpl.class)
     public void testFacetMissingSchema() throws Exception {
         deployContrib("org.nuxeo.ecm.core.schema.tests",
                 "OSGI-INF/test-facet-missing-schema.xml");
         CompositeType f = schemaManager.getFacet("someFacet");
         assertEquals(Collections.singletonList("common"),
                 Arrays.asList(f.getSchemaNames()));
+        capturedEvents.assertHasEvent();
     }
 
     @Test
@@ -285,7 +336,7 @@ public class TestSchemaManager extends NXRuntimeTestCase {
         assertEquals(Collections.singletonList("schema2"),
                 Arrays.asList(t.getSchemaNames()));
         assertEquals(
-                new HashSet<String>(Arrays.asList("viewable", "writable")),
+                new HashSet<String>(Arrays.asList("viewable")),
                 t.getFacets());
 
         t = schemaManager.getDocumentType("myDoc2");
@@ -300,7 +351,7 @@ public class TestSchemaManager extends NXRuntimeTestCase {
         assertEquals(Collections.singletonList("schema2"),
                 Arrays.asList(t.getSchemaNames()));
         assertEquals(
-                new HashSet<String>(Arrays.asList("viewable", "writable",
+                new HashSet<String>(Arrays.asList("viewable",
                         "NewFacet")), t.getFacets());
 
         t = schemaManager.getDocumentType("myDoc2");

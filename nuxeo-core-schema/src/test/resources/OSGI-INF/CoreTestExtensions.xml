@@ -13,7 +13,6 @@
     <doctype name="myDoc" extends="Document">
       <schema name="schema2"/>
       <facet name="viewable"/>
-      <facet name="writable"/>
     </doctype>
     <doctype name="myDoc2" extends="Document">
       <schema name="schema1"/>
