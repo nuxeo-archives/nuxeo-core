@@ -19,11 +19,10 @@ import static org.junit.Assert.fail;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.log4j.AppenderSkeleton;
 import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
 import org.apache.log4j.spi.LoggingEvent;
 import org.junit.Test;
+import org.junit.runner.RunWith;
 import org.nuxeo.ecm.core.NXCore;
 import org.nuxeo.ecm.core.api.ClientException;
 import org.nuxeo.ecm.core.api.CoreSession;
@@ -36,10 +35,21 @@ import org.nuxeo.ecm.core.event.EventService;
 import org.nuxeo.ecm.core.event.EventTransactionListener;
 import org.nuxeo.ecm.core.model.Repository;
 import org.nuxeo.runtime.api.Framework;
+import org.nuxeo.runtime.test.runner.Features;
+import org.nuxeo.runtime.test.runner.FeaturesRunner;
+import org.nuxeo.runtime.test.runner.LogCaptureFeature;
 import org.nuxeo.runtime.transaction.TransactionHelper;
 import org.nuxeo.runtime.transaction.TransactionRuntimeException;
 
+import com.google.inject.Inject;
+
+@RunWith(FeaturesRunner.class)
+@Features(LogCaptureFeature.class)
 public class TestSQLRepositoryJTAJCA extends TXSQLRepositoryTestCase {
+
+    @Inject
+    protected LogCaptureFeature.Result capturedEvents;
+
 
     /**
      * Test that connection sharing allows use of several sessions at the same
@@ -85,6 +95,7 @@ public class TestSQLRepositoryJTAJCA extends TXSQLRepositoryTestCase {
         // let commit do an implicit save
         TransactionHelper.commitOrRollbackTransaction(); // release cx
         TransactionHelper.startTransaction();
+        closeSession();
         openSession(); // reopen cx and hold open
 
         Thread t = new Thread() {
@@ -179,46 +190,29 @@ public class TestSQLRepositoryJTAJCA extends TXSQLRepositoryTestCase {
 
     protected static final Log log = LogFactory.getLog(TestSQLRepositoryJTAJCA.class);
 
-    protected static class TxWarnChecker extends AppenderSkeleton {
+    public static class FilterTxWarn implements LogCaptureFeature.Filter {
 
-        boolean seenWarn;
-
-        @Override
-        public void close() {
-
-        }
-
-        @Override
-        public boolean requiresLayout() {
-            return false;
-        }
-
-        /*
-         * (non-Javadoc)
-         * @see org.apache.log4j.AppenderSkeleton#append(org.apache.log4j.spi.
-         * LoggingEvent)
-         */
-        @Override
-        protected void append(LoggingEvent event) {
+         @Override
+        public boolean accept(LoggingEvent event) {
             if (!Level.WARN.equals(event.getLevel())) {
-                return;
+                return false;
             }
             Object msg = event.getMessage();
             if (msg instanceof String
                     && (((String) msg).startsWith("Session invoked in a container without a transaction active"))) {
-                seenWarn = true;
+                return true;
             }
+            return false;
         }
 
     }
 
     @Test
+    @LogCaptureFeature.With(value=FilterTxWarn.class)
     public void testAccessWithoutTx() throws ClientException {
         TransactionHelper.commitOrRollbackTransaction();
-        TxWarnChecker checker = new TxWarnChecker();
-        Logger.getRootLogger().addAppender(checker);
         session.getRootDocument();
-        assertTrue(checker.seenWarn);
+        capturedEvents.assertHasEvent();
     }
 
     /**
