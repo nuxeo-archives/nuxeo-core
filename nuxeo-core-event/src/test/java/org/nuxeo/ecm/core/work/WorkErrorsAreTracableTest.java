@@ -1,10 +1,11 @@
-package org.nuxeo.ecm.core.scheduler;
+package org.nuxeo.ecm.core.work;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.logging.LogFactory;
 import org.apache.log4j.spi.LoggingEvent;
 import org.junit.Test;
 import org.junit.runner.RunWith;
