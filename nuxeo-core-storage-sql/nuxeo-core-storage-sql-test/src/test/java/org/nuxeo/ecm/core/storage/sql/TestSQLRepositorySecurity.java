@@ -13,6 +13,12 @@
 
 package org.nuxeo.ecm.core.storage.sql;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.nuxeo.ecm.core.api.security.Access.DENY;
 import static org.nuxeo.ecm.core.api.security.Access.GRANT;
 import static org.nuxeo.ecm.core.api.security.Access.UNKNOWN;
@@ -31,12 +37,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.junit.Before;
 import org.junit.After;
-import org.junit.Test;
+import org.junit.Before;
 import org.junit.Ignore;
-import static org.junit.Assert.*;
-
+import org.junit.Test;
+import org.junit.runner.RunWith;
 import org.nuxeo.ecm.core.NXCore;
 import org.nuxeo.ecm.core.api.ClientException;
 import org.nuxeo.ecm.core.api.CoreSession;
@@ -55,20 +60,23 @@ import org.nuxeo.ecm.core.api.security.impl.ACLImpl;
 import org.nuxeo.ecm.core.api.security.impl.ACPImpl;
 import org.nuxeo.ecm.core.api.security.impl.UserEntryImpl;
 import org.nuxeo.ecm.core.security.SecurityService;
+import org.nuxeo.runtime.test.runner.Features;
+import org.nuxeo.runtime.test.runner.FeaturesRunner;
+import org.nuxeo.runtime.test.runner.LogCaptureFeature;
+
+import com.google.inject.Inject;
 
 /**
  * @author Florent Guillaume
  */
+@RunWith(FeaturesRunner.class)
+@Features(LogCaptureFeature.class)
 public class TestSQLRepositorySecurity extends SQLRepositoryTestCase {
 
-    public TestSQLRepositorySecurity() {
-        super();
-    }
+    @Inject
+    protected LogCaptureFeature.Result capturedEvents;
 
-    public TestSQLRepositorySecurity(String name) {
-        super(name);
-    }
-
+    @Override
     @Before
     public void setUp() throws Exception {
         super.setUp();
@@ -79,6 +87,7 @@ public class TestSQLRepositorySecurity extends SQLRepositoryTestCase {
         openSession();
     }
 
+    @Override
     @After
     public void tearDown() throws Exception {
         // session.cancel();
@@ -140,7 +149,10 @@ public class TestSQLRepositorySecurity extends SQLRepositoryTestCase {
         session.save();
     }
 
+
+
     @Test
+    @LogCaptureFeature.With(value = LogCaptureFeature.FilterErrors.class, includes = CoreSession.class)
     public void testSecurity() throws ClientException {
         // temporary set an Everything privileges on the root for anonymous
         // so that we can create a folder
@@ -241,7 +253,8 @@ public class TestSQLRepositorySecurity extends SQLRepositoryTestCase {
             removePermissionToAnonymous();
             anonSession.save(); // process invalidations
 
-            setPermissionToEveryone(WRITE, REMOVE, ADD_CHILDREN, REMOVE_CHILDREN, READ);
+            setPermissionToEveryone(WRITE, REMOVE, ADD_CHILDREN,
+                    REMOVE_CHILDREN, READ);
             root = anonSession.getRootDocument();
 
             DocumentModel folder3 = new DocumentModelImpl(
@@ -265,6 +278,11 @@ public class TestSQLRepositorySecurity extends SQLRepositoryTestCase {
         } finally {
             closeSession(anonSession);
         }
+
+        capturedEvents.assertHasEvent();
+        capturedEvents.assertContains(
+                "Permission 'AddChildren' is not granted to 'anonymous' on document /folder#1",
+                "Permission 'AddChildren' is not granted to 'anonymous' on document /folder#1");
     }
 
     @Test
@@ -354,7 +372,8 @@ public class TestSQLRepositorySecurity extends SQLRepositoryTestCase {
         DocumentModel root = new DocumentModelImpl("/", "testACPInheritance",
                 "Folder");
         root = session.createDocument(root);
-        DocumentModel doc = new DocumentModelImpl("/testACPInheritance", "folder", "Folder");
+        DocumentModel doc = new DocumentModelImpl("/testACPInheritance",
+                "folder", "Folder");
         doc = session.createDocument(doc);
 
         ACP rootAcp = root.getACP();
@@ -376,7 +395,9 @@ public class TestSQLRepositorySecurity extends SQLRepositoryTestCase {
         assertEquals("joe_reader", acl.getACEs()[0].getUsername());
 
         // block inheritance
-        acp.getOrCreateACL().add(new ACE(SecurityConstants.EVERYONE, SecurityConstants.EVERYTHING, false));
+        acp.getOrCreateACL().add(
+                new ACE(SecurityConstants.EVERYONE,
+                        SecurityConstants.EVERYTHING, false));
         doc.setACP(acp, true);
         session.save();
 
@@ -389,6 +410,7 @@ public class TestSQLRepositorySecurity extends SQLRepositoryTestCase {
 
     // copied from TestAPI in nuxeo-core-facade
     @Test
+    @LogCaptureFeature.With(value = LogCaptureFeature.FilterErrors.class, includes = CoreSession.class)
     public void testPermissionChecks() throws Throwable {
 
         CoreSession joeReaderSession = null;
@@ -503,6 +525,10 @@ public class TestSQLRepositorySecurity extends SQLRepositoryTestCase {
                 throw rethrow;
             }
         }
+        capturedEvents.assertContains(
+                "Permission 'WriteProperties' is not granted to 'joe_reader' on document /docWithPerms",
+                "Permission 'AddChildren' is not granted to 'joe_reader' on document /docWithPerms",
+                "Permission 'RemoveChildren' is not granted to 'joe_contributor' on document /docWithPerms");
     }
 
     protected DocumentRef createDocumentModelWithSamplePermissions(String name)
@@ -531,8 +557,7 @@ public class TestSQLRepositorySecurity extends SQLRepositoryTestCase {
         // add the permission to remove children on the root
         ACP rootACP = root.getACP();
         ACL rootACL = rootACP.getOrCreateACL();
-        rootACL.add(new ACE("joe_localmanager",
-                REMOVE_CHILDREN, true));
+        rootACL.add(new ACE("joe_localmanager", REMOVE_CHILDREN, true));
         rootACP.addACL(rootACL);
         root.setACP(rootACP, true);
 
@@ -615,7 +640,6 @@ public class TestSQLRepositorySecurity extends SQLRepositoryTestCase {
         } finally {
             closeSession(joeSession);
         }
-
 
     }
 }
