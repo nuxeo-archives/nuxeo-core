@@ -17,24 +17,41 @@
 
 package org.nuxeo.ecm.core.management.test.statuses;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+
 import java.util.List;
 
-import org.junit.Before;
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
-import static org.junit.Assert.*;
-
+import org.junit.runner.RunWith;
 import org.nuxeo.ecm.core.management.api.AdministrativeStatus;
 import org.nuxeo.ecm.core.management.api.AdministrativeStatusManager;
 import org.nuxeo.ecm.core.management.api.GlobalAdministrativeStatusManager;
 import org.nuxeo.ecm.core.management.api.ProbeManager;
 import org.nuxeo.ecm.core.management.statuses.AdministrableServiceDescriptor;
+import org.nuxeo.ecm.core.management.storage.DocumentModelStatusPersister;
 import org.nuxeo.ecm.core.management.storage.DocumentStoreSessionRunner;
 import org.nuxeo.ecm.core.storage.sql.SQLRepositoryTestCase;
 import org.nuxeo.runtime.api.Framework;
+import org.nuxeo.runtime.test.runner.Features;
+import org.nuxeo.runtime.test.runner.FeaturesRunner;
+import org.nuxeo.runtime.test.runner.LogCaptureFeature;
 
+import com.google.inject.Inject;
+
+@RunWith(FeaturesRunner.class)
+@Features(LogCaptureFeature.class)
 public class TestAdministrativeStatusService extends SQLRepositoryTestCase {
 
+    @Inject
+    protected LogCaptureFeature.Result capturedEvents;
+
+    @Override
     @Before
     public void setUp() throws Exception {
         AdministrativeStatusChangeListener.init();
@@ -48,6 +65,7 @@ public class TestAdministrativeStatusService extends SQLRepositoryTestCase {
         openSession();
     }
 
+    @Override
     @After
     public void tearDown() throws Exception {
         closeSession();
@@ -119,11 +137,13 @@ public class TestAdministrativeStatusService extends SQLRepositoryTestCase {
     }
 
     @Test
+    @LogCaptureFeature.With(value=LogCaptureFeature.FilterWarnAndErrors.class, includes=DocumentModelStatusPersister.class)
     public void testServiceListing() {
         AdministrativeStatusManager localManager = Framework.getLocalService(AdministrativeStatusManager.class);
         List<AdministrativeStatus> statuses = localManager.getAllStatuses();
         assertNotNull(statuses);
         assertEquals(3, statuses.size());
+        capturedEvents.assertContains("Unable to fetch status for service org.nawak in instance");
     }
 
     @Test
