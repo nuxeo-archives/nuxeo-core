@@ -166,6 +166,11 @@ public abstract class AbstractWork implements Work {
         try {
             work();
             ok = true;
+        } catch (Error e) {
+            if (System.getProperty("java.version").startsWith("1.6")) {
+                throw new RuntimeException("wrapped into runtime, not properly caught in java 1.6", e);
+            }
+            throw e;
         } catch (Exception e) {
             err = e;
             if (e instanceof RuntimeException) {

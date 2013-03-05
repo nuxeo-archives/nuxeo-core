@@ -1,6 +1,7 @@
 package org.nuxeo.ecm.core.work;
 
 import static org.junit.Assert.assertEquals;
+
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
@@ -30,7 +31,7 @@ public class WorkErrorsAreTracableTest {
 
         @Override
         public void work() throws Exception {
-            throw new RuntimeException();
+            throw new Error();
         }
 
         public static class Error extends java.lang.Error {
