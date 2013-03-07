@@ -37,10 +37,10 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
@@ -52,6 +52,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
 import org.nuxeo.common.utils.XidImpl;
 import org.nuxeo.ecm.core.api.ClientException;
 import org.nuxeo.ecm.core.api.IterableQueryResult;
@@ -65,14 +66,25 @@ import org.nuxeo.ecm.core.storage.sql.jdbc.ClusterNodeHandler;
 import org.nuxeo.ecm.core.storage.sql.jdbc.JDBCBackend;
 import org.nuxeo.ecm.core.storage.sql.jdbc.JDBCConnection;
 import org.nuxeo.ecm.core.storage.sql.jdbc.JDBCConnectionPropagator;
+import org.nuxeo.ecm.core.storage.sql.jdbc.JDBCLogger;
 import org.nuxeo.ecm.core.storage.sql.jdbc.JDBCMapper;
 import org.nuxeo.ecm.core.storage.sql.jdbc.JDBCRowMapper;
 import org.nuxeo.ecm.core.storage.sql.jdbc.dialect.Dialect;
 import org.nuxeo.runtime.api.Framework;
+import org.nuxeo.runtime.test.runner.Features;
+import org.nuxeo.runtime.test.runner.FeaturesRunner;
+import org.nuxeo.runtime.test.runner.LogCaptureFeature;
 
+import com.google.inject.Inject;
+
+@RunWith(FeaturesRunner.class)
+@Features(LogCaptureFeature.class)
 public class TestSQLBackend extends SQLBackendTestCase {
 
     private static final Log log = LogFactory.getLog(TestSQLBackend.class);
+
+    @Inject
+    protected LogCaptureFeature.Result caughtEvents;
 
     @Override
     @Before
@@ -364,6 +376,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
     }
 
     @Test
+    @LogCaptureFeature.With(value=LogCaptureFeature.Filter.Errors.class, loggers=JDBCLogger.class)
     public void testBasicsUpgrade() throws Exception {
         if ("sequence".equals(DatabaseHelper.DEF_ID_TYPE)) {
             return;
@@ -374,6 +387,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
         } finally {
             JDBCMapper.testProps.clear();
         }
+
     }
 
     @Test
@@ -2279,6 +2293,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
     }
 
     @Test
+    @LogCaptureFeature.With(value=LogCaptureFeature.Filter.Errors.class, loggers=JDBCLogger.class)
     public void testVersionsUpgrade() throws Exception {
         if ("sequence".equals(DatabaseHelper.DEF_ID_TYPE)) {
             return;
@@ -2331,6 +2346,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
     }
 
     @Test
+    @LogCaptureFeature.With(value=LogCaptureFeature.Filter.Errors.class, loggers=JDBCLogger.class)
     public void testLastContributorUpgrade() throws StorageException {
         if ("sequence".equals(DatabaseHelper.DEF_ID_TYPE)) {
             return;
@@ -2817,6 +2833,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
     }
 
     @Test
+    @LogCaptureFeature.With(value=LogCaptureFeature.Filter.Errors.class, loggers=JDBCLogger.class)
     public void testLocksUpgrade() throws Exception {
         if ("sequence".equals(DatabaseHelper.DEF_ID_TYPE)) {
             return;
