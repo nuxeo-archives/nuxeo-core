@@ -23,6 +23,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
+import org.junit.runner.RunWith;
 import org.nuxeo.ecm.core.event.Event;
 import org.nuxeo.ecm.core.event.EventService;
 import org.nuxeo.ecm.core.event.EventServiceAdmin;
@@ -34,10 +35,20 @@ import org.nuxeo.ecm.core.event.impl.PostCommitEventExecutor;
 import org.nuxeo.runtime.api.Framework;
 import org.nuxeo.runtime.jtajca.NuxeoContainer;
 import org.nuxeo.runtime.test.NXRuntimeTestCase;
+import org.nuxeo.runtime.test.runner.Features;
+import org.nuxeo.runtime.test.runner.FeaturesRunner;
+import org.nuxeo.runtime.test.runner.LogCaptureFeature;
 
+import com.google.inject.Inject;
+
+@RunWith(FeaturesRunner.class)
+@Features(LogCaptureFeature.class)
 public class TestEventServiceComponent extends NXRuntimeTestCase {
 
     protected int initialThreadCount;
+
+    @Inject
+    protected LogCaptureFeature.Result caughtEvents;
 
     @Override
     @Before
@@ -119,9 +130,15 @@ public class TestEventServiceComponent extends NXRuntimeTestCase {
     }
 
     @Test
+    @LogCaptureFeature.With(value=LogCaptureFeature.Filter.Errors.class, loggers=PostCommitEventExecutor.class)
     public void testSyncPostCommitError() throws Exception {
         // second handler done even though there's an error
         doTestSyncPostCommit(false, true, false, 2, 4);
+        caughtEvents.assertContains(
+                "Events postcommit execution encountered exception for listener: testPostCommit1",
+                "Rolling back transaction",
+                "Events postcommit execution encountered exception for listener: testPostCommit2",
+                "Rolling back transaction");
     }
 
     @Test
@@ -139,12 +156,18 @@ public class TestEventServiceComponent extends NXRuntimeTestCase {
     }
 
     @Test
+    @LogCaptureFeature.With(value=LogCaptureFeature.Filter.Errors.class, loggers=PostCommitEventExecutor.class)
     public void testSyncPostCommitErrorBulk() throws Exception {
         // second handler not done because error in first one (bulk)
         doTestSyncPostCommit(true, true, false, 1, 2);
+        caughtEvents.assertContains(
+                "Events postcommit bulk execution encountered exception for listener: testPostCommit1",
+                "Rolling back transaction",
+                "Events postcommit bulk execution aborted due to previous error");
     }
 
     @Test
+    @LogCaptureFeature.With(value=LogCaptureFeature.Filter.Errors.class, loggers=PostCommitEventExecutor.class)
     public void testSyncPostCommitTimeoutBulk() throws Exception {
         // returned after timeout (300ms), so only one listener done
         doTestSyncPostCommit(true, false, true, 1, 2);
@@ -152,6 +175,10 @@ public class TestEventServiceComponent extends NXRuntimeTestCase {
         // other listener was never run due to interrupt
         assertEquals(1, DummyPostCommitEventListener.handledCount());
         assertEquals(2, DummyPostCommitEventListener.eventCount());
+        caughtEvents.assertContains(
+                "Events postcommit bulk execution exceeded timeout of 1000ms, interrupting thread",
+                "Events postcommit bulk execution interrupted for listener: testPostCommit1, will rollback and abort bulk processing",
+                "Rolling back transaction");
     }
 
     protected void doTestSyncPostCommit(boolean bulk, boolean error,
