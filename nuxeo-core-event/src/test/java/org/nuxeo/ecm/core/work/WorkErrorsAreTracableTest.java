@@ -20,7 +20,7 @@ import com.google.inject.Inject;
 @RunWith(FeaturesRunner.class)
 @Features({ RuntimeFeature.class, LogCaptureFeature.class })
 @Deploy({ "org.nuxeo.ecm.core.event" })
-@LogCaptureFeature.With(includes=WorkTraceError.class, excludes={WorkManagerImpl.class, AbstractWork.class})
+@LogCaptureFeature.With(value=LogCaptureFeature.Filter.Errors.class, loggers={WorkManagerImpl.class, AbstractWork.class})
 public class WorkErrorsAreTracableTest {
 
     protected static class Fail extends AbstractWork {

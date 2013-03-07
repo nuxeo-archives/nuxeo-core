@@ -137,7 +137,7 @@ public class TestAdministrativeStatusService extends SQLRepositoryTestCase {
     }
 
     @Test
-    @LogCaptureFeature.With(value=LogCaptureFeature.FilterWarnAndErrors.class, includes=DocumentModelStatusPersister.class)
+    @LogCaptureFeature.With(value=LogCaptureFeature.Filter.WarnAndErrors.class, loggers=DocumentModelStatusPersister.class)
     public void testServiceListing() {
         AdministrativeStatusManager localManager = Framework.getLocalService(AdministrativeStatusManager.class);
         List<AdministrativeStatus> statuses = localManager.getAllStatuses();

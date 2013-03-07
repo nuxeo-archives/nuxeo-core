@@ -240,7 +240,7 @@ public class CanMonitorTransactions {
     }
 
     @Test
-    @LogCaptureFeature.With(value = CanMonitorTransactions.LogMessageFilter.class, includes=DefaultTransactionMonitor.class)
+    @LogCaptureFeature.With(value = CanMonitorTransactions.LogMessageFilter.class, loggers=DefaultTransactionMonitor.class)
     public void logContainsTxKey() throws InterruptedException,
             ExecutionException, NoFilterError {
         FutureTask<Boolean> task = new FutureTask<Boolean>(

@@ -274,7 +274,7 @@ public class TestSchemaManager extends NXRuntimeTestCase {
     }
 
     @Test
-    @LogCaptureFeature.With(value=FilterInheritanceLoopError.class, includes=SchemaManagerImpl.class)
+    @LogCaptureFeature.With(value=FilterInheritanceLoopError.class, loggers=SchemaManagerImpl.class)
     public void testSupertypeLoop() throws Exception {
         deployContrib("org.nuxeo.ecm.core.schema.tests",
                 "OSGI-INF/test-supertype-loop.xml");
@@ -296,7 +296,7 @@ public class TestSchemaManager extends NXRuntimeTestCase {
     }
 
     @Test
-    @LogCaptureFeature.With(value=FilterNoSuchDocument.class, includes=SchemaManagerImpl.class)
+    @LogCaptureFeature.With(value=FilterNoSuchDocument.class, loggers=SchemaManagerImpl.class)
     public void testMissingSupertype() throws Exception {
         deployContrib("org.nuxeo.ecm.core.schema.tests",
                 "OSGI-INF/test-missing-supertype.xml");
@@ -318,7 +318,7 @@ public class TestSchemaManager extends NXRuntimeTestCase {
     }
 
     @Test
-    @LogCaptureFeature.With(value=FilterUnknownSchema.class, includes=SchemaManagerImpl.class)
+    @LogCaptureFeature.With(value=FilterUnknownSchema.class, loggers=SchemaManagerImpl.class)
     public void testFacetMissingSchema() throws Exception {
         deployContrib("org.nuxeo.ecm.core.schema.tests",
                 "OSGI-INF/test-facet-missing-schema.xml");

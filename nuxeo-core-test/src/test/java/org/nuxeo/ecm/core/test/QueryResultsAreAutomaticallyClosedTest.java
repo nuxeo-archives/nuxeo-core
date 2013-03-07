@@ -25,7 +25,7 @@ import com.google.inject.Inject;
         LogCaptureFeature.class })
 @TransactionalConfig(autoStart = false)
 @RepositoryConfig(init = DefaultRepositoryInit.class)
-@LogCaptureFeature.With(value=QueryResultsAreAutomaticallyClosedTest.LogFilter.class, includes=CoreSession.class)
+@LogCaptureFeature.With(value=QueryResultsAreAutomaticallyClosedTest.LogFilter.class, loggers=CoreSession.class)
 public class QueryResultsAreAutomaticallyClosedTest {
 
     public static class LogFilter implements LogCaptureFeature.Filter {

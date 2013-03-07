@@ -116,7 +116,7 @@ public class WorkManagerTest extends NXRuntimeTestCase {
     }
 
     @Test
-    @LogCaptureFeature.With(value=FilterInterruptException.class, includes=FeaturesRunner.class)
+    @LogCaptureFeature.With(value=FilterInterruptException.class, loggers=FeaturesRunner.class)
     public void testWorkSuspendFromThread() throws Exception {
         long duration = 5000; // 5s
         SleepWork work = new SleepWork(duration, true);

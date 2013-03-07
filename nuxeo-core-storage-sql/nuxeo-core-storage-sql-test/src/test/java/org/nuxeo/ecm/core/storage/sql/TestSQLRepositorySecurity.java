@@ -152,7 +152,7 @@ public class TestSQLRepositorySecurity extends SQLRepositoryTestCase {
 
 
     @Test
-    @LogCaptureFeature.With(value = LogCaptureFeature.FilterErrors.class, includes = CoreSession.class)
+    @LogCaptureFeature.With(value = LogCaptureFeature.Filter.Errors.class, loggers = CoreSession.class)
     public void testSecurity() throws ClientException {
         // temporary set an Everything privileges on the root for anonymous
         // so that we can create a folder
@@ -410,7 +410,7 @@ public class TestSQLRepositorySecurity extends SQLRepositoryTestCase {
 
     // copied from TestAPI in nuxeo-core-facade
     @Test
-    @LogCaptureFeature.With(value = LogCaptureFeature.FilterErrors.class, includes = CoreSession.class)
+    @LogCaptureFeature.With(value = LogCaptureFeature.Filter.Errors.class, loggers = CoreSession.class)
     public void testPermissionChecks() throws Throwable {
 
         CoreSession joeReaderSession = null;
