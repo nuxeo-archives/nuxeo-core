@@ -20,7 +20,8 @@ import com.google.inject.Inject;
 @RunWith(FeaturesRunner.class)
 @Features({ RuntimeFeature.class, LogCaptureFeature.class })
 @Deploy({ "org.nuxeo.ecm.core.event" })
-@LogCaptureFeature.With(value=LogCaptureFeature.Filter.Errors.class, loggers={WorkManagerImpl.class, AbstractWork.class})
+@LogCaptureFeature.With(value = LogCaptureFeature.Filter.Errors.class, loggers = {
+        WorkTraceError.class, WorkManagerImpl.class, AbstractWork.class })
 public class WorkErrorsAreTracableTest {
 
     protected static class Fail extends AbstractWork {
@@ -65,16 +66,14 @@ public class WorkErrorsAreTracableTest {
     protected LogCaptureFeature.Result result;
 
     @Test
-    public void captureSimple() throws NoFilterError,
-            InterruptedException {
+    public void captureSimple() throws NoFilterError, InterruptedException {
         Fail work = new Fail();
         manager.schedule(work);
         awaitFailure(work);
     }
 
     @Test
-    public void captureChained() throws NoFilterError,
-            InterruptedException {
+    public void captureChained() throws NoFilterError, InterruptedException {
         Nest work = new Nest();
         manager.schedule(work);
         awaitFailure(work);
@@ -84,7 +83,10 @@ public class WorkErrorsAreTracableTest {
             throws InterruptedException, NoFilterError {
         manager.awaitCompletion(1, TimeUnit.SECONDS);
         result.assertHasEvent();
-        WorkTraceError error = (WorkTraceError) result.getCaughtEvents().get(0).getThrowableInformation().getThrowable();
+        result.assertContains(
+                "Exception during work: Fail(RUNNING, Progress(0.0%, ?/0), null)",
+                "Fail(FAILED, Progress(0.0%, ?/0), null)");
+        WorkTraceError error = (WorkTraceError) result.getCaughtEvents().get(1).getThrowableInformation().getThrowable();
         assertIsRootWork(work, error);
         return error;
     }
