@@ -34,7 +34,6 @@ import org.nuxeo.ecm.core.management.api.AdministrativeStatusManager;
 import org.nuxeo.ecm.core.management.api.GlobalAdministrativeStatusManager;
 import org.nuxeo.ecm.core.management.api.ProbeManager;
 import org.nuxeo.ecm.core.management.statuses.AdministrableServiceDescriptor;
-import org.nuxeo.ecm.core.management.storage.DocumentModelStatusPersister;
 import org.nuxeo.ecm.core.management.storage.DocumentStoreSessionRunner;
 import org.nuxeo.ecm.core.storage.sql.SQLRepositoryTestCase;
 import org.nuxeo.runtime.api.Framework;
@@ -137,13 +136,11 @@ public class TestAdministrativeStatusService extends SQLRepositoryTestCase {
     }
 
     @Test
-    @LogCaptureFeature.With(value=LogCaptureFeature.Filter.WarnAndErrors.class, loggers=DocumentModelStatusPersister.class)
     public void testServiceListing() {
         AdministrativeStatusManager localManager = Framework.getLocalService(AdministrativeStatusManager.class);
         List<AdministrativeStatus> statuses = localManager.getAllStatuses();
         assertNotNull(statuses);
         assertEquals(3, statuses.size());
-        capturedEvents.assertContains("Unable to fetch status for service org.nawak in instance");
     }
 
     @Test
