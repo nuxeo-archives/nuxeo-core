@@ -295,6 +295,11 @@ public class DocumentModelFactory {
         // write data models
         // check only the loaded ones to find the dirty ones
         for (DataModel dm : docModel.getDataModelsCollection()) { // only loaded
+            if (!Arrays.asList(docModel.getSchemas()).contains(dm.getSchema())) {
+                log.debug("Skipping data model from missing schema " + dm.getSchema());
+                continue;
+            }
+
             if (dm.isDirty()) {
                 DocumentPart part = ((DataModelImpl) dm).getDocumentPart();
                 try {

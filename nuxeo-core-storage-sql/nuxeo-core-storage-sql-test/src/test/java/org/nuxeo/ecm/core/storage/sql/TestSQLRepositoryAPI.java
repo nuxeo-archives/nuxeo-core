@@ -1800,6 +1800,29 @@ public class TestSQLRepositoryAPI extends SQLRepositoryTestCase {
     }
 
     @Test
+    public void testSaveDocumentWithExtraDataModel() throws ClientException {
+        DocumentModel root = session.getRootDocument();
+        String name = "file#" + generateUnique();
+        DocumentModel child = new DocumentModelImpl(root.getPathAsString(),
+                name, "File");
+        child = createChildDocument(child);
+
+        name = "book#" + generateUnique();
+        DocumentModel book = new DocumentModelImpl(root.getPathAsString(),
+                name, "Book");
+        book = createChildDocument(book);
+
+        child.detach(true);
+        book.detach(true);
+
+        child.getDataModels().putAll(book.getDataModels());
+        session.saveDocuments(new DocumentModel[]{child, book});
+
+        assertTrue(session.exists(child.getRef()));
+        assertTrue(session.exists(book.getRef()));
+    }
+
+    @Test
     public void testGetDataModel() throws ClientException {
         DocumentModel root = session.getRootDocument();
 
