@@ -354,15 +354,25 @@ public abstract class AbstractSession implements CoreSession, OperationHandler,
             log.trace("Transaction "
                     + (committed ? "committed" : "rolled back"));
         }
-        try {
-            if (committed) {
-                getEventService().transactionCommitted();
-            } else {
-                getEventService().transactionRolledback();
-            }
-        } catch (Exception e) {
-            log.error("Error while notifying transaction completion", e);
-        }
+		try {
+			if (isSessionAlive()) {
+				getSession().dispose();
+			}
+		} catch (ClientException e) {
+			log.error(
+					"Cannot access to repository session (" + sessionId + ")",
+					e);
+		} finally {
+			try {
+				if (committed) {
+					getEventService().transactionCommitted();
+				} else {
+					getEventService().transactionRolledback();
+				}
+			} catch (Exception e) {
+				log.error("Error while notifying transaction completion", e);
+			}
+		}
     }
 
     public void fireEvent(Event event) throws ClientException {
