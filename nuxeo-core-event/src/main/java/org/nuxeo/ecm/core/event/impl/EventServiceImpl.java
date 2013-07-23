@@ -25,6 +25,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.nuxeo.common.collections.ListenerList;
+import org.nuxeo.common.logging.SequenceTracer;
 import org.nuxeo.ecm.core.api.ClientException;
 import org.nuxeo.ecm.core.api.RecoverableClientException;
 import org.nuxeo.ecm.core.event.Event;
@@ -259,14 +260,17 @@ public class EventServiceImpl implements EventService, EventServiceAdmin {
                 }
             }
         }
-        
+
         if (!event.isInline()) { // record the event
             // don't record the complete event, only a shallow copy
             ShallowEvent shallowEvent = ShallowEvent.create(event);
             if (event.isImmediate()) {
                 EventBundleImpl b = new EventBundleImpl();
                 b.push(shallowEvent);
+                SequenceTracer.start("Fire immediate async " + event.getName());
+                long t0 = System.currentTimeMillis();
                 fireEventBundle(b);
+                SequenceTracer.stop("done");
             } else {
                 CompositeEventBundle b = compositeBundle.get();
                 b.push(shallowEvent);
@@ -298,8 +302,11 @@ public class EventServiceImpl implements EventService, EventServiceAdmin {
                 listeners.addAll(listenerDescriptors.getEnabledAsyncPostCommitListenersDescriptors());
             }
             if (!listeners.isEmpty()) {
+
+                SequenceTracer.start("Fire bulk postcommit bundle");
                 BulkExecutor bulkExecutor = new BulkExecutor(listeners, event);
                 bulkExecutor.run();
+                SequenceTracer.stop("done");
             }
             return;
         }
@@ -315,9 +322,12 @@ public class EventServiceImpl implements EventService, EventServiceAdmin {
         } else {
             List<EventListenerDescriptor> syncPCDescs = listenerDescriptors.getEnabledSyncPostCommitListenersDescriptors();
             if (syncPCDescs != null && !syncPCDescs.isEmpty()) {
+                SequenceTracer.start("Fire postcommit bundle");
                 PostCommitSynchronousRunner syncRunner = new PostCommitSynchronousRunner(
                         syncPCDescs, event);
                 syncRunner.run();
+                SequenceTracer.stop("done");
+
             }
         }
 
@@ -330,6 +340,7 @@ public class EventServiceImpl implements EventService, EventServiceAdmin {
         if (AsyncProcessorConfig.forceJMSUsage() && !comesFromJMS) {
             log.debug("Skipping async exec, this will be triggered via JMS");
         } else {
+            SequenceTracer.addNote("Fire async bundle");
             asyncExec.run(
                     listenerDescriptors.getEnabledAsyncPostCommitListenersDescriptors(),
                     event);

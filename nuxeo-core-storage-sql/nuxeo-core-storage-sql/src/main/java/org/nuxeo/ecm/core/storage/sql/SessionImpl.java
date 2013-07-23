@@ -39,6 +39,7 @@ import javax.transaction.xa.Xid;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.nuxeo.common.logging.SequenceTracer;
 import org.nuxeo.ecm.core.api.ClientException;
 import org.nuxeo.ecm.core.api.IterableQueryResult;
 import org.nuxeo.ecm.core.api.Lock;
@@ -309,14 +310,19 @@ public class SessionImpl implements Session, XAResource {
 
     @Override
     public void save() throws StorageException {
+        long start = System.nanoTime();
         checkLive();
         flush();
+        long elapsed = System.nanoTime() - start;
         if (!inTransaction) {
             sendInvalidationsToOthers();
             // as we don't have a way to know when the next non-transactional
             // statement will start, process invalidations immediately
             processReceivedInvalidations();
         }
+        SequenceTracer.addNote("session 0x" + Integer.toHexString(hashCode())
+                + " save in " + elapsed / 1000000 + " ms");
+
     }
 
     protected void flush() throws StorageException {
@@ -1116,8 +1122,7 @@ public class SessionImpl implements Session, XAResource {
 
     @Override
     public PartialList<Serializable> query(String query, String queryType,
-            QueryFilter queryFilter, long countUpTo)
-            throws StorageException {
+            QueryFilter queryFilter, long countUpTo) throws StorageException {
         return mapper.query(query, queryType, queryFilter, countUpTo);
     }
 
@@ -1153,7 +1158,11 @@ public class SessionImpl implements Session, XAResource {
 
     @Override
     public void updateReadAcls() throws StorageException {
+        long start = System.nanoTime();
+        SequenceTracer.start("Aclr update");
         mapper.updateReadAcls();
+        long elapsed = System.nanoTime() - start;
+        SequenceTracer.stop("done in " + elapsed / 1000000 + " ms");
         readAclsChanged = false;
     }
 

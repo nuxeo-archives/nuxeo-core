@@ -35,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.nuxeo.common.logging.SequenceTracer;
 import org.nuxeo.ecm.core.api.DocumentLocation;
 import org.nuxeo.ecm.core.work.api.Work;
 import org.nuxeo.ecm.core.work.api.WorkManager;
@@ -79,15 +80,20 @@ public abstract class AbstractWork implements Work {
 
     protected volatile Map<String, Serializable> data;
 
-    // Subclasses can update this field during the lifecycle of the work execution
-    // when they want to manage their transaction manually (e.g. for long running tasks
+    // Subclasses can update this field during the lifecycle of the work
+    // execution
+    // when they want to manage their transaction manually (e.g. for long
+    // running tasks
     // that only need access to transactional resources at specific times)
     protected volatile boolean isTransactionStarted = false;
+
+    protected String callerThread;
 
     public AbstractWork() {
         state = SCHEDULED;
         progress = PROGRESS_INDETERMINATE;
         schedulingTime = System.currentTimeMillis();
+        callerThread = SequenceTracer.getThreadName();
     }
 
     @Override
@@ -133,6 +139,7 @@ public abstract class AbstractWork implements Work {
             // cannot be SUSPENDING because we switch to that state
             // only if state is RUNNING (in suspend())
         }
+        SequenceTracer.startFrom(callerThread, getTitle());
     }
 
     @Override
@@ -207,6 +214,7 @@ public abstract class AbstractWork implements Work {
             setProgress(PROGRESS_100_PC);
         }
         completionTime = System.currentTimeMillis();
+        SequenceTracer.stop("done " + (completionTime - startTime) + "ms");
     }
 
     /**
