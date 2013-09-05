@@ -24,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.nuxeo.ecm.core.api.DocumentLocation;
 import org.nuxeo.ecm.core.work.AbstractWork;
+import org.nuxeo.ecm.core.work.WorkScheduleCallTrace;
 
 /**
  * A {@link Work} instance gets executed by a {@link WorkManager}.
@@ -93,12 +94,12 @@ public interface Work extends Runnable {
 
         public Progress(float percent) {
             this.percent = percent > 100F ? 100F : percent;
-            this.current = CURRENT_INDETERMINATE;
-            this.total = 0;
+            current = CURRENT_INDETERMINATE;
+            total = 0;
         }
 
         public Progress(long current, long total) {
-            this.percent = PERCENT_INDETERMINATE;
+            percent = PERCENT_INDETERMINATE;
             this.current = current;
             this.total = total;
         }
@@ -165,10 +166,10 @@ public interface Work extends Runnable {
      * Called by the thread pool executor after the work is run. Must set the
      * proper state (COMPLETED, SUSPENDED or FAILED).
      *
-     * @param ok {@code false} if there was an exception during task run and the
+     * @param error if there was an exception during task run and the
      *            state should be FAILED
      */
-    void afterRun(boolean ok);
+    void afterRun(Throwable error);
 
     /**
      * Gets the running state for this work instance.
@@ -197,6 +198,21 @@ public interface Work extends Runnable {
      * @return the scheduling time (milliseconds since epoch)
      */
     long getSchedulingTime();
+
+    /**
+     * Register the schedule call trace in work (usefull for debugging and error handling)
+     *
+     * @since 5.7.3
+     */
+    void setScheduleCallTrace(WorkScheduleCallTrace trace);
+
+    /**
+     * Gets the schedule call trace
+     *
+     * @since 5.7.3
+     */
+    WorkScheduleCallTrace getScheduleTrace();
+
 
     /**
      * Gets the time at which this work instance was started.
@@ -285,5 +301,7 @@ public interface Work extends Runnable {
      * @return the documents
      */
     Collection<DocumentLocation> getDocuments();
+
+
 
 }

@@ -97,6 +97,8 @@ public abstract class AbstractWork implements Work {
 
     protected CoreSession session;
 
+    protected WorkScheduleCallTrace scheduleTrace;
+
     public AbstractWork() {
         state = SCHEDULED;
         progress = PROGRESS_INDETERMINATE;
@@ -159,6 +161,9 @@ public abstract class AbstractWork implements Work {
         }
         boolean ok = false;
         Exception err = null;
+        if (scheduleTrace != null) {
+            scheduleTrace.handleEnter();
+        }
         try {
             work();
             ok = true;
@@ -170,6 +175,7 @@ public abstract class AbstractWork implements Work {
                 throw new RuntimeException(e);
             }
         } finally {
+            WorkScheduleCallTrace.handleReturn();
             try {
                 cleanUp(ok, err);
             } finally {
@@ -207,9 +213,9 @@ public abstract class AbstractWork implements Work {
     // before this, state is RUNNING, SUSPENDED or SUSPENDING (and error)
     // after this, state is COMPLETED, SUSPENDED or FAILED
     @Override
-    public void afterRun(boolean ok) {
+    public void afterRun(Throwable error) {
         synchronized (stateMonitor) {
-            if (!ok) {
+            if (error != null) {
                 state = FAILED;
             } else if (state == RUNNING || state == SUSPENDING) {
                 state = COMPLETED;
@@ -385,6 +391,16 @@ public abstract class AbstractWork implements Work {
     }
 
     @Override
+    public void setScheduleCallTrace(WorkScheduleCallTrace trace) {
+            scheduleTrace = trace;
+    }
+
+    @Override
+    public WorkScheduleCallTrace getScheduleTrace() {
+        return scheduleTrace;
+    }
+
+    @Override
     public long getStartTime() {
         return startTime;
     }
@@ -401,7 +417,7 @@ public abstract class AbstractWork implements Work {
 
     @Override
     public String toString() {
-        return getClass().getSimpleName() + "(" + getState() + ", "
+        return getCategory() + "(" + getPrincipal() + ","  + getDocuments() + "," + getState() + ", "
                 + getProgress() + ", " + getStatus() + ")";
     }
 
@@ -414,6 +430,7 @@ public abstract class AbstractWork implements Work {
     public Collection<DocumentLocation> getDocuments() {
         return Collections.emptyList();
     }
+
 
     /**
      * Release the transaction resources by committing the existing transaction

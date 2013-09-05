@@ -29,8 +29,6 @@ import org.nuxeo.ecm.core.event.Event;
 import org.nuxeo.ecm.core.event.EventBundle;
 import org.nuxeo.ecm.core.event.EventContext;
 import org.nuxeo.ecm.core.event.EventStats;
-import org.nuxeo.ecm.core.event.PostCommitEventListener;
-import org.nuxeo.ecm.core.event.PostCommitFilteringEventListener;
 import org.nuxeo.ecm.core.event.ReconnectedEventBundle;
 import org.nuxeo.ecm.core.work.AbstractWork;
 import org.nuxeo.ecm.core.work.api.WorkManager;
@@ -105,9 +103,9 @@ public class AsyncEventExecutor {
 
         protected final String title;
 
-        protected ReconnectedEventBundle bundle;
+        protected final ReconnectedEventBundle bundle;
 
-        protected EventListenerDescriptor listener;
+        protected final EventListenerDescriptor listener;
 
         public ListenerWork(EventListenerDescriptor listener, EventBundle bundle) {
             this.listener = listener;
@@ -164,8 +162,6 @@ public class AsyncEventExecutor {
             if (stats != null) {
                 stats.logAsyncExec(listener, System.currentTimeMillis() - startTime);
             }
-            bundle = null;
-            listener = null;
         }
     }
 

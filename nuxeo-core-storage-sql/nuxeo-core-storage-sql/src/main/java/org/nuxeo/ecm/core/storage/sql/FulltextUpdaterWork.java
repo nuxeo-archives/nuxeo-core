@@ -77,11 +77,11 @@ public class FulltextUpdaterWork extends PrioritizedWork {
         }
     }
 
-    protected boolean simpletext;
+    protected final boolean simpletext;
 
-    protected String repositoryName;
+    protected final String repositoryName;
 
-    protected Collection<FulltextUpdaterInfo> infos;
+    protected final Collection<FulltextUpdaterInfo> infos;
 
     public FulltextUpdaterWork(boolean simpletext, String repositoryName,
             Collection<FulltextUpdaterInfo> infos) {
@@ -166,7 +166,7 @@ public class FulltextUpdaterWork extends PrioritizedWork {
                             getFulltextPropertyName(info.indexName), info.text);
                     save = true;
                 } catch (DocumentException e) {
-                    log.error("Could not set fulltext on: " + doc.getId(), e);
+                    log.error("Could not set fulltext on: " + doc.getId() + "," + doc.getPathAsString(), e);
                     continue;
                 }
             }
@@ -191,6 +191,17 @@ public class FulltextUpdaterWork extends PrioritizedWork {
     public void cleanUp(boolean ok, Exception e) {
         super.cleanUp(ok, e);
         infos.clear();
-        infos = null;
+    }
+
+    @Override
+    public String toString() {
+        StringBuffer buffer = new StringBuffer(super.toString());
+        if (infos != null) {
+            for (FulltextUpdaterInfo info:infos) {
+                buffer.append(',');
+                buffer.append(info.toString());
+            }
+        }
+        return buffer.toString();
     }
 }

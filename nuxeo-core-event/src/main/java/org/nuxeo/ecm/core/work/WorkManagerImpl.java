@@ -494,16 +494,21 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
             synchronized (monitor) {
                 runningCount.dec();
                 Work work = (Work) r;
-                work.afterRun(t == null); // change state
-                workTimer.update(
-                        work.getCompletionTime() - work.getStartTime(),
-                        TimeUnit.MILLISECONDS);
+                work.afterRun(t); // change state
                 running.remove(work);
-                if (work.getState() == State.SUSPENDED) {
+                State state = work.getState();
+                if (state == State.SUSPENDED) {
                     suspended.add(work);
                 } else {
                     completed.add(work);
                     completedCount.inc();
+                }
+                if (state == State.FAILED) {
+                    log.error("Failure : " + work, work.getScheduleTrace());
+                } else {
+                    if (log.isDebugEnabled()) {
+                        log.debug("End : " + work, work.getScheduleTrace());
+                    }
                 }
             }
         }
@@ -868,8 +873,12 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
             throw new IllegalStateException(String.valueOf(work.getState()));
         }
         String queueId = getCategoryQueueId(work.getCategory());
+        if (log.isTraceEnabled()) {
+            WorkScheduleCallTrace scheduleTrace = WorkScheduleCallTrace.newInstance(work);
+            work.setScheduleCallTrace(scheduleTrace);
+        }
         if (log.isDebugEnabled()) {
-            log.debug("Scheduling work: " + work + " using queue: " + queueId);
+            log.debug("Scheduling work: " + work + " using queue: " + queueId, work.getScheduleTrace());
         }
         WorkThreadPoolExecutor executor = getExecutor(queueId);
         switch (scheduling) {

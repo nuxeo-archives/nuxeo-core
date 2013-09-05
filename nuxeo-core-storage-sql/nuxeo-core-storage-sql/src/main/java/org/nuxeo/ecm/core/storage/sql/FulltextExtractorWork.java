@@ -57,9 +57,9 @@ public class FulltextExtractorWork extends AbstractWork {
 
     protected static final String TITLE = "fulltextExtractor";
 
-    protected String repositoryName;
+    protected final String repositoryName;
 
-    protected Set<String> ids;
+    protected final Set<String> ids;
 
     protected ModelFulltext fulltextInfo;
 
@@ -169,10 +169,10 @@ public class FulltextExtractorWork extends AbstractWork {
     @Override
     public void cleanUp(boolean ok, Exception e) {
         super.cleanUp(ok, e);
+        ids.clear();
         fulltextInfo = null;
         fulltextParser = null;
         fulltextParserClass = null;
-        ids = null;
     }
 
     protected void initFulltextParser() {
