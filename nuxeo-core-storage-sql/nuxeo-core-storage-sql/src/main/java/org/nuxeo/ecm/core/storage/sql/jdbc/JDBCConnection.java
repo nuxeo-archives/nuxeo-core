@@ -271,6 +271,8 @@ public class JDBCConnection {
      */
     protected void checkConnectionReset(XAException e) {
         if (connection == null
+                || e.errorCode == XAException.XAER_RMFAIL
+                || e.errorCode == XAException.XAER_RMERR
                 || sqlInfo.dialect.isConnectionClosedException(e)) {
             try {
                 resetConnection();

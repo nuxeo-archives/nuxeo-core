@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.io.Reader;
 import java.io.Serializable;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.SocketException;
 import java.sql.Array;
@@ -35,6 +36,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import javax.transaction.xa.XAException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -71,6 +74,47 @@ public class DialectOracle extends Dialect {
 
     protected String usersSeparator;
 
+    protected XAErrorLogger xaErrorLogger;
+
+    protected static class XAErrorLogger {
+
+        protected final Class<?> oracleXAExceptionClass;
+
+        protected final Method m_xaError;
+
+        protected final Method m_xaErrorMessage;
+
+        protected final Method m_oracleError;
+
+        protected final Method m_oracleSQLError;
+
+        public XAErrorLogger() throws ClassNotFoundException, NoSuchMethodException, SecurityException {
+             oracleXAExceptionClass = Thread.currentThread().getContextClassLoader().loadClass(
+                    "oracle.jdbc.xa.OracleXAException");
+             m_xaError = oracleXAExceptionClass.getMethod("getXAError",
+                    new Class[] {});
+             m_xaErrorMessage = oracleXAExceptionClass.getMethod(
+                    "getXAErrorMessage", new Class[] { m_xaError.getReturnType() });
+             m_oracleError = oracleXAExceptionClass.getMethod(
+                    "getOracleError", new Class[] {});
+             m_oracleSQLError = oracleXAExceptionClass.getMethod(
+                    "getOracleSQLError", new Class[] {});
+        }
+
+        public void log(XAException e) throws IllegalAccessException, IllegalArgumentException, InvocationTargetException {
+            int xaError = ((Integer)m_xaError.invoke(e)).intValue();
+            String xaErrorMessage = (String)m_xaErrorMessage.invoke(xaError);
+            int oracleError = ((Integer)m_oracleError.invoke(e)).intValue();
+            int oracleSQLError = ((Integer)m_oracleSQLError.invoke(e)).intValue();
+            StringBuilder builder = new StringBuilder();
+            builder.append("Oracle XA Error : " + xaError + " (" + xaErrorMessage +"),");
+            builder.append("Oracle Error : " + oracleError +",");
+            builder.append("Oracle SQL Error : " + oracleSQLError);
+            log.warn(builder.toString(), e);
+        }
+
+    }
+
     public DialectOracle(DatabaseMetaData metadata,
             BinaryManager binaryManager,
             RepositoryDescriptor repositoryDescriptor) throws StorageException {
@@ -87,8 +131,16 @@ public class DialectOracle extends Dialect {
         usersSeparator = repositoryDescriptor == null ? null
                 : repositoryDescriptor.usersSeparatorKey == null ? DEFAULT_USERS_SEPARATOR
                         : repositoryDescriptor.usersSeparatorKey;
+        xaErrorLogger = newXAErrorLogger();
     }
 
+    protected XAErrorLogger newXAErrorLogger() throws StorageException {
+        try {
+            return new XAErrorLogger();
+        } catch (Exception e) {
+            throw new StorageException("Cannot introspect oracle driver classes", e);
+        }
+    }
     @Override
     public String getConnectionSchema(Connection connection)
             throws SQLException {
@@ -323,9 +375,9 @@ public class DialectOracle extends Dialect {
             String indexName, int nthMatch, Column mainColumn, Model model,
             Database database) {
         String indexSuffix = model.getFulltextIndexSuffix(indexName);
-        Table ft = database.getTable(model.FULLTEXT_TABLE_NAME);
-        Column ftMain = ft.getColumn(model.MAIN_KEY);
-        Column ftColumn = ft.getColumn(model.FULLTEXT_FULLTEXT_KEY
+        Table ft = database.getTable(Model.FULLTEXT_TABLE_NAME);
+        Column ftMain = ft.getColumn(Model.MAIN_KEY);
+        Column ftColumn = ft.getColumn(Model.FULLTEXT_FULLTEXT_KEY
                 + indexSuffix);
         String score = String.format("SCORE(%d)", nthMatch);
         String nthSuffix = nthMatch == 1 ? "" : String.valueOf(nthMatch);
@@ -562,16 +614,16 @@ public class DialectOracle extends Dialect {
         properties.put("fulltextEnabled", Boolean.valueOf(!fulltextDisabled));
         properties.put("clusteringEnabled", Boolean.valueOf(clusteringEnabled));
         if (!fulltextDisabled) {
-            Table ft = database.getTable(model.FULLTEXT_TABLE_NAME);
+            Table ft = database.getTable(Model.FULLTEXT_TABLE_NAME);
             properties.put("fulltextTable", ft.getQuotedName());
             ModelFulltext fti = model.getFulltextInfo();
             List<String> lines = new ArrayList<String>(fti.indexNames.size());
             for (String indexName : fti.indexNames) {
                 String suffix = model.getFulltextIndexSuffix(indexName);
-                Column ftft = ft.getColumn(model.FULLTEXT_FULLTEXT_KEY + suffix);
-                Column ftst = ft.getColumn(model.FULLTEXT_SIMPLETEXT_KEY
+                Column ftft = ft.getColumn(Model.FULLTEXT_FULLTEXT_KEY + suffix);
+                Column ftst = ft.getColumn(Model.FULLTEXT_SIMPLETEXT_KEY
                         + suffix);
-                Column ftbt = ft.getColumn(model.FULLTEXT_BINARYTEXT_KEY
+                Column ftbt = ft.getColumn(Model.FULLTEXT_BINARYTEXT_KEY
                         + suffix);
                 String line = String.format(
                         "  :NEW.%s := :NEW.%s || ' ' || :NEW.%s; ",
@@ -595,33 +647,52 @@ public class DialectOracle extends Dialect {
         return properties;
     }
 
-    @Override
-    public boolean isConnectionClosedException(Throwable t) {
-        while (t.getCause() != null) {
-            t = t.getCause();
-        }
+    public boolean isSocketError(Throwable t) {
         if (t instanceof SocketException) {
             return true;
         }
-        // XAResource.start:
-        // oracle.jdbc.xa.OracleXAException
-        Integer err = Integer.valueOf(0);
-        try {
-            Method m = t.getClass().getMethod("getOracleError");
-            err = (Integer) m.invoke(t);
-        } catch (Exception e) {
-            // ignore
+        Throwable cause = t.getCause();
+        if (cause == null || cause == t) {
+            return false;
         }
-        if (Integer.valueOf(0).equals(err)) {
+        return isSocketError(t);
+    }
+
+    @Override
+    public boolean isConnectionClosedException(Throwable t) {
+        if (t instanceof XAException) {
             try {
-                err = ((SQLException) t).getErrorCode();
+                xaErrorLogger.log((XAException)t);
             } catch (Exception e) {
-                // ignore
+                log.error("Cannot introspect oracle error ", t);
             }
+            return false;
         }
-        switch (err.intValue()) {
-        case 17002: // ORA-17002 IO Exception
-        case 17410: // ORA-17410 No more data to read from socket
+        if (isSocketError(t)) {
+            return true;
+        }
+        if (t instanceof SQLException) {
+            return isConnectionClosed(((SQLException)t).getErrorCode());
+        }
+        log.warn("Unknown exception type " + t.getClass(), t);
+        return false;
+    }
+
+    protected boolean isConnectionClosed(int oracleError) {
+        switch (oracleError) {
+        case 28:    // your session has been killed.
+        case 1033:  // Oracle initialization or shudown in progress.
+        case 1034:  // Oracle not available
+        case 1041:  // internal error. hostdef extension doesn't exist
+        case 1089:  // immediate shutdown in progress - no operations are permitted
+        case 1090:  // shutdown in progress - connection is not permitted
+        case 3113:  // end-of-file on communication channel
+        case 3114:  // not connected to ORACLE
+        case 12571: // TNS:packet writer failure
+        case 17002: // IO Exception
+        case 17008: // Closed Connection
+        case 17410: // No more data to read from socket
+        case 24768: // commit protocol error occured in the server
             return true;
         }
         return false;
