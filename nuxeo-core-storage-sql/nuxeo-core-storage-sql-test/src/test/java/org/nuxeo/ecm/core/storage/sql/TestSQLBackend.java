@@ -2774,7 +2774,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
                 QueryFilter.EMPTY, false);
         assertEquals(1, res.list.size());
 
-        assertTrue(node.addMixinType("Aged"));
+        assertTrue(session.addMixinType(node, "Aged"));
         session.save();
         assertTrue(node.hasMixinType("Aged"));
         assertEquals(1, node.getMixinTypes().length);
@@ -2787,23 +2787,23 @@ public class TestSQLBackend extends SQLBackendTestCase {
                 QueryFilter.EMPTY, false);
         assertEquals(0, res.list.size());
 
-        assertFalse(node.addMixinType("Aged"));
+        assertFalse(session.addMixinType(node, "Aged"));
         assertEquals(1, node.getMixinTypes().length);
 
-        assertTrue(node.addMixinType("Orderable"));
+        assertTrue(session.addMixinType(node, "Orderable"));
         assertTrue(node.hasMixinType("Aged"));
         assertTrue(node.hasMixinType("Orderable"));
         assertEquals(2, node.getMixinTypes().length);
 
         try {
-            node.addMixinType("nosuchmixin");
+            session.addMixinType(node, "nosuchmixin");
             fail();
         } catch (IllegalArgumentException e) {
             // ok
         }
         assertEquals(2, node.getMixinTypes().length);
 
-        assertTrue(node.removeMixinType("Aged"));
+        assertTrue(session.removeMixinType(node, "Aged"));
         session.save();
         assertFalse(node.hasMixinType("Aged"));
         assertTrue(node.hasMixinType("Orderable"));
@@ -2817,13 +2817,13 @@ public class TestSQLBackend extends SQLBackendTestCase {
                 QueryFilter.EMPTY, false);
         assertEquals(1, res.list.size());
 
-        assertFalse(node.removeMixinType("Aged"));
+        assertFalse(session.removeMixinType(node, "Aged"));
         assertEquals(1, node.getMixinTypes().length);
 
-        assertFalse(node.removeMixinType("nosuchmixin"));
+        assertFalse(session.removeMixinType(node, "nosuchmixin"));
         assertEquals(1, node.getMixinTypes().length);
 
-        assertTrue(node.removeMixinType("Orderable"));
+        assertTrue(session.removeMixinType(node, "Orderable"));
         assertFalse(node.hasMixinType("Aged"));
         assertFalse(node.hasMixinType("Orderable"));
         assertEquals(0, node.getMixinTypes().length);
@@ -2850,8 +2850,8 @@ public class TestSQLBackend extends SQLBackendTestCase {
         assertEquals(0, node.getMixinTypes().length); // instance mixins
         assertEquals(Collections.singleton("Aged"), node.getAllMixinTypes());
         assertTrue(node.hasMixinType("Aged"));
-        assertFalse(node.addMixinType("Aged"));
-        assertFalse(node.removeMixinType("Aged"));
+        assertFalse(session.addMixinType(node, "Aged"));
+        assertFalse(session.removeMixinType(node, "Aged"));
 
     }
 
@@ -2871,14 +2871,14 @@ public class TestSQLBackend extends SQLBackendTestCase {
         }
 
         // add
-        node.addMixinType("Aged");
+        session.addMixinType(node, "Aged");
         SimpleProperty p = node.getSimpleProperty("age:age");
         assertNotNull(p);
         p.setValue("123");
         session.save();
 
         // remove
-        node.removeMixinType("Aged");
+        session.removeMixinType(node, "Aged");
         session.save();
 
         // mixin not there anymore
@@ -2900,11 +2900,11 @@ public class TestSQLBackend extends SQLBackendTestCase {
         node.setSimpleProperty("age:age", "456");
         session.save();
 
-        node.addMixinType("Aged");
+        session.addMixinType(node, "Aged");
         SimpleProperty p = node.getSimpleProperty("age:age");
         assertEquals("456", p.getValue());
 
-        node.removeMixinType("Aged");
+        session.removeMixinType(node, "Aged");
         p = node.getSimpleProperty("age:age");
         assertEquals("456", p.getValue());
         session.save();
@@ -2918,7 +2918,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
         node.setSimpleProperty("tst:title", "bar");
         session.save();
 
-        node.addMixinType("Aged");
+        session.addMixinType(node, "Aged");
         node.setSimpleProperty("age:title", "gee");
         session.save();
 
@@ -2931,7 +2931,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
         Session session = repository.getConnection();
         Node root = session.getRootNode();
         Node node = session.addChildNode(root, "foo", null, "TestDoc", false);
-        node.addMixinType("Aged");
+        session.addMixinType(node, "Aged");
         node.setSimpleProperty("age:age", "123");
         node.setCollectionProperty("age:nicknames",
                 new String[] { "bar", "gee" });
@@ -2951,7 +2951,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
         Session session = repository.getConnection();
         Node root = session.getRootNode();
         Node node = session.addChildNode(root, "foo", null, "TestDoc", false);
-        node.addMixinType("Templated");
+        session.addMixinType(node, "Templated");
         Node t = session.addChildNode(node, "template", Long.valueOf(0),
                 "template", true);
         t.setSimpleProperty("templateId", "123");
@@ -2974,7 +2974,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
         session.save();
 
         Node node = session.addChildNode(folder, "foo", null, "TestDoc", false);
-        node.addMixinType("Aged");
+        session.addMixinType(node, "Aged");
         node.setSimpleProperty("age:age", "123");
         node.setCollectionProperty("age:nicknames",
                 new String[] { "bar", "gee" });
@@ -2995,7 +2995,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
         Session session = repository.getConnection();
         Node root = session.getRootNode();
         Node node = session.addChildNode(root, "foo", null, "TestDoc", false);
-        node.addMixinType("Aged");
+        session.addMixinType(node, "Aged");
         node.setSimpleProperty("age:age", "barbar");
         session.save();
 
@@ -3402,16 +3402,15 @@ public class TestSQLBackend extends SQLBackendTestCase {
         doc.setCollectionProperty("tst:subjects", new String[] { "foo", "bar",
                 "moo" });
 
-        Node owner = session.addChildNode(doc, "tst:owner", null, "person",
-                true);
+        Node owner = session.getChildNode(doc, "tst:owner", true);
         // tst:owner/firstname = 'Bruce'
         owner.setSimpleProperty("firstname", "Bruce");
         // tst:owner/lastname = 'Willis'
         owner.setSimpleProperty("lastname", "Willis");
 
-        Node duo = session.addChildNode(doc, "tst:couple", null, "duo", true);
-        Node first = session.addChildNode(duo, "first", null, "person", true);
-        Node second = session.addChildNode(duo, "second", null, "person", true);
+        Node duo = session.getChildNode(doc, "tst:couple", true);
+        Node first = session.getChildNode(duo, "first", true);
+        Node second = session.getChildNode(duo, "second", true);
         // tst:couple/first/firstname = 'Steve'
         first.setSimpleProperty("firstname", "Steve");
         // tst:couple/first/lastname = 'Jobs'
@@ -3436,8 +3435,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
         friend1.setSimpleProperty("lastname", "Smith");
 
         // this one doesn't have a schema prefix
-        Node person = session.addChildNode(doc, "animal", null, "animal",
-                true);
+        Node person = session.getChildNode(doc, "animal", true);
         // animal/race = 'dog'
         person.setSimpleProperty("race", "dog");
         // animal/name = 'Scooby'
