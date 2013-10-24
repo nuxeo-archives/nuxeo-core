@@ -220,4 +220,9 @@ public class SoftRefCachingMapper extends SoftRefCachingRowMapper implements Cac
         return mapper.isSameRM(xares);
     }
 
+    @Override
+    public String toString() {
+        return "SoftRefCachingMapper [mapper=" + mapper + "]";
+    }
+
 }

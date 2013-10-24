@@ -435,7 +435,9 @@ public class RepositoryImpl implements Repository {
      */
     @Override
     public SessionImpl getConnection() throws StorageException {
-        return getConnection(null);
+        SessionImpl session = getConnection(null);
+        session.acquire();
+        return session;
     }
 
     /**

@@ -19,6 +19,7 @@ import org.nuxeo.ecm.core.storage.sql.ra.PoolingRepositoryFactory;
 import org.nuxeo.ecm.core.test.annotations.Granularity;
 import org.nuxeo.ecm.core.test.annotations.RepositoryConfig;
 import org.nuxeo.ecm.core.test.annotations.TransactionalConfig;
+import org.nuxeo.runtime.api.ConnectionHelper;
 import org.nuxeo.runtime.jtajca.JtaActivator;
 import org.nuxeo.runtime.test.runner.Defaults;
 import org.nuxeo.runtime.test.runner.Deploy;
@@ -33,6 +34,8 @@ public class TransactionalFeature extends SimpleFeature {
     protected TransactionalConfig config;
 
     protected String autoactivationValue;
+
+    protected String singleDS;
 
     protected boolean txStarted;
 
@@ -50,6 +53,8 @@ public class TransactionalFeature extends SimpleFeature {
     @Override
     public void start(FeaturesRunner runner) throws Exception {
         autoactivationValue = System.getProperty(JtaActivator.AUTO_ACTIVATION);
+        singleDS = System.getProperty(ConnectionHelper.SINGLE_DS);
+        System.setProperty(ConnectionHelper.SINGLE_DS, "jdbc/NuxeoTestDS");
         System.setProperty(JtaActivator.AUTO_ACTIVATION, "true");
     }
 
@@ -60,6 +65,11 @@ public class TransactionalFeature extends SimpleFeature {
             props.put(JtaActivator.AUTO_ACTIVATION, autoactivationValue);
         } else {
             props.remove(JtaActivator.AUTO_ACTIVATION);
+        }
+        if (singleDS != null) {
+            props.put(ConnectionHelper.SINGLE_DS, singleDS);
+        } else {
+            props.remove(ConnectionHelper.SINGLE_DS);
         }
     }
 

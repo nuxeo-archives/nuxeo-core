@@ -893,12 +893,7 @@ public abstract class AbstractSession implements CoreSession, OperationHandler,
             options.put(CoreEventConstants.DESTINATION_NAME, docModel.getName());
             notifyEvent(DocumentEventTypes.ABOUT_TO_CREATE, docModel, options,
                     null, null, false, true); // no lifecycle yet
-            String docName = docModel.getName();
-            if (docName != null && !docName.equals(name)) {
-                name = docModel.getName();
-            } else {
-                name = (String)options.get(CoreEventConstants.DESTINATION_NAME);
-            }
+            name = (String) options.get(CoreEventConstants.DESTINATION_NAME);
             if (folder == null) {
                 folder = getSession().getNullDocument();
             }

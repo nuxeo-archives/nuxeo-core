@@ -332,4 +332,9 @@ public class JDBCConnection {
         }
     }
 
+    @Override
+    public String toString() {
+        return "JDBCConnection [connection=" + connection + ", noSharing="
+                + noSharing + "]";
+    }
 }

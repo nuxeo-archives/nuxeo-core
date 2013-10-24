@@ -22,6 +22,7 @@ import javax.resource.cci.ConnectionMetaData;
 import javax.resource.cci.Interaction;
 import javax.resource.cci.LocalTransaction;
 import javax.resource.cci.ResultSetInfo;
+import javax.resource.spi.IllegalStateException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -36,6 +37,7 @@ import org.nuxeo.ecm.core.storage.sql.Model;
 import org.nuxeo.ecm.core.storage.sql.Node;
 import org.nuxeo.ecm.core.storage.sql.Session;
 import org.nuxeo.ecm.core.storage.sql.SessionImpl;
+import org.nuxeo.ecm.core.storage.sql.SessionImpl.OwnerException;
 import org.nuxeo.runtime.services.streaming.FileSource;
 
 /**
@@ -83,13 +85,14 @@ public class ConnectionImpl implements Session {
      */
     protected void associate(SessionImpl session) {
         this.session = session;
+        session.acquire();
     }
 
     /**
      * Called by {@link ManagedConnectionImpl#removeConnection}.
      */
     protected void disassociate() {
-        session.checkLive();
+        session.release();
         session = null;
     }
 
@@ -100,13 +103,15 @@ public class ConnectionImpl implements Session {
     @Override
     public void close() throws ResourceException {
         if (managedConnection == null) {
-            log.error("Closing an already closed connection: " + this);
-            return;
+            throw new IllegalStateException("Closing an already closed connection: " + this);
         }
         try {
             managedConnection.close(this);
-        } finally {
+        } catch (OwnerException e) {
+            throw e;
+        } catch (Exception e) {
             managedConnection = null;
+            throw new IllegalStateException("Cannot close managed connection", e);
         }
     }
 

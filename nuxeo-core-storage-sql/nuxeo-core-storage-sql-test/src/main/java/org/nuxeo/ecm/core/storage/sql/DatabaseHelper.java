@@ -96,7 +96,7 @@ public abstract class DatabaseHelper {
     protected String databaseName = DEFAULT_DATABASE_NAME;
 
     public void setDatabaseName(String name) {
-        this.databaseName = name;
+        databaseName = name;
     }
 
     public static final String DEFAULT_REPOSITORY_NAME = "test";
@@ -104,7 +104,7 @@ public abstract class DatabaseHelper {
     public String repositoryName = DEFAULT_REPOSITORY_NAME;
 
     public void setRepositoryName(String name) {
-        this.repositoryName = name;
+        repositoryName = name;
     }
 
     /**

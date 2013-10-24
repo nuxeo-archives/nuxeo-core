@@ -20,7 +20,6 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.ConcurrentModificationException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -35,6 +34,8 @@ import javax.resource.cci.ConnectionMetaData;
 import javax.resource.cci.Interaction;
 import javax.resource.cci.LocalTransaction;
 import javax.resource.cci.ResultSetInfo;
+import javax.transaction.Transaction;
+import javax.transaction.TransactionManager;
 import javax.transaction.xa.XAException;
 import javax.transaction.xa.XAResource;
 import javax.transaction.xa.Xid;
@@ -63,9 +64,11 @@ import org.nuxeo.ecm.core.storage.sql.RowMapper.RowBatch;
 import org.nuxeo.ecm.core.work.api.Work;
 import org.nuxeo.ecm.core.work.api.WorkManager;
 import org.nuxeo.ecm.core.work.api.WorkManager.Scheduling;
+import org.nuxeo.runtime.api.ConnectionHelper;
 import org.nuxeo.runtime.api.Framework;
 import org.nuxeo.runtime.metrics.MetricsService;
 import org.nuxeo.runtime.services.streaming.FileSource;
+import org.nuxeo.runtime.transaction.TransactionHelper;
 
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.SharedMetricRegistries;
@@ -107,15 +110,73 @@ public class SessionImpl implements Session, XAResource {
 
     private boolean live;
 
-    private boolean inTransaction;
+    private Xid xid;
 
     private Node rootNode;
 
-    private long threadId;
+    protected static class OwnerInfo {
 
-    private String threadName;
+        protected static final boolean isCaptureStackEnabled = log.isTraceEnabled() || Framework.isDevModeSet() || Framework.isTestModeSet();
 
-    private Throwable threadStack;
+        protected final long threadId;
+
+        protected final String threadName;
+
+        protected final OwnerInfo stolen;
+
+        protected int count;
+
+        protected OwnerInfo stoler;
+
+        protected final transient Throwable cause;
+
+        protected OwnerInfo(OwnerInfo stolen) {
+            Thread.currentThread();
+            Thread thread = Thread.currentThread();
+            threadId = thread.getId();
+            threadName = thread.getName();
+            // link stolen info
+            this.stolen = stolen;
+            count = 1;
+            if (stolen != null) {
+                stolen.stoler = this;
+            }
+            cause = captureStackTrace();
+        }
+
+        protected Throwable captureStackTrace() {
+            return isCaptureStackEnabled ? new Throwable(toString(), stolen == null ? null : stolen.cause) : null;
+        }
+
+        @Override
+        public String toString() {
+            return "OwnerInfo [threadId=" + threadId + ", threadName="
+                    + threadName + ", count=" + count + ", stolen=" + (stoler != null)
+                    + "]";
+        }
+
+
+    }
+
+    public static class OwnerException extends RuntimeException {
+
+        private static final long serialVersionUID = 1L;
+        protected final OwnerInfo info;
+
+        public OwnerException(String message, OwnerInfo info) {
+            super("concurrent access with " + info, findCause(info));
+            this.info = info;
+        }
+
+        protected static Throwable findCause(OwnerInfo info) {
+            if (info.stoler != null) {
+                return findCause(info.stoler);
+            }
+            return info.cause;
+        }
+    }
+
+    protected volatile OwnerInfo ownerInfo;
 
     private boolean readAclsChanged;
 
@@ -179,11 +240,10 @@ public class SessionImpl implements Session, XAResource {
      * Clears all the caches. Called by RepositoryManagement.
      */
     protected int clearCaches() {
-        if (inTransaction) {
+        if (xid == null) {
             // avoid potential multi-threaded access to active session
             return 0;
         }
-        checkThreadEnd();
         return context.clearCaches();
     }
 
@@ -195,35 +255,71 @@ public class SessionImpl implements Session, XAResource {
         context.clearCaches();
     }
 
+    public void acquire() {
+        if (ownerInfo == null) {
+            ownerInfo = new OwnerInfo(null);
+        } else {
+            long id = Thread.currentThread().getId();
+            if (ownerInfo.threadId == id) {
+                ownerInfo.count += 1;
+            } else {
+                checkThread();
+            }
+        }
+    }
+
+    protected void trySteal() {
+        synchronized(this) {
+            ownerInfo = new OwnerInfo(ownerInfo);
+            if (!TransactionHelper.isTransactionActiveOrMarkedRollback()) {
+                throw new OwnerException("tx is not active", ownerInfo);
+            }
+            String datasourceName = ConnectionHelper.getPseudoDataSourceNameForRepository(repository.getName());
+            if (!ConnectionHelper.useSingleConnection(datasourceName)) {
+                throw new OwnerException(repository.getName()
+                        + " not in single connection mode", ownerInfo);
+            }
+            try {
+                rollback(xid);
+                TransactionManager tm = TransactionHelper.lookupTransactionManager();
+                Transaction tx = tm.getTransaction();
+                tx.enlistResource(this);
+                tx.setRollbackOnly();
+            } catch (Exception e) {
+                throw new UnsupportedOperationException(
+                        "Cannot enlist connection in tx", e);
+            }
+        }
+    }
+
+    public void release() {
+        checkLive();
+        ownerInfo.count -= 1;
+        if (ownerInfo.count == 0) {
+            ownerInfo = null;
+        }
+    }
+
     protected void checkThread() {
-        if (threadId == 0) {
+        if (ownerInfo == null) {
             return;
         }
-        long currentThreadId = Thread.currentThread().getId();
-        if (threadId == currentThreadId) {
+        Thread currentThread = Thread.currentThread();
+        long currentThreadId = currentThread.getId();
+        if (ownerInfo.threadId == currentThreadId) {
             return;
         }
-        String currentThreadName = Thread.currentThread().getName();
-        String msg = String.format(
-                "Concurrency Error: Session was started in thread %s (%s)"
-                        + " but is being used in thread %s (%s)", threadId,
-                threadName, currentThreadId, currentThreadName);
-        throw new IllegalStateException(msg, threadStack);
-    }
-
-    protected void checkThreadStart() {
-        threadId = Thread.currentThread().getId();
-        threadName = Thread.currentThread().getName();
-        if (log.isDebugEnabled()) {
-            threadStack = new Throwable("owner stack trace");
+        // is thread stolen
+        OwnerInfo stolenInfo = ownerInfo.stolen;
+        while (stolenInfo != null) { // TODO
+            if (stolenInfo.threadId == currentThreadId) {
+                throw new OwnerException("stolen session", stolenInfo);
+            }
+            stolenInfo = stolenInfo.stolen;
         }
+        trySteal();
     }
 
-    protected void checkThreadEnd() {
-        threadId = 0;
-        threadName = null;
-        threadStack = null;
-    }
 
     /**
      * Generates a new id, or used a pre-generated one (import).
@@ -254,6 +350,7 @@ public class SessionImpl implements Session, XAResource {
     protected void closeSession() throws StorageException {
         checkLive();
         live = false;
+        ownerInfo = null;
         context.clearCaches();
         // close the mapper and therefore the connection
         mapper.close();
@@ -307,7 +404,6 @@ public class SessionImpl implements Session, XAResource {
 
     @Override
     public Node getRootNode() {
-        checkThread();
         checkLive();
         return rootNode;
     }
@@ -341,7 +437,7 @@ public class SessionImpl implements Session, XAResource {
         try {
             checkLive();
             flushAndScheduleWork();
-            if (!inTransaction) {
+            if (xid == null) {
                 sendInvalidationsToOthers();
                 // as we don't have a way to know when the next
                 // non-transactional
@@ -354,7 +450,7 @@ public class SessionImpl implements Session, XAResource {
     }
 
     protected void flushAndScheduleWork() throws StorageException {
-        checkThread();
+        checkLive();
         List<Work> works;
         if (!repository.getRepositoryDescriptor().fulltextDisabled) {
             works = getFulltextWorks();
@@ -638,7 +734,6 @@ public class SessionImpl implements Session, XAResource {
 
     @Override
     public Node getNodeById(Serializable id) throws StorageException {
-        checkThread();
         checkLive();
         if (id == null) {
             throw new IllegalArgumentException("Illegal null id");
@@ -800,7 +895,6 @@ public class SessionImpl implements Session, XAResource {
     @Override
     public List<Node> getNodesByIds(List<Serializable> ids)
             throws StorageException {
-        checkThread();
         checkLive();
         return getNodesByIds(ids, true);
     }
@@ -878,7 +972,7 @@ public class SessionImpl implements Session, XAResource {
         }
         list.add(mixin);
         String[] mixins = list.toArray(new String[list.size()]);
-        node.hierFragment.put(model.MAIN_MIXIN_TYPES_KEY, mixins);
+        node.hierFragment.put(Model.MAIN_MIXIN_TYPES_KEY, mixins);
         // immediately create child nodes (for complex properties) in order
         // to avoid concurrency issue later on
         Map<String, String> childrenTypes = model.getMixinComplexChildren(mixin);
@@ -902,7 +996,7 @@ public class SessionImpl implements Session, XAResource {
         if (mixins.length == 0) {
             mixins = null;
         }
-        node.hierFragment.put(model.MAIN_MIXIN_TYPES_KEY, mixins);
+        node.hierFragment.put(Model.MAIN_MIXIN_TYPES_KEY, mixins);
         // remove child nodes
         Map<String, String> childrenTypes = model.getMixinComplexChildren(mixin);
         for (String childName: childrenTypes.keySet()) {
@@ -1360,8 +1454,7 @@ public class SessionImpl implements Session, XAResource {
 
     public boolean hasPendingChanges() throws StorageException {
         checkLive();
-        // TODO Auto-generated method stub
-        throw new RuntimeException("Not implemented");
+        throw new UnsupportedOperationException("Not implemented");
     }
 
     public void markReferencedBinaries(BinaryGarbageCollector gc) {
@@ -1396,6 +1489,7 @@ public class SessionImpl implements Session, XAResource {
 
     @Override
     public void start(Xid xid, int flags) throws XAException {
+        checkLive();
         if (flags == TMNOFLAGS) {
             try {
                 processReceivedInvalidations();
@@ -1405,24 +1499,18 @@ public class SessionImpl implements Session, XAResource {
             }
         }
         mapper.start(xid, flags);
-        inTransaction = true;
-        checkThreadStart();
+        this.xid = xid;
     }
 
     @Override
     public void end(Xid xid, int flags) throws XAException {
+        checkLive();
         boolean failed = true;
         try {
             if (flags != TMFAIL) {
                 try {
                     flushAndScheduleWork();
                 } catch (Exception e) {
-                    String msg = "Could not end transaction";
-                    if (e instanceof ConcurrentModificationException) {
-                        log.debug(msg, e);
-                    } else {
-                        log.error(msg, e);
-                    }
                     throw (XAException) new XAException(XAException.XAER_RMERR).initCause(e);
                 }
             }
@@ -1441,6 +1529,7 @@ public class SessionImpl implements Session, XAResource {
 
     @Override
     public int prepare(Xid xid) throws XAException {
+        checkLive();
         int res = mapper.prepare(xid);
         if (res == XA_RDONLY) {
             // Read-only optimization, commit() won't be called by the TM.
@@ -1456,6 +1545,7 @@ public class SessionImpl implements Session, XAResource {
 
     @Override
     public void commit(Xid xid, boolean onePhase) throws XAException {
+        checkLive();
         try {
             mapper.commit(xid, onePhase);
         } finally {
@@ -1464,13 +1554,9 @@ public class SessionImpl implements Session, XAResource {
     }
 
     protected void commitDone() throws XAException {
-        inTransaction = false;
+        xid = null;
         try {
-            try {
-                sendInvalidationsToOthers();
-            } finally {
-                checkThreadEnd();
-            }
+            sendInvalidationsToOthers();
         } catch (Exception e) {
             log.error("Could not send invalidations", e);
             throw (XAException) new XAException(XAException.XAER_RMERR).initCause(e);
@@ -1479,6 +1565,7 @@ public class SessionImpl implements Session, XAResource {
 
     @Override
     public void rollback(Xid xid) throws XAException {
+        checkLive();
         try {
             try {
                 mapper.rollback(xid);
@@ -1486,24 +1573,25 @@ public class SessionImpl implements Session, XAResource {
                 rollback();
             }
         } finally {
-            inTransaction = false;
-            // no invalidations to send
-            checkThreadEnd();
+            xid = null;
         }
     }
 
     @Override
     public void forget(Xid xid) throws XAException {
+        checkLive();
         mapper.forget(xid);
     }
 
     @Override
     public Xid[] recover(int flag) throws XAException {
+        checkLive();
         return mapper.recover(flag);
     }
 
     @Override
     public boolean setTransactionTimeout(int seconds) throws XAException {
+        checkLive();
         return mapper.setTransactionTimeout(seconds);
     }
 
@@ -1527,5 +1615,13 @@ public class SessionImpl implements Session, XAResource {
     public long getCacheSelectionSize() {
         return context.getCacheSelectionSize();
     }
+
+    @Override
+    public String toString() {
+        return "SessionImpl [repository=" + repository.getName() + ", mapper=" + mapper.toString()
+                + ", xid=" + xid + ", ownerInfo=" + ownerInfo + "]";
+    }
+
+
 
 }

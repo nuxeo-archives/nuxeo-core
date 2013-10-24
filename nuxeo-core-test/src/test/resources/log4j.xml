@@ -12,10 +12,14 @@
     </layout>
   </appender>
 
+  <category name="org.nuxeo.ecm.core.storage.sql.SessionImpl$OwnerInfo">
+    <priority value="TRACE" />
+  </category>
+
   <logger name="org.nuxeo.ecm.core.storage.sql.jdbc">
     <level value="WARN" />
   </logger>
-
+  
   <root>
     <priority value="WARN" />
     <appender-ref ref="CONSOLE" />

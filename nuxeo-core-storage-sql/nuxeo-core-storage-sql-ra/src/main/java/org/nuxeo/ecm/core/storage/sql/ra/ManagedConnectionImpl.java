@@ -35,6 +35,7 @@ import org.nuxeo.common.collections.ListenerList;
 import org.nuxeo.ecm.core.storage.Credentials;
 import org.nuxeo.ecm.core.storage.sql.ConnectionSpecImpl;
 import org.nuxeo.ecm.core.storage.sql.SessionImpl;
+import org.nuxeo.ecm.core.storage.sql.SessionImpl.OwnerException;
 
 /**
  * The managed connection represents an actual physical connection to the
@@ -97,7 +98,7 @@ public class ManagedConnectionImpl implements ManagedConnection,
         }
         out = managedConnectionFactory.getLogWriter();
         this.managedConnectionFactory = managedConnectionFactory;
-        this.connectionSpec = connectionRequestInfo.connectionSpec;
+        connectionSpec = connectionRequestInfo.connectionSpec;
         connections = new HashSet<ConnectionImpl>();
         listeners = new ListenerList();
         // create the underlying session
@@ -295,7 +296,12 @@ public class ManagedConnectionImpl implements ManagedConnection,
             ConnectionImpl[] array = new ConnectionImpl[connections.size()];
             for (ConnectionImpl connection : connections.toArray(array)) {
                 log.debug("closing connection: " + connection);
-                connection.disassociate();
+                try {
+                    connection.disassociate();
+                } catch (OwnerException e) {
+                    sendErrorEvent(connection, e);
+                    throw e;
+                }
                 sendClosedEvent(connection);
             }
             connections.clear();
