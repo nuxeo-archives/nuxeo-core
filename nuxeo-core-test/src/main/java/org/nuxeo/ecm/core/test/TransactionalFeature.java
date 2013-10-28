@@ -43,8 +43,7 @@ public class TransactionalFeature extends SimpleFeature {
 
     @Override
     public void initialize(FeaturesRunner runner) throws Exception {
-        config = runner.getDescription().getAnnotation(
-                TransactionalConfig.class);
+        config = runner.getConfig(TransactionalConfig.class);
         if (config == null) {
             config = Defaults.of(TransactionalConfig.class);
         }
@@ -79,6 +78,9 @@ public class TransactionalFeature extends SimpleFeature {
             return;
         }
         txStarted = TransactionHelper.startTransaction();
+        if (config.rollback()) {
+            TransactionHelper.setTransactionRollbackOnly();
+        }
     }
 
     @Override
