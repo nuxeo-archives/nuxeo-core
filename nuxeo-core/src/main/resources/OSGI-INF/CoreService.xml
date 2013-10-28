@@ -13,6 +13,8 @@
   @author <a href="mailto:bs@nuxeo.com">Bogdan Stefanescu</a>
   </documentation>
 
+  <require>org.nuxeo.ecm.core.work.service</require>
+  
   <implementation class="org.nuxeo.ecm.core.CoreService"/>
 
   <service>
