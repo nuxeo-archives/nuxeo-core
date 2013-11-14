@@ -91,7 +91,6 @@ public class SchedulerServiceImpl extends DefaultComponent implements
             schedulerFactory.initialize(props);
         }
         scheduler = schedulerFactory.getScheduler();
-        scheduler.start();
         // server = MBeanServerFactory.createMBeanServer();
         // server.createMBean("org.quartz.ee.jmx.jboss.QuartzService",
         // quartzObjectName);
@@ -112,6 +111,8 @@ public class SchedulerServiceImpl extends DefaultComponent implements
 
     @Override
     public void applicationStarted(ComponentContext context) throws Exception {
+        scheduler.start();
+
         applicationStarted = true;
     }
 
