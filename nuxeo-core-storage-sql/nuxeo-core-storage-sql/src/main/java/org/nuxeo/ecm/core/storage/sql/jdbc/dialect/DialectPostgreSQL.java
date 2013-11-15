@@ -713,8 +713,8 @@ public class DialectPostgreSQL extends Dialect {
     @Override
     public String getReadAclsCheckSql(String idColumnName) {
         // return String.format("%s IN (SELECT acl_id FROM hierarchy_aclr WHERE acl_id && nx_aclr_get_principal(?))",
-        return String.format("%s && nx_aclr_get_principal(?)",
-                idColumnName);
+        // idColumnName);
+        return String.format("acl && nx_aclr_get_principal(?)");
     }
 
     @Override

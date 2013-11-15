@@ -727,7 +727,7 @@ BEGIN
   --
   -- 2/ Handles new ACLs, marking read acl with a NULL marker
   RAISE DEBUG 'nx_aclr_update updating hierarchy_read_acl ...';
-  UPDATE hierarchy_read_acl SET acl_id = NULL WHERE id IN (
+  UPDATE hierarchy_aclr SET acl = NULL WHERE id IN (
     SELECT DISTINCT(hierarchy_id) AS hierarchy_id FROM aclr_modified WHERE NOT is_new);
   GET DIAGNOSTICS update_count = ROW_COUNT;
   RAISE DEBUG 'nx_aclr_update mark % lines to update', update_count;
@@ -735,12 +735,12 @@ BEGIN
   --
   -- 3/ Mark all children with the NULL marker
   LOOP
-    UPDATE hierarchy_aclr SET acl_id = NULL WHERE id IN (
+    UPDATE hierarchy_aclr SET acl = NULL WHERE id IN (
       SELECT h.id
       FROM hierarchy AS h
-      JOIN hierarchy_read_acl AS r ON h.id = r.id
-      WHERE r.acl_id IS NOT NULL
-        AND h.parentid IN (SELECT id FROM hierarchy_read_acl WHERE acl_id IS NULL));
+      JOIN hierarchy_aclr AS r ON h.id = r.id
+      WHERE r.acl IS NOT NULL
+        AND h.parentid IN (SELECT id FROM hierarchy_aclr WHERE acl IS NULL));
     GET DIAGNOSTICS update_count = ROW_COUNT;
     RAISE DEBUG 'nx_aclr_update % lines to udpate', update_count;
     IF (update_count = 0) THEN
@@ -750,7 +750,7 @@ BEGIN
   --
   -- 4/ Compute the new read ACLs for updated documents
   RAISE DEBUG 'nx_aclr_update computing read acls ...';
-  UPDATE hierarchy_aclr SET acl_id = nx_aclr_get(id) WHERE acl_id IS NULL;
+  UPDATE hierarchy_aclr SET acl = nx_aclr_get(id) WHERE acl IS NULL;
   GET DIAGNOSTICS update_count = ROW_COUNT;
   RAISE INFO 'nx_aclr_update % updated.', update_count;
   RETURN;
@@ -922,7 +922,7 @@ SELECT 1 FROM pg_tables WHERE tablename = 'principal';
 #IF: emptyResult
 CREATE TABLE principal (
     id SERIAL NOT NULL,
-    name VARCHAR(250) NOT NULL
+    name VARCHAR(250) UNIQUE NOT NULL
 );
 
 
@@ -932,45 +932,18 @@ SELECT 1 FROM pg_tables WHERE tablename = 'hierarchy_aclr';
 #IF: emptyResult
 CREATE TABLE hierarchy_aclr (
   id ${idType} NOT NULL,
-  acl_id integer[],
+  acl integer[],
   CONSTRAINT hierarchy_aclr_id_fk FOREIGN KEY(id) REFERENCES hierarchy(id) ON DELETE CASCADE
 );
 
 
 #TEST:
-SELECT 1 FROM pg_indexes WHERE indexname='hierarchy_aclr_acl_id_idx';
+SELECT 1 FROM pg_indexes WHERE indexname='hierarchy_aclr_acl_idx';
 
 #IF: emptyResult
-CREATE INDEX hierarchy_aclr_acl_id_idx ON hierarchy_aclr USING GIN(acl_id);
+CREATE INDEX hierarchy_aclr_acl_idx ON hierarchy_aclr USING GIN(acl);
 
 
-CREATE OR REPLACE FUNCTION nx_aclr_get_local(id ${idType})
-RETURNS varchar
-AS $$
--- Compute the read acl for a hierarchy id using a local acl
-DECLARE
-  curid ${idType} := id;
-  ret integer[];
-  r record;
-BEGIN
-  -- RAISE DEBUG 'call %', curid;
-  FOR r IN SELECT CASE
-      WHEN (NOT acls.grant) THEN -1
-      WHEN (acls.grant) THEN 1
-      ELSE 0
-    END * (select p.id from principal p where name=acls.user) AS ace
-  FROM acls
-  WHERE acls.id = curid AND
-      permission IN (SELECT permission FROM aclr_permission)
-  ORDER BY acls.pos LOOP
-    IF r.ace <> 0 THEN
-      ret = array_append(ret, r.ace);
-    END IF;
-  END LOOP;
-  RETURN ret;
-END $$
-LANGUAGE plpgsql
-STABLE;
 
 CREATE OR REPLACE FUNCTION nx_aclr_get(id ${idType})
 RETURNS integer[]
@@ -980,19 +953,23 @@ DECLARE
   curid ${idType} := id;
   newid ${idType};
   first boolean := true;
-  read_acl integer[];
-  ret integer[];
   deny integer;
+  r record;
+  ret integer[];
 BEGIN
-  SELECT -1 * p.id FROM principal p WHERE name='Everyone' INTO deny;
+  SELECT -1 * p.id FROM principal p WHERE name='${everyone}' INTO deny;
+  <<main>>
   WHILE curid IS NOT NULL LOOP
-    SELECT nx_aclr_get_local(curid) INTO read_acl;
-    IF read_acl is NOT NULL THEN
-      ret = array_cat(ret, read_acl);
-      IF read_acl @> ARRAY[deny] THEN
-        EXIT;
-      END IF; 
-    END IF;
+    FOR r IN SELECT CASE WHEN (NOT a.grant) THEN -1 WHEN (a.grant) THEN 1 ELSE 0 END * u."id" AS uid
+             FROM acls a
+             JOIN principal u ON a."user" = u.name
+             JOIN aclr_permission p ON a."permission" = p."permission"
+             WHERE a.id=curid
+             ORDER BY a.pos LOOP
+      EXIT main WHEN r.uid = deny;
+      CONTINUE WHEN ARRAY[r.uid] && ret;
+      ret = array_append(ret, r.uid);
+    END LOOP;
     SELECT parentid INTO newid FROM hierarchy WHERE hierarchy.id = curid;
     IF first AND newid IS NULL THEN
       SELECT versionableid INTO newid FROM versions WHERE versions.id = curid;
@@ -1042,31 +1019,65 @@ BEGIN
   RETURN ret;
 END $$
 LANGUAGE plpgsql
-STABLE;
+IMMUTABLE;
+
 
 CREATE OR REPLACE FUNCTION nx_aclr_trig_acls()
 RETURNS trigger
 AS $$
--- Trigger to add new principals
+-- Trigger to add new principals and track modified acls
 DECLARE
+  doc_id ${idType};
 BEGIN
-  INSERT INTO principal (name) SELECT NEW.user WHERE NOT EXISTS (SELECT 1 FROM principal WHERE name=NEW.user);
+  BEGIN
+    INSERT INTO principal (name) SELECT NEW.user WHERE NOT EXISTS (SELECT 1 FROM principal WHERE name=NEW.user);
+  EXCEPTION WHEN unique_violation THEN
+    -- Do nothing, another conccurent tx already add the user
+  END;
+  IF (TG_OP = 'DELETE') THEN
+    doc_id := OLD.id;
+  ELSE
+    doc_id := NEW.id;
+  END IF;
+  INSERT INTO aclr_modified VALUES(doc_id, 'f');
   RETURN NEW;
 END $$
 LANGUAGE plpgsql;
+
 
 DROP TRIGGER IF EXISTS nx_aclr_trig_acls_modified ON acls;
 CREATE TRIGGER nx_aclr_trig_acls_modified
   AFTER INSERT OR UPDATE ON acls
   FOR EACH ROW EXECUTE PROCEDURE nx_aclr_trig_acls();
 
-# DROP TRIGGER IF EXISTS nx_trig_hierarchy_read_acl_modified ON hierarchy_read_acl;
 
 DROP TRIGGER IF EXISTS nx_trig_acls_modified ON acls;
 
 #IF: aclOptimizationsEnabled
 #IF: emptyResult
 SELECT * FROM nx_aclr_rebuild();
+
+
+CREATE OR REPLACE FUNCTION nx_path(docid ${idType})
+RETURNS varchar
+AS $$
+-- Return path of a doc, only used for SQL debug purpose
+BEGIN
+  RETURN (SELECT array_to_string(array_agg(name),'/','/')
+    FROM hierarchy h
+    JOIN (SELECT unnest(ancestors) AS id FROM ancestors WHERE id=docid) v ON v.id = h.id);
+END $$
+LANGUAGE plpgsql
+STABLE;
+
+
+CREATE OR REPLACE VIEW nx_aclr_limited_violation AS SELECT a.id, h.primarytype, nx_get_local_read_acl(a.id) AS local_read_ACL, nx_path(a.id) AS path
+FROM acls a
+JOIN hierarchy h on a.id = h.id
+WHERE NOT a."grant" AND a."user" != '${everyone}' AND a."permission" IN (SELECT permission FROM aclr_permission);
+
+# ------------------------------------------------------------
+# -- End of Limited Read ACLs optim
 
 # ##### soft delete #####
 
