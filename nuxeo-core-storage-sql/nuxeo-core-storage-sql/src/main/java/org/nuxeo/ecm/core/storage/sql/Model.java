@@ -248,7 +248,9 @@ public class Model {
 
     public static final String FULLTEXT_BINARYTEXT_KEY = "binarytext";
 
-    public static final String HIER_READ_ACL_TABLE_NAME = "hierarchy_read_acl";
+    public static final String HIER_READ_ACL_TABLE_NAME = "hierarchy_aclr";
+
+    // public static final String HIER_READ_ACL_TABLE_NAME = "hierarchy_read_acl";
 
     public static final String HIER_READ_ACL_ID = "id";
 
