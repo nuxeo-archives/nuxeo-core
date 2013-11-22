@@ -11,6 +11,7 @@
   <artifactId>nuxeo-core-storage-sql</artifactId>
   <name>Nuxeo Core SQL Storage</name>
   <description>Nuxeo Core: SQL Storage.</description>
+  <version>5.6.0-HF23-NXP-13252</version>
 
   <dependencies>
     <dependency>
