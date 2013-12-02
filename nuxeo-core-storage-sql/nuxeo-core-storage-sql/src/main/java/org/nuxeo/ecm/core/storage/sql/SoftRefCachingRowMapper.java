@@ -191,6 +191,9 @@ public class SoftRefCachingRowMapper implements RowMapper {
     protected void cachePutAbsent(RowId rowId) {
         cache.put(new RowId(rowId), new Row(ABSENT, (Serializable) null));
         cacheSize.inc();
+        if (log.isTraceEnabled()) {
+            log.trace("row " + rowId.id + " is absent", new Throwable("captured stack trace"));
+        }
     }
 
     protected void cachePutAbsentIfNull(RowId rowId, Row row) {
@@ -397,6 +400,9 @@ public class SoftRefCachingRowMapper implements RowMapper {
             // fragments because other session's ABSENT fragments have
             // to be invalidated
             localInvalidations.addModified(new RowId(row));
+            if (log.isTraceEnabled()) {
+                log.trace("scheduled absent invalidation for " + row.id, new Throwable("captured stack trace"));
+            }
         }
         for (RowUpdate rowu : batch.updates) {
             cachePut(rowu.row);
