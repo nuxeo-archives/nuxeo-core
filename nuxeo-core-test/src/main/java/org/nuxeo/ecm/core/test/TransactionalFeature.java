@@ -15,6 +15,7 @@ import java.util.Properties;
 
 import org.apache.log4j.Logger;
 import org.nuxeo.ecm.core.repository.RepositoryFactory;
+import org.nuxeo.ecm.core.storage.sql.DatabaseHelper;
 import org.nuxeo.ecm.core.storage.sql.ra.PoolingRepositoryFactory;
 import org.nuxeo.ecm.core.test.annotations.Granularity;
 import org.nuxeo.ecm.core.test.annotations.RepositoryConfig;
@@ -34,6 +35,8 @@ public class TransactionalFeature extends SimpleFeature {
 
     protected String autoactivationValue;
 
+    protected String singledsValue;
+
     protected boolean txStarted;
 
     protected Class<? extends RepositoryFactory> defaultFactory;
@@ -51,6 +54,8 @@ public class TransactionalFeature extends SimpleFeature {
     public void start(FeaturesRunner runner) throws Exception {
         autoactivationValue = System.getProperty(JtaActivator.AUTO_ACTIVATION);
         System.setProperty(JtaActivator.AUTO_ACTIVATION, "true");
+        singledsValue = System.getProperty(DatabaseHelper.SINGLEDS_PROPERTY);
+        System.setProperty(DatabaseHelper.SINGLEDS_PROPERTY, "true");
     }
 
     @Override
@@ -60,6 +65,11 @@ public class TransactionalFeature extends SimpleFeature {
             props.put(JtaActivator.AUTO_ACTIVATION, autoactivationValue);
         } else {
             props.remove(JtaActivator.AUTO_ACTIVATION);
+        }
+        if (singledsValue != null) {
+            props.put(DatabaseHelper.SINGLEDS_PROPERTY, singledsValue);
+        } else {
+            props.remove(DatabaseHelper.SINGLEDS_PROPERTY);
         }
     }
 
