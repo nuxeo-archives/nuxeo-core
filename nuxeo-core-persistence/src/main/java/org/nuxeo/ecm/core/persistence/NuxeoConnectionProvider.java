@@ -20,17 +20,11 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Properties;
 
-import javax.naming.NamingException;
-import javax.transaction.Status;
-import javax.transaction.SystemException;
-import javax.transaction.Transaction;
-
 import org.hibernate.HibernateException;
 import org.hibernate.cfg.Environment;
 import org.hibernate.connection.ConnectionProvider;
 import org.hibernate.connection.DatasourceConnectionProvider;
 import org.nuxeo.runtime.api.ConnectionHelper;
-import org.nuxeo.runtime.transaction.TransactionHelper;
 
 /**
  * ConnectionProvider for Hibernate that looks up the connection in a
@@ -51,12 +45,6 @@ public class NuxeoConnectionProvider implements ConnectionProvider {
      * The application-server-specific JNDI name for the datasource.
      */
     protected String dataSourceName;
-
-    /**
-     * Whether we have switched the connection autoCommit=false and must commit
-     * it on release.
-     */
-    protected boolean began;
 
     @Override
     public void configure(Properties props) throws HibernateException {
@@ -121,6 +109,7 @@ public class NuxeoConnectionProvider implements ConnectionProvider {
             began = false;
             connection.commit();
         }
+        connection.close();
     }
 
     @Override
@@ -129,7 +118,6 @@ public class NuxeoConnectionProvider implements ConnectionProvider {
 
     @Override
     public boolean supportsAggressiveRelease() {
-        // close the connection after each statement
         return true;
     }
 
