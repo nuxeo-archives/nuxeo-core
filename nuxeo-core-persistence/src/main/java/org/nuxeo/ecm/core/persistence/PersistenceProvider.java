@@ -155,13 +155,14 @@ public class PersistenceProvider {
 
     public <T> T run(Boolean needActiveSession, RunCallback<T> callback)
             throws ClientException {
-        // needActiveSession now unused
         Thread myThread = Thread.currentThread();
         ClassLoader lastLoader = myThread.getContextClassLoader();
         myThread.setContextClassLoader(getClass().getClassLoader());
         try { // insure context class loader restoring
             EntityManager em = doAcquireEntityManager();
-            doBegin(em);
+            if (needActiveSession) {
+                doBegin(em);
+            }
             try { // insure entity manager releasing
                 return callback.runWith(em);
             } finally {
@@ -178,13 +179,14 @@ public class PersistenceProvider {
 
     public void run(Boolean needActiveSession, RunVoid callback)
             throws ClientException {
-        // needActiveSession now unused
         Thread myThread = Thread.currentThread();
         ClassLoader lastLoader = myThread.getContextClassLoader();
         myThread.setContextClassLoader(getClass().getClassLoader());
         try { // insure context class loader restoring
             EntityManager em = doAcquireEntityManager();
-            doBegin(em);
+            if (needActiveSession) {
+                doBegin(em);
+            }
             try { // insure entity manager releasing
                 callback.runWith(em);
             } finally {
