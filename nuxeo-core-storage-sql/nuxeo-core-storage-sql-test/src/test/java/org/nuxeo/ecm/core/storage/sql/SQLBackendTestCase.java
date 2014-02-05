@@ -24,9 +24,9 @@ import org.nuxeo.runtime.test.NXRuntimeTestCase;
  */
 public abstract class SQLBackendTestCase extends NXRuntimeTestCase {
 
-    public Repository repository;
+    public RepositoryImpl repository;
 
-    public Repository repository2;
+    public RepositoryImpl repository2;
 
     /** Set to false for client unit tests */
     public boolean initDatabase() {
@@ -40,17 +40,26 @@ public abstract class SQLBackendTestCase extends NXRuntimeTestCase {
         deployBundle("org.nuxeo.ecm.core.schema");
         deployBundle("org.nuxeo.ecm.core.event");
         deployBundle("org.nuxeo.ecm.core.storage.sql");
-        if (initDatabase()) {
+        final boolean initDatabase = initDatabase();
+        if (initDatabase) {
             DatabaseHelper.DATABASE.setUp();
         }
-        repository = newRepository(-1, false);
+        deployRepositoryContrib();
+        if(initDatabase) {
+            repository = newRepository(-1, false);
+        }
     }
 
-    protected Repository newRepository(long clusteringDelay,
+    protected void deployRepositoryContrib() throws Exception {
+
+    }
+
+    protected RepositoryImpl newRepository(long clusteringDelay,
             boolean fulltextDisabled) throws Exception {
         RepositoryDescriptor descriptor = newDescriptor(clusteringDelay,
                 fulltextDisabled);
         RepositoryImpl repo = new RepositoryImpl(descriptor);
+        repo.initialize();
         RepositoryResolver.registerTestRepository(repo);
         return repo;
     }
@@ -95,11 +104,11 @@ public abstract class SQLBackendTestCase extends NXRuntimeTestCase {
     }
 
     public boolean isSoftDeleteEnabled() {
-        return ((RepositoryImpl) repository).getRepositoryDescriptor().softDeleteEnabled;
+        return repository.getRepositoryDescriptor().softDeleteEnabled;
     }
 
     public boolean isProxiesEnabled() {
-        return ((RepositoryImpl) repository).getRepositoryDescriptor().proxiesEnabled;
+        return repository.getRepositoryDescriptor().proxiesEnabled;
     }
 
 }

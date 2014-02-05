@@ -6,6 +6,8 @@
 
   <implementation class="org.nuxeo.ecm.core.event.EventServiceComponent"/>
 
+  <require>org.nuxeo.ecm.core.work.service</require>
+  
   <service>
     <provide interface="org.nuxeo.ecm.core.event.EventService"/>
     <provide interface="org.nuxeo.ecm.core.event.EventProducer"/>

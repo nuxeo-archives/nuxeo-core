@@ -21,7 +21,6 @@ import org.nuxeo.ecm.core.test.annotations.Granularity;
 import org.nuxeo.ecm.core.test.annotations.RepositoryConfig;
 import org.nuxeo.ecm.core.test.annotations.TransactionalConfig;
 import org.nuxeo.runtime.jtajca.JtaActivator;
-import org.nuxeo.runtime.test.runner.Defaults;
 import org.nuxeo.runtime.test.runner.Deploy;
 import org.nuxeo.runtime.test.runner.FeaturesRunner;
 import org.nuxeo.runtime.test.runner.SimpleFeature;
@@ -31,7 +30,7 @@ import org.nuxeo.runtime.transaction.TransactionHelper;
 @RepositoryConfig(cleanup=Granularity.METHOD, repositoryFactoryClass=PoolingRepositoryFactory.class)
 public class TransactionalFeature extends SimpleFeature {
 
-    protected TransactionalConfig config;
+    protected TransactionalConfig txConfig;
 
     protected String autoactivationValue;
 
@@ -39,15 +38,14 @@ public class TransactionalFeature extends SimpleFeature {
 
     protected boolean txStarted;
 
+    protected RepositoryConfig repoConfig;
+
     protected Class<? extends RepositoryFactory> defaultFactory;
 
     @Override
     public void initialize(FeaturesRunner runner) throws Exception {
-        config = runner.getDescription().getAnnotation(
-                TransactionalConfig.class);
-        if (config == null) {
-            config = Defaults.of(TransactionalConfig.class);
-        }
+        txConfig = runner.getConfig(TransactionalConfig.class);
+        repoConfig = runner.getConfig(RepositoryConfig.class);
     }
 
     @Override
@@ -74,26 +72,62 @@ public class TransactionalFeature extends SimpleFeature {
     }
 
     @Override
+    public void beforeRun(FeaturesRunner runner) throws Exception {
+        if (repoConfig.cleanup().equals(Granularity.CLASS)) {
+            begin();
+        }
+    }
+
+    @Override
+    public void afterRun(FeaturesRunner runner) throws Exception {
+        if (repoConfig.cleanup().equals(Granularity.CLASS)) {
+            commitOrRollback();
+        }
+    }
+
+    @Override
     public void beforeSetup(FeaturesRunner runner) throws Exception {
-        if (config.autoStart() == false) {
+        if (repoConfig.cleanup().equals(Granularity.METHOD)) {
+            begin();
+        }
+    }
+
+    @Override
+    public void afterTeardown(FeaturesRunner runner) throws Exception {
+        if (repoConfig.cleanup().equals(Granularity.METHOD)) {
+            commitOrRollback();
+        }
+    }
+
+    public void begin() {
+        if (txStarted) {
+            return;
+        }
+        if (txConfig.autoStart() == false) {
             return;
         }
         txStarted = TransactionHelper.startTransaction();
     }
 
-    @Override
-    public void afterTeardown(FeaturesRunner runner) throws Exception {
-        if (txStarted == false) {
-            if (TransactionHelper.isTransactionActive()) {
-                try {
-                TransactionHelper.setTransactionRollbackOnly();
-                TransactionHelper.commitOrRollbackTransaction();
-                } finally {
-                    Logger.getLogger(TransactionalFeature.class).warn("Committing a transaction for your, please do it yourself");
-                }
-            }
+    public void commitOrRollback() {
+        if (!txStarted) {
             return;
         }
-        TransactionHelper.commitOrRollbackTransaction();
+        if (TransactionHelper.isTransactionActive()) {
+            if (!txStarted || txConfig.rollback()) {
+                TransactionHelper.setTransactionRollbackOnly();
+            }
+        }
+        if (TransactionHelper.isTransactionActiveOrMarkedRollback()) {
+            try {
+                TransactionHelper.commitOrRollbackTransaction();
+            } finally {
+                if (!txStarted) {
+                    Logger.getLogger(TransactionalFeature.class).warn(
+                            "Committing a transaction for your, please do it yourself");
+                }
+                txStarted = false;
+            }
+        }
     }
 }

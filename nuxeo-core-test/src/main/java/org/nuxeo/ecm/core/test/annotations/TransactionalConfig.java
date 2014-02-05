@@ -23,4 +23,6 @@ import java.lang.annotation.Target;
 public @interface TransactionalConfig {
 
     boolean autoStart() default true;
+
+    boolean rollback() default false;
 }

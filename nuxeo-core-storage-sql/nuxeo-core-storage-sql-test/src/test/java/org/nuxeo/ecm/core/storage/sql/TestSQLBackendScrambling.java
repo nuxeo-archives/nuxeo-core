@@ -12,8 +12,8 @@
 
 package org.nuxeo.ecm.core.storage.sql;
 
-import org.junit.Before;
 import org.junit.Test;
+
 import static org.junit.Assert.*;
 
 import java.io.BufferedInputStream;
@@ -29,9 +29,8 @@ import org.nuxeo.runtime.services.streaming.StreamSource;
  */
 public class TestSQLBackendScrambling extends SQLBackendTestCase {
 
-    @Before
-    public void setUp() throws Exception {
-        super.setUp();
+    @Override
+    protected void deployRepositoryContrib() throws Exception {
         deployContrib("org.nuxeo.ecm.core.storage.sql.test.tests",
                 "OSGI-INF/test-backend-core-types-contrib.xml");
     }

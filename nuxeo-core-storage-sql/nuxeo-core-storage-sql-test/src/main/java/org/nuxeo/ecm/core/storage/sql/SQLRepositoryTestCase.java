@@ -65,17 +65,19 @@ public abstract class SQLRepositoryTestCase extends NXRuntimeTestCase {
         super(name);
     }
 
+    @Override
     @Before
     public void setUp() throws Exception {
         initialOpenSessions = CoreInstance.getInstance().getNumberOfSessions();
-        initialSingleConnections = ConnectionHelper.countConnectionReferences();
         super.setUp();
+        deployBundle("org.nuxeo.runtime.datasource");
         deployBundle("org.nuxeo.ecm.core.schema");
         deployBundle("org.nuxeo.ecm.core.api");
         deployBundle("org.nuxeo.ecm.core");
         deployBundle("org.nuxeo.ecm.core.event");
         deployBundle("org.nuxeo.ecm.core.storage.sql");
         database.setUp();
+        initialSingleConnections = ConnectionHelper.countConnectionReferences();
         deployRepositoryContrib();
     }
 
@@ -84,6 +86,7 @@ public abstract class SQLRepositoryTestCase extends NXRuntimeTestCase {
                 database.getDeploymentContrib());
     }
 
+    @Override
     @After
     public void tearDown() throws Exception {
         waitForAsyncCompletion();
@@ -111,7 +114,6 @@ public abstract class SQLRepositoryTestCase extends NXRuntimeTestCase {
                     Integer.valueOf(finalSingleConnections),
                     Integer.valueOf(leakedSingleConnections)));
         }
-        ConnectionHelper.clearConnectionReferences();
     }
 
     public void waitForAsyncCompletion() {

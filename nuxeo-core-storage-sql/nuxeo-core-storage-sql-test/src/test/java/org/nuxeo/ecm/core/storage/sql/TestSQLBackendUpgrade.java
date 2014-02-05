@@ -23,11 +23,9 @@ import java.util.Calendar;
 import java.util.GregorianCalendar;
 
 import org.junit.After;
-import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.nuxeo.ecm.core.api.Lock;
-import org.nuxeo.ecm.core.storage.StorageException;
 import org.nuxeo.ecm.core.storage.sql.jdbc.JDBCMapper;
 
 public class TestSQLBackendUpgrade extends SQLBackendTestCase {
@@ -39,27 +37,36 @@ public class TestSQLBackendUpgrade extends SQLBackendTestCase {
     }
 
     @Override
-    @Before
-    public void setUp() throws Exception {
-        super.setUp();
+    public boolean initDatabase() {
+        return false;
+    }
+
+    @Override
+    protected void deployRepositoryContrib() throws Exception {
         deployContrib("org.nuxeo.ecm.core.storage.sql.test.tests",
                 "OSGI-INF/test-backend-core-types-contrib.xml");
-        JDBCMapper.testProps.put(JDBCMapper.TEST_UPGRADE, Boolean.TRUE);
     }
 
     @Override
     @After
     public void tearDown() throws Exception {
-        JDBCMapper.testProps.clear();
-        super.tearDown();
+        try {
+            DatabaseHelper.DATABASE.tearDown();
+        } finally {
+            JDBCMapper.testProps.clear();
+            super.tearDown();
+        }
     }
 
-    protected void setUpTestProp(String prop) {
+    protected void setUpTestProp(String prop) throws Exception {
+        JDBCMapper.testProps.put(JDBCMapper.TEST_UPGRADE, Boolean.TRUE);
         for (String p : Arrays.asList(JDBCMapper.TEST_UPGRADE_VERSIONS,
                 JDBCMapper.TEST_UPGRADE_LAST_CONTRIBUTOR,
                 JDBCMapper.TEST_UPGRADE_LOCKS)) {
             JDBCMapper.testProps.put(p, Boolean.valueOf(p.equals(prop)));
         }
+        DatabaseHelper.DATABASE.setUp();
+        repository = newRepository(-1, true);
     }
 
     protected static boolean isLatestVersion(Node node) throws Exception {
@@ -191,7 +198,7 @@ public class TestSQLBackendUpgrade extends SQLBackendTestCase {
     }
 
     @Test
-    public void testLastContributorUpgrade() throws StorageException {
+    public void testLastContributorUpgrade() throws Exception {
         setUpTestProp(JDBCMapper.TEST_UPGRADE_LAST_CONTRIBUTOR);
 
         Node ver;

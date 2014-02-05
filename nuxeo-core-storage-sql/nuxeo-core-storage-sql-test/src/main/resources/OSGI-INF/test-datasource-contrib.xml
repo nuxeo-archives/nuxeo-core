@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<component name="org.nuxeo.ecm.core.storage.test.datasource">
+  <extension target="org.nuxeo.runtime.datasource" point="datasources">
+    <datasource name="jdbc/NuxeoTestDS" driverClassName="org.h2.Driver"
+      maxActive="20" maxIdle="1">
+      <property name="url">jdbc:h2:target/test/h2</property>
+    </datasource>
+  </extension>
+</component>

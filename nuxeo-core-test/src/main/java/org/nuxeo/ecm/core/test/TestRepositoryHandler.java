@@ -19,6 +19,7 @@ import org.nuxeo.ecm.core.NXCore;
 import org.nuxeo.ecm.core.api.ClientException;
 import org.nuxeo.ecm.core.api.CoreInstance;
 import org.nuxeo.ecm.core.api.CoreSession;
+import org.nuxeo.ecm.core.api.DocumentException;
 import org.nuxeo.ecm.core.api.local.LocalSession;
 import org.nuxeo.ecm.core.model.Repository;
 
@@ -56,7 +57,7 @@ public class TestRepositoryHandler {
         return session;
     }
 
-    public void releaseRepository() {
+    public void releaseRepository() throws DocumentException {
         if (repository != null) {
             repository.shutdown();
         }

@@ -46,6 +46,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
 
+import javax.naming.NamingException;
 import javax.resource.ResourceException;
 import javax.transaction.xa.XAException;
 import javax.transaction.xa.XAResource;
@@ -53,7 +54,6 @@ import javax.transaction.xa.Xid;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.nuxeo.common.utils.XidImpl;
@@ -66,13 +66,13 @@ import org.nuxeo.ecm.core.query.sql.model.SQLQuery;
 import org.nuxeo.ecm.core.storage.ConcurrentUpdateStorageException;
 import org.nuxeo.ecm.core.storage.PartialList;
 import org.nuxeo.ecm.core.storage.StorageException;
-import org.nuxeo.ecm.core.storage.sql.jdbc.ClusterNodeHandler;
 import org.nuxeo.ecm.core.storage.sql.jdbc.JDBCBackend;
 import org.nuxeo.ecm.core.storage.sql.jdbc.JDBCConnection;
 import org.nuxeo.ecm.core.storage.sql.jdbc.JDBCConnectionPropagator;
 import org.nuxeo.ecm.core.storage.sql.jdbc.JDBCRowMapper;
 import org.nuxeo.ecm.core.storage.sql.jdbc.dialect.Dialect;
 import org.nuxeo.runtime.api.Framework;
+import org.nuxeo.runtime.transaction.TransactionHelper;
 
 public class TestSQLBackend extends SQLBackendTestCase {
 
@@ -80,10 +80,9 @@ public class TestSQLBackend extends SQLBackendTestCase {
 
     protected Boolean aclOptimizationsConcurrentUpdate;
 
+
     @Override
-    @Before
-    public void setUp() throws Exception {
-        super.setUp();
+    protected void deployRepositoryContrib() throws Exception {
         deployContrib("org.nuxeo.ecm.core.storage.sql.test.tests",
                 "OSGI-INF/test-backend-core-types-contrib.xml");
     }
@@ -384,6 +383,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
     public void testSmallText() throws Exception {
         deployContrib("org.nuxeo.ecm.core.storage.sql.test.tests",
                 "OSGI-INF/test-restriction-contrib.xml");
+        repository.initializeModel();
         Session session = repository.getConnection();
         Node root = session.getRootNode();
         Node nodea = session.addChildNode(root, "foo", null, "Restriction",
@@ -404,6 +404,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
     public void testBigText() throws Exception {
         deployContrib("org.nuxeo.ecm.core.storage.sql.test.tests",
                 "OSGI-INF/test-restriction-big-contrib.xml");
+        repository.initializeModel();
         Session session = repository.getConnection();
         Node root = session.getRootNode();
         Node nodea = session.addChildNode(root, "foo", null, "RestrictionBig",
@@ -700,7 +701,6 @@ public class TestSQLBackend extends SQLBackendTestCase {
         try {
             aclOptimizationsConcurrentUpdate = Boolean.FALSE;
             repository = newRepository(-1, false);
-            repository.getConnection().close(); // create repo
             for (int i = 0; i < ITERATIONS; i++) {
                 multiThreadedUpdateReadAclsJob(i);
             }
@@ -748,7 +748,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
         protected DocCreator(Repository repository, String name) {
             this.repository = repository;
             this.name = name;
-            this.random = new Random();
+            random = new Random();
         }
 
         @Override
@@ -853,16 +853,16 @@ public class TestSQLBackend extends SQLBackendTestCase {
     }
 
     protected static Xid begin(Session session) throws XAException {
-        XAResource xaresource = ((SessionImpl) session).getXAResource();
+        XAResource resource = ((SessionImpl)session).getXAResource();
         Xid xid = new XidImpl(UUID.randomUUID().toString());
-        xaresource.start(xid, XAResource.TMNOFLAGS);
+        resource.start(xid, XAResource.TMNOFLAGS);
         return xid;
     }
 
     protected static void commit(Session session, Xid xid) throws XAException {
-        XAResource xaresource = ((SessionImpl) session).getXAResource();
-        xaresource.end(xid, XAResource.TMSUCCESS);
-        xaresource.commit(xid, true);
+        XAResource resource = ((SessionImpl)session).getXAResource();
+        resource.end(xid, XAResource.TMSUCCESS);
+        resource.commit(xid, true);
     }
 
     protected static void rollback(Session session, Xid xid) throws XAException {
@@ -925,7 +925,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
         DeadlockTestJob r1 = new DeadlockTestJob("foo1");
         DeadlockTestJob r2 = new DeadlockTestJob("foo2");
         try {
-            DeadlockTestJob.run(r1, r2);
+            LockStepJob.run(r1, r2);
             fail("Expected ConcurrentUpdateStorageException");
         } catch (ConcurrentUpdateStorageException e) {
             // ok, detected
@@ -1309,7 +1309,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
 
         ClusterTestJob r1 = new ClusterTestJob(repository, repository2);
         ClusterTestJob r2 = new ClusterTestJob(repository, repository2);
-        ClusterTestJob.run(r1, r2);
+        LockStepJob.run(r1, r2);
         repository = null; // already closed
         repository2 = null; // already closed
     }
@@ -2230,11 +2230,11 @@ public class TestSQLBackend extends SQLBackendTestCase {
             // deploy another contrib where TestDoc4 also has the proxy schema
             deployContrib("org.nuxeo.ecm.core.storage.sql.test.tests",
                     "OSGI-INF/test-backend-core-types-contrib-2.xml");
+            repository.initializeModel();
             type = "TestDoc4";
         } else {
             type = "TestDoc2";
         }
-
         Session session = repository.getConnection();
         Node root = session.getRootNode();
         Node folder = session.addChildNode(root, "folder", null, "TestDoc3",
@@ -3035,6 +3035,12 @@ public class TestSQLBackend extends SQLBackendTestCase {
             return;
         }
 
+        try {
+            TransactionHelper.lookupTransactionManager();
+        } catch (NamingException cause) {
+            return;
+        }
+
         Serializable nodeId = createNode();
 
         // get two clustered repositories
@@ -3183,10 +3189,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
 
     @Test
     public void testJDBCConnectionPropagatorLeak() throws Exception {
-        assertEquals(0, getJDBCConnectionPropagatorSize());
-        repository.getConnection().close();
-        // 1 connection remains for the lock manager
-        assertEquals(1, getJDBCConnectionPropagatorSize());
+        assertEquals(1, getJDBCConnectionPropagatorSize()); // locker connection
         Session s1 = repository.getConnection();
         Session s2 = repository.getConnection();
         Session s3 = repository.getConnection();
@@ -3209,19 +3212,19 @@ public class TestSQLBackend extends SQLBackendTestCase {
 
     @Test
     public void testCacheInvalidationsPropagatorLeak() throws Exception {
-        assertEquals(0, getCacheInvalidationsPropagatorSize());
-        Session session = repository.getConnection();
         assertEquals(1, getCacheInvalidationsPropagatorSize());
+        Session session = repository.getConnection();
+        assertEquals(2, getCacheInvalidationsPropagatorSize());
         session.close();
-        assertEquals(0, getCacheInvalidationsPropagatorSize());
+        assertEquals(1, getCacheInvalidationsPropagatorSize());
         Session s1 = repository.getConnection();
         Session s2 = repository.getConnection();
         Session s3 = repository.getConnection();
-        assertEquals(3, getCacheInvalidationsPropagatorSize());
+        assertEquals(4, getCacheInvalidationsPropagatorSize());
         s1.close();
         s2.close();
         s3.close();
-        assertEquals(0, getCacheInvalidationsPropagatorSize());
+        assertEquals(1, getCacheInvalidationsPropagatorSize());
     }
 
     protected int getCacheInvalidationsPropagatorSize() throws Exception {
@@ -3281,10 +3284,6 @@ public class TestSQLBackend extends SQLBackendTestCase {
         repository = newRepository(DELAY, false);
         repository.getConnection(); // init
 
-        // lock manager mapper has no invalidations queue
-        LockManager lockManager = ((RepositoryImpl) repository).getLockManager();
-        assertNoInvalidationsQueue((JDBCRowMapper) lockManager.mapper);
-
         // cluster node handler mapper has no invalidations queue
         Field backendField = RepositoryImpl.class.getDeclaredField("backend");
         backendField.setAccessible(true);
@@ -3292,9 +3291,12 @@ public class TestSQLBackend extends SQLBackendTestCase {
         Field handlerField = JDBCBackend.class.getDeclaredField("clusterNodeHandler");
         handlerField.setAccessible(true);
         ClusterNodeHandler clusterNodeHandler = (ClusterNodeHandler) handlerField.get(backend);
-        Field clusterNodeMapperField = ClusterNodeHandler.class.getDeclaredField("clusterNodeMapper");
+        Field clusterNodeRunnerField = ClusterNodeHandler.class.getDeclaredField("runner");
+        clusterNodeRunnerField.setAccessible(true);
+        IsolatedMapperRunner clusterNodeRunner = (IsolatedMapperRunner)clusterNodeRunnerField.get(clusterNodeHandler);
+        Field clusterNodeMapperField = IsolatedMapperRunner.class.getDeclaredField("mapper");
         clusterNodeMapperField.setAccessible(true);
-        JDBCRowMapper mapper = (JDBCRowMapper) clusterNodeMapperField.get(clusterNodeHandler);
+        JDBCRowMapper mapper = (JDBCRowMapper) clusterNodeMapperField.get(clusterNodeRunner);
         assertNoInvalidationsQueue(mapper);
     }
 
@@ -3968,6 +3970,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
         RepositoryDescriptor descriptor = newDescriptor(-1, false);
         descriptor.pathOptimizationsEnabled = false;
         repository = new RepositoryImpl(descriptor);
+        repository.initialize();
         Session session = repository.getConnection();
         PartialList<Serializable> res;
         Node root = session.getRootNode();
@@ -3990,6 +3993,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
         repository.close();
         descriptor.pathOptimizationsEnabled = true;
         repository = new RepositoryImpl(descriptor);
+        repository.initialize();
         session = repository.getConnection();
         // this query will use nx_ancestors to bulk load the path
         nodes = session.getNodesByIds(ids);

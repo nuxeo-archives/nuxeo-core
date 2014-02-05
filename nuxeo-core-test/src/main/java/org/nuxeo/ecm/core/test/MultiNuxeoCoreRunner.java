@@ -21,6 +21,7 @@ import org.junit.runners.ParentRunner;
 import org.junit.runners.Suite.SuiteClasses;
 import org.junit.runners.model.InitializationError;
 import org.junit.runners.model.RunnerBuilder;
+import org.nuxeo.ecm.core.api.DocumentException;
 import org.nuxeo.ecm.core.test.annotations.RepositoryConfig;
 import org.nuxeo.ecm.core.test.annotations.RepositoryConfigs;
 import org.nuxeo.runtime.test.runner.FeaturesRunner;
@@ -111,13 +112,22 @@ public class MultiNuxeoCoreRunner extends ParentRunner<FeaturesRunner> {
 
     @Override
     protected void runChild(FeaturesRunner child, RunNotifier notifier) {
+        DocumentException errors = new DocumentException("Errors in configs setup");
         for (RepositorySettings config : configs) {
             CoreFeature cf = child.getFeature(CoreFeature.class);
-            if (cf != null) {
+            if (cf == null) {
+                continue;
+            }
+            try {
                 cf.setRepositorySettings(config);
+            } catch (DocumentException cause) {
+                errors.addSuppressed(cause);
             }
 //TODO            child.resetInjector();
             child.run(notifier);
+        }
+        if (errors.getSuppressed().length > 0) {
+            throw new AssertionError(errors);
         }
     }
 

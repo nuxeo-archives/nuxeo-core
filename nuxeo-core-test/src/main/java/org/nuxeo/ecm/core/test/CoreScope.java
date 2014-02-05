@@ -20,7 +20,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.google.inject.Key;
-import com.google.inject.OutOfScopeException;
 import com.google.inject.Provider;
 import com.google.inject.Scope;
 
@@ -30,50 +29,88 @@ import com.google.inject.Scope;
  */
 public class CoreScope implements Scope {
 
-    protected final ThreadLocal<Map<Key<?>, Object>> values =
-            new ThreadLocal<Map<Key<?>, Object>>() {
-        protected java.util.Map<Key<?>,Object> initialValue() {
-            return new HashMap<Key<?>, Object>();
-        };
+    protected final ThreadLocal<Cache> threadHolder =
+            new ThreadLocal<Cache>() {
     };
 
+    public interface CleanupHook<T> {
+        void handleCleanup(T instance);
+    }
+
+    protected static class Cache {
+
+        protected Map<Key<?>, ScopedProvider<?>> cached =
+                new HashMap<>();
+
+        @SuppressWarnings("unchecked")
+        <T> T getOrCreate(Key<T> key, ScopedProvider<T> provider) {
+            if (!cached.containsKey(key)) {
+                provider.instance = provider.unscoped.get();
+                cached.put(key, provider);
+            }
+            return (T)cached.get(key).instance;
+        }
+
+        void cleanup() {
+            AssertionError errors = new AssertionError("Cannot cleanup core scope");
+            for (ScopedProvider<?> each:cached.values()) {
+                try {
+                    cleanup(each);
+                } catch (Exception cause) {
+                    errors.addSuppressed(cause);
+                }
+            }
+            if (errors.getSuppressed().length > 0) {
+                throw errors;
+            }
+        }
+
+        @SuppressWarnings("unchecked")
+        protected <T> void cleanup(ScopedProvider<T> scoped) {
+            if (scoped.unscoped instanceof CleanupHook) {
+                ((CleanupHook<T>)scoped.unscoped).handleCleanup(scoped.instance);
+            }
+        }
+    }
+
+    protected class ScopedProvider<T> implements Provider<T> {
+
+        protected final Key<T> key;
+        protected final Provider<T> unscoped;
+        protected T instance;
+
+        ScopedProvider(Key<T> key, Provider<T> unscoped) {
+            this.key = key;
+            this.unscoped = unscoped;
+        }
+
+        @Override
+        public T get() {
+            return threadHolder.get().getOrCreate(key, this);
+        }
+
+    }
     public final static CoreScope INSTANCE = new CoreScope();
 
     protected CoreScope() {
-
+        threadHolder.get();
     }
+
     public void enter() {
-        values.get();
+        threadHolder.set(new Cache());
     }
 
     public void exit() {
-        values.remove();
+        try {
+            threadHolder.get().cleanup();
+        } finally {
+            threadHolder.remove();
+        }
     }
 
     @Override
     public <T> Provider<T> scope(final Key<T> key, final Provider<T> unscoped) {
-        return new Provider<T>() {
-
-            @Override
-            public T get() {
-                Map<Key<?>, Object> scopedMap = getScopedObjectMap(key);
-                T current = (T)scopedMap.get(key);
-                if (current == null && !scopedMap.containsKey(key)) {
-                    current = unscoped.get();
-                    scopedMap.put(key, current);
-                }
-                return current;
-            }
-
-        };
+        return new ScopedProvider<T>(key, unscoped);
     }
 
-    private <T> Map<Key<?>, Object> getScopedObjectMap(Key<T> key) {
-        Map<Key<?>, Object> scopedObjects = values.get();
-        if (scopedObjects == null) {
-          throw new OutOfScopeException("Cannot access " + key
-              + " outside of a scoping block");
-        }
-        return scopedObjects;
-      }
 }

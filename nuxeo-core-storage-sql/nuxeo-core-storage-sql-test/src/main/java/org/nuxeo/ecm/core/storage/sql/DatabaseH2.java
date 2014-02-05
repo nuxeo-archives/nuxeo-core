@@ -45,7 +45,7 @@ public class DatabaseH2 extends DatabaseHelper {
 
     protected static final String DRIVER = "org.h2.Driver";
 
-    protected static final String URL_FORMAT = "jdbc:h2:%s/%s";
+    protected static final String URL_FORMAT = "jdbc:h2:%s/%s;TRACE_LEVEL_FILE=4";
 
     protected String h2Path;
 

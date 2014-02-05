@@ -96,7 +96,7 @@ public abstract class DatabaseHelper {
     protected String databaseName = DEFAULT_DATABASE_NAME;
 
     public void setDatabaseName(String name) {
-        this.databaseName = name;
+        databaseName = name;
     }
 
     public static final String DEFAULT_REPOSITORY_NAME = "test";
@@ -104,7 +104,7 @@ public abstract class DatabaseHelper {
     public String repositoryName = DEFAULT_REPOSITORY_NAME;
 
     public void setRepositoryName(String name) {
-        this.repositoryName = name;
+        repositoryName = name;
     }
 
     /**
@@ -215,14 +215,12 @@ public abstract class DatabaseHelper {
     public abstract RepositoryDescriptor getRepositoryDescriptor();
 
     public static void setSingleDataSourceMode() {
-        if (Boolean.parseBoolean(System.getProperty(SINGLEDS_PROPERTY))
+        if (!Boolean.parseBoolean(System.getProperty(SINGLEDS_PROPERTY))
                 || SINGLEDS_DEFAULT) {
-            // the name doesn't actually matter, as code in
-            // ConnectionHelper.getDataSource ignores it and uses
-            // nuxeo.test.vcs.url etc. for connections in test mode
-            String dataSourceName = "jdbc/NuxeoTestDS";
-            System.setProperty(ConnectionHelper.SINGLE_DS, dataSourceName);
+            return;
         }
+        String dataSourceName = "jdbc/NuxeoTestDS";
+        System.setProperty(ConnectionHelper.SINGLE_DS, dataSourceName);
     }
 
     /**

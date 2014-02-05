@@ -24,6 +24,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.nuxeo.ecm.core.api.ClientException;
 import org.nuxeo.ecm.core.api.CoreSession;
+import org.nuxeo.ecm.core.api.DocumentException;
 import org.nuxeo.ecm.core.api.impl.UserPrincipal;
 import org.nuxeo.ecm.core.api.security.SecurityConstants;
 import org.nuxeo.ecm.core.event.EventService;
@@ -130,7 +131,7 @@ public class RepositorySettings extends ServiceProvider<CoreSession> {
         }
     }
 
-    public void importSettings(RepositorySettings settings) {
+    public void importSettings(RepositorySettings settings) throws DocumentException {
         shutdown();
         // override only the user name and the type.
         // overriding initializer and granularity may broke tests that are
@@ -157,7 +158,7 @@ public class RepositorySettings extends ServiceProvider<CoreSession> {
     }
 
     public void setName(String name) {
-        this.repositoryName = name;
+        repositoryName = name;
     }
 
     public String getUsername() {
@@ -173,7 +174,7 @@ public class RepositorySettings extends ServiceProvider<CoreSession> {
     }
 
     public void setInitializer(RepositoryInit initializer) {
-        this.repoInitializer = initializer;
+        repoInitializer = initializer;
     }
 
     public Granularity getGranularity() {
@@ -208,7 +209,7 @@ public class RepositorySettings extends ServiceProvider<CoreSession> {
         }
     }
 
-    public void shutdown() {
+    public void shutdown() throws DocumentException {
         try {
             if (repo != null) {
                 if (session != null) {
@@ -231,9 +232,8 @@ public class RepositorySettings extends ServiceProvider<CoreSession> {
             try {
                 repo = new TestRepositoryHandler(repositoryName);
                 repo.openRepository();
-            } catch (Exception e) {
-                log.error(e.toString(), e);
-                return null;
+            } catch (Exception cause) {
+                throw new RuntimeException("Cannot open repository " + repositoryName, cause);
             }
         }
         return repo;
@@ -242,11 +242,10 @@ public class RepositorySettings extends ServiceProvider<CoreSession> {
     public CoreSession createSession() {
         assert session == null;
         try {
-            session = openSessionAs(getUsername());
-        } catch (Exception e) {
-            log.error(e.toString(), e);
+            return session = openSessionAs(getUsername());
+        } catch (ClientException cause) {
+            throw new RuntimeException("Cannot open session", cause);
         }
-        return session;
     }
 
     /**
@@ -265,7 +264,8 @@ public class RepositorySettings extends ServiceProvider<CoreSession> {
     public CoreSession openSessionAs(String userName) throws ClientException {
         sessionContext = new Hashtable<String, Serializable>();
         sessionContext.put("username", userName);
-        return getRepositoryHandler().openSession(sessionContext);
+        TestRepositoryHandler handler = getRepositoryHandler();
+        return handler.openSession(sessionContext);
     }
 
     public CoreSession openSessionAsAdminUser(String username)

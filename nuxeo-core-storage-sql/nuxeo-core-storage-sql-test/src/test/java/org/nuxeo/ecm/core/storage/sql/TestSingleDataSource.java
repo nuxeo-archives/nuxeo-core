@@ -15,18 +15,13 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
 import javax.transaction.Transaction;
-import javax.transaction.xa.XAResource;
-import javax.transaction.xa.Xid;
-
 import org.junit.Test;
-import org.nuxeo.common.utils.XidImpl;
 import org.nuxeo.ecm.core.storage.StorageException;
 import org.nuxeo.ecm.core.storage.sql.jdbc.XAResourceConnectionAdapter;
 import org.nuxeo.ecm.core.storage.sql.jdbc.dialect.Dialect;
@@ -411,6 +406,10 @@ public class TestSingleDataSource extends SQLRepositoryTestCase {
             connection.close();
             assertTrue(connection.isClosed());
         }
+    }
+
+    protected boolean useSingleConnectionMode() {
+        return false;
     }
 
     /*

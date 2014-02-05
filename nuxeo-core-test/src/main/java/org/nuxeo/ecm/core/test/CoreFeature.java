@@ -17,6 +17,7 @@ import org.nuxeo.ecm.core.NXCore;
 import org.nuxeo.ecm.core.api.ClientException;
 import org.nuxeo.ecm.core.api.CoreInstance;
 import org.nuxeo.ecm.core.api.CoreSession;
+import org.nuxeo.ecm.core.api.DocumentException;
 import org.nuxeo.ecm.core.api.PathRef;
 import org.nuxeo.ecm.core.event.EventService;
 import org.nuxeo.ecm.core.test.annotations.BackendType;
@@ -26,6 +27,7 @@ import org.nuxeo.runtime.api.Framework;
 import org.nuxeo.runtime.test.runner.Deploy;
 import org.nuxeo.runtime.test.runner.Features;
 import org.nuxeo.runtime.test.runner.FeaturesRunner;
+import org.nuxeo.runtime.test.runner.LocalDeploy;
 import org.nuxeo.runtime.test.runner.RuntimeFeature;
 import org.nuxeo.runtime.test.runner.SimpleFeature;
 import org.nuxeo.runtime.transaction.TransactionHelper;
@@ -46,7 +48,8 @@ import com.google.inject.Binder;
         "org.nuxeo.ecm.core.api", "org.nuxeo.ecm.core.event",
         "org.nuxeo.ecm.core", "org.nuxeo.ecm.core.convert",
         "org.nuxeo.ecm.core.convert.plugins", "org.nuxeo.ecm.core.storage.sql",
-        "org.nuxeo.ecm.core.storage.sql.test" })
+        "org.nuxeo.runtime.datasource", "org.nuxeo.ecm.core.storage.sql.test" })
+@LocalDeploy("org.nuxeo.ecm.core.storage.sql.test:OSGI-INF/test-datasource-xa-contrib.xml")
 @Features(RuntimeFeature.class)
 public class CoreFeature extends SimpleFeature {
 
@@ -57,6 +60,8 @@ public class CoreFeature extends SimpleFeature {
     protected RepositorySettings repository;
 
     protected boolean cleaned;
+
+    protected TransactionalFeature txFeature;
 
     public RepositorySettings getRepository() {
         return repository;
@@ -70,6 +75,7 @@ public class CoreFeature extends SimpleFeature {
     public void initialize(FeaturesRunner runner) throws Exception {
         repository = new RepositorySettings(runner);
         runner.getFeature(RuntimeFeature.class).addServiceProvider(repository);
+        txFeature = runner.getFeature(TransactionalFeature.class);
     }
 
     @Override
@@ -104,11 +110,13 @@ public class CoreFeature extends SimpleFeature {
 
     @Override
     public void afterRun(FeaturesRunner runner) throws Exception {
-        waitForAsyncCompletion(); // fulltext and various workers
-        if (repository.getGranularity() != Granularity.METHOD) {
-            cleanupSession(runner);
+        try {
+            if (repository.getGranularity() != Granularity.METHOD) {
+                cleanupSession(runner);
+            }
+        } finally {
+            repository.shutdown();
         }
-        repository.shutdown();
 
         final CoreInstance core = CoreInstance.getInstance();
         int finalOpenSessions = core.getNumberOfSessions();
@@ -139,22 +147,12 @@ public class CoreFeature extends SimpleFeature {
         }
     }
 
+
     protected void waitForAsyncCompletion() {
-        boolean tx = TransactionHelper.isTransactionActive();
-        boolean rb = TransactionHelper.isTransactionMarkedRollback();
-        if (tx || rb) {
-            // there may be afterCommit work pending, so we
-            // have to commit the transaction
-            TransactionHelper.commitOrRollbackTransaction();
+        if (TransactionHelper.isTransactionActiveOrMarkedRollback()) {
+            return;
         }
         Framework.getLocalService(EventService.class).waitForAsyncCompletion();
-        if (tx || rb) {
-            // restore previous tx status
-            TransactionHelper.startTransaction();
-            if (rb) {
-                TransactionHelper.setTransactionRollbackOnly();
-            }
-        }
     }
 
     protected void cleanupSession(FeaturesRunner runner) {
@@ -165,18 +163,18 @@ public class CoreFeature extends SimpleFeature {
         }
         try {
             // flush anything not saved
-            session.save();
-            waitForAsyncCompletion();
-            // remove everything except root
             session.removeChildren(new PathRef("/"));
             session.save();
-            waitForAsyncCompletion();
+            repository.releaseSession();
         } catch (ClientException e) {
             log.error("Unable to reset repository", e);
         } finally {
-            CoreScope.INSTANCE.exit();
+            try {
+                waitForAsyncCompletion();
+            } finally {
+                CoreScope.INSTANCE.exit();
+            }
         }
-        repository.releaseSession();
         cleaned = true;
     }
 
@@ -196,7 +194,7 @@ public class CoreFeature extends SimpleFeature {
         }
     }
 
-    public void setRepositorySettings(RepositorySettings settings) {
+    public void setRepositorySettings(RepositorySettings settings) throws DocumentException {
         repository.importSettings(settings);
     }
 
