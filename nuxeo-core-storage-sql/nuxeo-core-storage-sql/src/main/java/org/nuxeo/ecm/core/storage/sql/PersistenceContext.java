@@ -35,7 +35,7 @@ import org.nuxeo.common.utils.StringUtils;
 import org.nuxeo.ecm.core.schema.FacetNames;
 import org.nuxeo.ecm.core.storage.StorageException;
 import org.nuxeo.ecm.core.storage.sql.Fragment.State;
-import org.nuxeo.ecm.core.storage.sql.Invalidations.InvalidationsPair;
+import org.nuxeo.ecm.core.storage.sql.InvalidationsRows.InvalidationsPair;
 import org.nuxeo.ecm.core.storage.sql.RowMapper.CopyResult;
 import org.nuxeo.ecm.core.storage.sql.RowMapper.IdWithTypes;
 import org.nuxeo.ecm.core.storage.sql.RowMapper.NodeInfo;
@@ -410,7 +410,7 @@ public class PersistenceContext {
      * Marks locally all the invalidations gathered by a {@link Mapper}
      * operation (like a version restore).
      */
-    protected void markInvalidated(Invalidations invalidations) {
+    protected void markInvalidated(InvalidationsRows invalidations) {
         if (invalidations.modified != null) {
             for (RowId rowId : invalidations.modified) {
                 Fragment fragment = getIfPresent(rowId);
@@ -456,7 +456,7 @@ public class PersistenceContext {
      * save.
      */
     public void sendInvalidationsToOthers() throws StorageException {
-        Invalidations invalidations = new Invalidations();
+        InvalidationsRows invalidations = new InvalidationsRows();
         for (SelectionContext sel : selections) {
             sel.gatherInvalidations(invalidations);
         }
@@ -471,9 +471,6 @@ public class PersistenceContext {
      */
     public void processReceivedInvalidations() throws StorageException {
         InvalidationsPair invals = mapper.receiveInvalidations();
-        if (invals == null) {
-            return;
-        }
 
         processCacheInvalidations(invals.cacheInvalidations);
 
@@ -482,29 +479,25 @@ public class PersistenceContext {
 
     private void processCacheInvalidations(Invalidations invalidations)
             throws StorageException {
-        if (invalidations == null) {
+
+        if (invalidations.equals(Invalidations.ALL)) {
+            clearLocalCaches();
             return;
         }
-        if (invalidations.all) {
-            clearLocalCaches();
-        }
-        if (invalidations.modified != null) {
-            for (RowId rowId : invalidations.modified) {
-                Fragment fragment = pristine.remove(rowId);
-                if (fragment != null) {
-                    fragment.setInvalidatedModified();
-                }
-            }
-            for (SelectionContext sel : selections) {
-                sel.processReceivedInvalidations(invalidations.modified);
+        for (RowId rowId : invalidations.getModified()) {
+            Fragment fragment = pristine.remove(rowId);
+            if (fragment != null) {
+                fragment.setInvalidatedModified();
             }
         }
-        if (invalidations.deleted != null) {
-            for (RowId rowId : invalidations.deleted) {
-                Fragment fragment = pristine.remove(rowId);
-                if (fragment != null) {
-                    fragment.setInvalidatedDeleted();
-                }
+        for (SelectionContext sel : selections) {
+            sel.processReceivedInvalidations(invalidations.getModified());
+        }
+
+        for (RowId rowId : invalidations.getDeleted()) {
+            Fragment fragment = pristine.remove(rowId);
+            if (fragment != null) {
+                fragment.setInvalidatedDeleted();
             }
         }
     }

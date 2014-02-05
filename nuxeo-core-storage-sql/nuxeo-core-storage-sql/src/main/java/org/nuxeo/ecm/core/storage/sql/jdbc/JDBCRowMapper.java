@@ -34,13 +34,12 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import javax.sql.XADataSource;
-import javax.transaction.xa.XAException;
-import javax.transaction.xa.Xid;
-
 import org.nuxeo.common.utils.StringUtils;
 import org.nuxeo.ecm.core.storage.StorageException;
+import org.nuxeo.ecm.core.storage.sql.InvalidationsRows;
+import org.nuxeo.ecm.core.storage.sql.InvalidationsRows.InvalidationsPair;
+import org.nuxeo.ecm.core.storage.sql.ClusterNodeHandler;
 import org.nuxeo.ecm.core.storage.sql.Invalidations;
-import org.nuxeo.ecm.core.storage.sql.Invalidations.InvalidationsPair;
 import org.nuxeo.ecm.core.storage.sql.InvalidationsQueue;
 import org.nuxeo.ecm.core.storage.sql.Mapper;
 import org.nuxeo.ecm.core.storage.sql.Model;
@@ -59,7 +58,7 @@ import org.nuxeo.ecm.core.storage.sql.jdbc.db.Update;
 /**
  * A {@link JDBCRowMapper} maps {@link Row}s to and from a JDBC database.
  */
-public class JDBCRowMapper extends JDBCConnection implements RowMapper {
+public abstract class JDBCRowMapper extends JDBCConnection implements RowMapper {
 
     public static final int UPDATE_BATCH_SIZE = 100; // also insert/delete
 
@@ -100,29 +99,34 @@ public class JDBCRowMapper extends JDBCConnection implements RowMapper {
 
     @Override
     public InvalidationsPair receiveInvalidations() throws StorageException {
-        Invalidations invalidations = null;
-        if (clusterNodeHandler != null && connection != null) {
+        Invalidations invalidations = new InvalidationsRows();
+        if (clusterNodeHandler != null) {
             receiveClusterInvalidations();
             invalidations = queue.getInvalidations();
+        } else {
+            invalidations = Invalidations.EMPTY;
         }
-        return invalidations == null ? null : new InvalidationsPair(
-                invalidations, null);
+        return new InvalidationsPair(
+                invalidations, Invalidations.EMPTY);
     }
 
     protected void receiveClusterInvalidations() throws StorageException {
         Invalidations invalidations = clusterNodeHandler.receiveClusterInvalidations();
-        // send received invalidations to all mappers
-        if (invalidations != null && !invalidations.isEmpty()) {
-            clusterNodeHandler.propagateInvalidations(invalidations, null);
-        }
+        clusterNodeHandler.propagateInvalidations(invalidations, null);
     }
 
     @Override
     public void sendInvalidations(Invalidations invalidations)
             throws StorageException {
-        if (clusterNodeHandler != null) {
-            clusterNodeHandler.sendClusterInvalidations(invalidations);
+        if (clusterNodeHandler == null) {
+            return;
         }
+        clusterNodeHandler.sendClusterInvalidations(invalidations);
+    }
+
+    @Override
+    public boolean isCached(RowId id) {
+        return false;
     }
 
     @Override
@@ -135,18 +139,8 @@ public class JDBCRowMapper extends JDBCConnection implements RowMapper {
         return 0;
     }
 
-    @Override
-    public void rollback(Xid xid) throws XAException {
-        try {
-            xaresource.rollback(xid);
-        } catch (XAException e) {
-            logger.error("XA error on rollback: " + e);
-            throw e;
-        }
-    }
-
     protected CollectionIO getCollectionIO(String tableName) {
-        return tableName.equals(model.ACL_TABLE_NAME) ? ACLCollectionIO.INSTANCE
+        return tableName.equals(Model.ACL_TABLE_NAME) ? ACLCollectionIO.INSTANCE
                 : ScalarCollectionIO.INSTANCE;
     }
 
@@ -251,7 +245,7 @@ public class JDBCRowMapper extends JDBCConnection implements RowMapper {
         SQLInfoSelect select = sqlInfo.getSelectFragmentsByIds(tableName,
                 ids.size());
         Map<String, Serializable> criteriaMap = Collections.singletonMap(
-                model.MAIN_KEY, (Serializable) ids);
+                Model.MAIN_KEY, (Serializable) ids);
         return getSelectRows(tableName, select, criteriaMap, null, false);
     }
 
@@ -266,10 +260,10 @@ public class JDBCRowMapper extends JDBCConnection implements RowMapper {
         if (ids.isEmpty()) {
             return Collections.emptyList();
         }
-        String[] orderBys = { model.MAIN_KEY, model.COLL_TABLE_POS_KEY }; // clusters
+        String[] orderBys = { Model.MAIN_KEY, Model.COLL_TABLE_POS_KEY }; // clusters
                                                                           // results
         Set<String> skipColumns = new HashSet<String>(
-                Arrays.asList(model.COLL_TABLE_POS_KEY));
+                Arrays.asList(Model.COLL_TABLE_POS_KEY));
         SQLInfoSelect select = sqlInfo.getSelectFragmentsByIds(tableName,
                 ids.size(), orderBys, skipColumns);
 
@@ -357,7 +351,7 @@ public class JDBCRowMapper extends JDBCConnection implements RowMapper {
             // happens when we fetch a fragment whose columns are all opaque
             // check it's a by-id query
             if (select.whereColumns.size() == 1
-                    && select.whereColumns.get(0).getKey() == model.MAIN_KEY
+                    && select.whereColumns.get(0).getKey() == Model.MAIN_KEY
                     && joinMap == null) {
                 Row row = new Row(tableName, criteriaMap);
                 if (select.opaqueColumns != null) {
@@ -484,7 +478,7 @@ public class JDBCRowMapper extends JDBCConnection implements RowMapper {
         // reorganize by table
         Map<String, List<Row>> tableRows = new LinkedHashMap<String, List<Row>>();
         // hierarchy table first because there are foreign keys to it
-        tableRows.put(model.HIER_TABLE_NAME, new LinkedList<Row>());
+        tableRows.put(Model.HIER_TABLE_NAME, new LinkedList<Row>());
         for (Row row : creates) {
             List<Row> rows = tableRows.get(row.tableName);
             if (rows == null) {
@@ -542,14 +536,13 @@ public class JDBCRowMapper extends JDBCConnection implements RowMapper {
         for (Entry<String, Set<Serializable>> en : tableIds.entrySet()) {
             String tableName = en.getKey();
             Set<Serializable> ids = en.getValue();
-            deleteRows(tableName, ids);
+            deleteSimpleRows(tableName, ids);
         }
     }
 
-    /**
-     * Inserts multiple rows, all for the same table.
-     */
-    protected void insertSimpleRows(String tableName, List<Row> rows)
+
+    @Override
+    public void insertSimpleRows(String tableName, List<Row> rows)
             throws StorageException {
         if (rows.isEmpty()) {
             return;
@@ -714,14 +707,12 @@ public class JDBCRowMapper extends JDBCConnection implements RowMapper {
             ids.add(rowu.row.id);
             rows.add(rowu.row);
         }
-        deleteRows(tableName, ids);
+        deleteSimpleRows(tableName, ids);
         insertCollectionRows(tableName, rows);
     }
 
-    /**
-     * Deletes multiple rows, all for the same table.
-     */
-    protected void deleteRows(String tableName, Set<Serializable> ids)
+    @Override
+    public void deleteSimpleRows(String tableName, Set<Serializable> ids)
             throws StorageException {
         if (ids.isEmpty()) {
             return;
@@ -915,7 +906,7 @@ public class JDBCRowMapper extends JDBCConnection implements RowMapper {
     public Row readSimpleRow(RowId rowId) throws StorageException {
         SQLInfoSelect select = sqlInfo.selectFragmentById.get(rowId.tableName);
         Map<String, Serializable> criteriaMap = Collections.singletonMap(
-                model.MAIN_KEY, rowId.id);
+                Model.MAIN_KEY, rowId.id);
         List<Row> maps = getSelectRows(rowId.tableName, select, criteriaMap,
                 null, true);
         return maps.isEmpty() ? null : maps.get(0);
@@ -989,7 +980,7 @@ public class JDBCRowMapper extends JDBCConnection implements RowMapper {
     public CopyResult copy(IdWithTypes source, Serializable destParentId,
             String destName, Row overwriteRow) throws StorageException {
         // assert !model.separateMainTable; // other case not implemented
-        Invalidations invalidations = new Invalidations();
+        InvalidationsRows invalidations = new InvalidationsRows();
         try {
             Map<Serializable, Serializable> idMap = new LinkedHashMap<Serializable, Serializable>();
             Map<Serializable, IdWithTypes> idToTypes = new HashMap<Serializable, IdWithTypes>();
@@ -998,7 +989,7 @@ public class JDBCRowMapper extends JDBCConnection implements RowMapper {
                     : overwriteRow.id;
             if (overwriteId != null) {
                 // overwrite hier root with explicit values
-                String tableName = model.HIER_TABLE_NAME;
+                String tableName = Model.HIER_TABLE_NAME;
                 updateSimpleRowWithValues(tableName, overwriteRow);
                 idMap.put(source.id, overwriteId);
                 // invalidate
@@ -1020,17 +1011,17 @@ public class JDBCRowMapper extends JDBCConnection implements RowMapper {
             for (Entry<String, Set<Serializable>> entry : model.getPerFragmentIds(
                     idToTypes).entrySet()) {
                 String tableName = entry.getKey();
-                if (tableName.equals(model.HIER_TABLE_NAME)) {
+                if (tableName.equals(Model.HIER_TABLE_NAME)) {
                     // already done
                     continue;
                 }
-                if (tableName.equals(model.VERSION_TABLE_NAME)) {
+                if (tableName.equals(Model.VERSION_TABLE_NAME)) {
                     // versions not fileable
                     // restore must not copy versions either
                     continue;
                 }
                 Set<Serializable> ids = entry.getValue();
-                if (tableName.equals(model.PROXY_TABLE_NAME)) {
+                if (tableName.equals(Model.PROXY_TABLE_NAME)) {
                     for (Serializable id : ids) {
                         proxyIds.add(idMap.get(id)); // copied ids
                     }
@@ -1161,19 +1152,19 @@ public class JDBCRowMapper extends JDBCConnection implements RowMapper {
             for (Column column : copy.whatColumns) {
                 String key = column.getKey();
                 Serializable v;
-                if (key.equals(model.HIER_PARENT_KEY)) {
+                if (key.equals(Model.HIER_PARENT_KEY)) {
                     v = parentId;
-                } else if (key.equals(model.HIER_CHILD_NAME_KEY)) {
+                } else if (key.equals(Model.HIER_CHILD_NAME_KEY)) {
                     // present if name explicitely set (first iteration)
                     v = name;
-                } else if (key.equals(model.MAIN_KEY)) {
+                } else if (key.equals(Model.MAIN_KEY)) {
                     // present if APP_UUID generation
                     v = newId;
-                } else if (key.equals(model.MAIN_BASE_VERSION_KEY)
-                        || key.equals(model.MAIN_CHECKED_IN_KEY)) {
+                } else if (key.equals(Model.MAIN_BASE_VERSION_KEY)
+                        || key.equals(Model.MAIN_CHECKED_IN_KEY)) {
                     v = null;
-                } else if (key.equals(model.MAIN_MINOR_VERSION_KEY)
-                        || key.equals(model.MAIN_MAJOR_VERSION_KEY)) {
+                } else if (key.equals(Model.MAIN_MINOR_VERSION_KEY)
+                        || key.equals(Model.MAIN_MAJOR_VERSION_KEY)) {
                     // present if reset version (regular copy, not checkin)
                     v = null;
                 } else {
@@ -1233,11 +1224,11 @@ public class JDBCRowMapper extends JDBCConnection implements RowMapper {
                 for (Column column : columns) {
                     String key = column.getKey();
                     Serializable value = column.getFromResultSet(rs, i++);
-                    if (key.equals(model.MAIN_KEY)) {
+                    if (key.equals(Model.MAIN_KEY)) {
                         childId = value;
-                    } else if (key.equals(model.MAIN_PRIMARY_TYPE_KEY)) {
+                    } else if (key.equals(Model.MAIN_PRIMARY_TYPE_KEY)) {
                         childPrimaryType = (String) value;
-                    } else if (key.equals(model.MAIN_MIXIN_TYPES_KEY)) {
+                    } else if (key.equals(Model.MAIN_MIXIN_TYPES_KEY)) {
                         childMixinTypes = (String[]) value;
                     }
                 }
@@ -1324,7 +1315,7 @@ public class JDBCRowMapper extends JDBCConnection implements RowMapper {
         if (sqlInfo.softDeleteEnabled) {
             deleteRowsSoft(info);
         } else {
-            deleteRowsDirect(model.HIER_TABLE_NAME, Collections.singleton(rootId));
+            deleteRowsDirect(Model.HIER_TABLE_NAME, Collections.singleton(rootId));
         }
         return info;
     }
@@ -1358,17 +1349,17 @@ public class JDBCRowMapper extends JDBCConnection implements RowMapper {
                 for (Column column : columns) {
                     String key = column.getKey();
                     Serializable value = column.getFromResultSet(rs, i++);
-                    if (key.equals(model.MAIN_KEY)) {
+                    if (key.equals(Model.MAIN_KEY)) {
                         id = value;
-                    } else if (key.equals(model.HIER_PARENT_KEY)) {
+                    } else if (key.equals(Model.HIER_PARENT_KEY)) {
                         parentId = value;
-                    } else if (key.equals(model.MAIN_PRIMARY_TYPE_KEY)) {
+                    } else if (key.equals(Model.MAIN_PRIMARY_TYPE_KEY)) {
                         primaryType = (String) value;
-                    } else if (key.equals(model.HIER_CHILD_ISPROPERTY_KEY)) {
+                    } else if (key.equals(Model.HIER_CHILD_ISPROPERTY_KEY)) {
                         isProperty = (Boolean) value;
-                    } else if (key.equals(model.PROXY_TARGET_KEY)) {
+                    } else if (key.equals(Model.PROXY_TARGET_KEY)) {
                         targetId = value;
-                    } else if (key.equals(model.PROXY_VERSIONABLE_KEY)) {
+                    } else if (key.equals(Model.PROXY_VERSIONABLE_KEY)) {
                         versionableId = value;
                     }
                     // no mixins (not useful to caller)

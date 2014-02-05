@@ -27,6 +27,7 @@ import org.nuxeo.ecm.core.schema.SchemaManager;
 import org.nuxeo.ecm.core.security.SecurityManager;
 import org.nuxeo.ecm.core.storage.StorageException;
 import org.nuxeo.ecm.core.storage.sql.RepositoryImpl;
+import org.nuxeo.ecm.core.storage.sql.SessionImpl;
 import org.nuxeo.runtime.api.Framework;
 
 /**
@@ -93,9 +94,10 @@ public class SQLRepository implements Repository {
     @Override
     public Session getSession(Map<String, Serializable> context)
             throws DocumentException {
-        org.nuxeo.ecm.core.storage.sql.Session session;
+        SessionImpl session;
         try {
             session = repository.getConnection();
+            session.open();
         } catch (StorageException e) {
             throw new DocumentException(e);
         }
@@ -128,11 +130,20 @@ public class SQLRepository implements Repository {
     }
 
     @Override
+    public void startup() {
+        try {
+            repository.initialize();
+        } catch (StorageException cause) {
+            throw new RuntimeException("Cannot startup repository", cause);
+        }
+    }
+
+    @Override
     public void shutdown() {
         try {
             repository.close();
-        } catch (StorageException e) {
-            log.error("Cannot close repository", e);
+        } catch (StorageException cause) {
+            throw new RuntimeException("Cannot shutdown repository", cause);
         }
     }
 

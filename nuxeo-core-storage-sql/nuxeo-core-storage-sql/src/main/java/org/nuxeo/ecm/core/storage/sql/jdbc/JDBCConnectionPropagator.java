@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.nuxeo.ecm.core.storage.StorageException;
+import org.nuxeo.ecm.core.storage.sql.ClusterNodeHandler;
 
 /**
  * Knows all the {@link JDBCConnection}s in use by a backend, so that they can

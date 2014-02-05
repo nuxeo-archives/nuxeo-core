@@ -157,10 +157,11 @@ public class DefaultMonitorComponent extends DefaultComponent {
             String name = dsEntry.getKey();
             DataSource ds = dsEntry.getValue();
             DatabaseConnectionMonitor monitor = null;
-            if (ds instanceof org.apache.commons.dbcp.BasicDataSource) {
+            Class<? extends DataSource> dsType = ds.getClass();
+            if (org.apache.commons.dbcp.BasicDataSource.class.isAssignableFrom(dsType)) {
                 monitor = new CommonsDatabaseConnectionMonitor(name,
                         (org.apache.commons.dbcp.BasicDataSource) ds);
-            } else if (ds instanceof org.apache.tomcat.dbcp.dbcp.BasicDataSource) {
+            } else if (org.apache.tomcat.dbcp.dbcp.BasicDataSource.class.isAssignableFrom(dsType)) {
                 monitor = new TomcatDatabaseConnectionMonitor(name,
                         (org.apache.tomcat.dbcp.dbcp.BasicDataSource) ds);
             } else {

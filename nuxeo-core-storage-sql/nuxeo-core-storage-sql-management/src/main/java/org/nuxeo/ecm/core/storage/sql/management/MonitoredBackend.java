@@ -13,6 +13,7 @@
 package org.nuxeo.ecm.core.storage.sql.management;
 
 import org.nuxeo.ecm.core.storage.StorageException;
+import org.nuxeo.ecm.core.storage.sql.LockManager;
 import org.nuxeo.ecm.core.storage.sql.Mapper;
 import org.nuxeo.ecm.core.storage.sql.Model;
 import org.nuxeo.ecm.core.storage.sql.ModelSetup;
@@ -55,6 +56,11 @@ public abstract class MonitoredBackend implements RepositoryBackend {
     @Override
     public void shutdown() throws StorageException {
         wrapped.shutdown();
+    }
+
+    @Override
+    public LockManager getLockManager() {
+        return wrapped.getLockManager();
     }
 
 }

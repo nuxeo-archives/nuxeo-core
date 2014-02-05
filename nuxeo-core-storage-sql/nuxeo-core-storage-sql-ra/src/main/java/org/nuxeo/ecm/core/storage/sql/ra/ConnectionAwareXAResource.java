@@ -16,6 +16,8 @@ import javax.transaction.xa.XAException;
 import javax.transaction.xa.XAResource;
 import javax.transaction.xa.Xid;
 
+import org.nuxeo.ecm.core.storage.StorageException;
+
 /**
  * A wrapping of a {@link XAResource} (actually of our TransactionalSession)
  * that closes all connection handles at transaction end.
@@ -58,7 +60,14 @@ public class ConnectionAwareXAResource implements XAResource {
         try {
             xaresource.end(xid, flags);
         } finally {
-            managedConnection.closeConnections();
+            try {
+                managedConnection.closeConnections();
+            } catch (StorageException cause) {
+                XAException error = new XAException("Cannot close connections");
+                error.initCause(cause);
+                error.errorCode = XAException.XA_RBBASE;
+                throw error;
+            }
         }
     }
 

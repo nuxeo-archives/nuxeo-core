@@ -22,7 +22,6 @@ import javax.transaction.xa.XAResource;
 import javax.transaction.xa.Xid;
 
 import org.nuxeo.ecm.core.api.IterableQueryResult;
-import org.nuxeo.ecm.core.api.Lock;
 import org.nuxeo.ecm.core.query.QueryFilter;
 import org.nuxeo.ecm.core.storage.PartialList;
 import org.nuxeo.ecm.core.storage.StorageException;
@@ -60,9 +59,29 @@ public class SoftRefCachingMapper extends SoftRefCachingRowMapper implements Cac
     }
 
     @Override
+    public void open() throws StorageException {
+        mapper.open();
+    }
+
+    @Override
     public void close() throws StorageException {
         super.close();
         mapper.close();
+    }
+
+    @Override
+    public void openConnections() throws StorageException {
+        mapper.openConnections();
+    }
+
+    @Override
+    public void closeConnections() throws StorageException {
+        mapper.closeConnections();
+    }
+
+    @Override
+    public boolean isOpen() {
+        return mapper.isOpen();
     }
 
     @Override
@@ -140,25 +159,9 @@ public class SoftRefCachingMapper extends SoftRefCachingRowMapper implements Cac
     }
 
     @Override
-    public Invalidations getClusterInvalidations(String nodeId)
+    public InvalidationsRows getClusterInvalidations(String nodeId)
             throws StorageException {
         return mapper.getClusterInvalidations(nodeId);
-    }
-
-    @Override
-    public Lock getLock(Serializable id) throws StorageException {
-        return mapper.getLock(id);
-    }
-
-    @Override
-    public Lock setLock(Serializable id, Lock lock) throws StorageException {
-        return mapper.setLock(id, lock);
-    }
-
-    @Override
-    public Lock removeLock(Serializable id, String owner, boolean force)
-            throws StorageException {
-        return mapper.removeLock(id, owner, force);
     }
 
     @Override
@@ -219,5 +222,6 @@ public class SoftRefCachingMapper extends SoftRefCachingRowMapper implements Cac
     public boolean isSameRM(XAResource xares) throws XAException {
         return mapper.isSameRM(xares);
     }
+
 
 }

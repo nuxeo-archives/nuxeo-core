@@ -261,8 +261,21 @@ public class ConnectionFactoryImpl implements Repository,
     }
 
     @Override
-    public void shutdown() {
-        managedConnectionFactory.shutdown();
+    public void startup() throws DocumentException {
+        try {
+            managedConnectionFactory.startup();
+        } catch (StorageException e) {
+            throw new DocumentException("Cannot startup connection factory " + managedConnectionFactory.getName());
+        }
+    }
+
+    @Override
+    public void shutdown() throws DocumentException {
+        try {
+            managedConnectionFactory.shutdown();
+        } catch (StorageException e) {
+            throw new DocumentException("Cannot shutdown shutdown factory " + managedConnectionFactory.getName());
+        }
     }
 
     @Override
@@ -300,7 +313,7 @@ public class ConnectionFactoryImpl implements Repository,
     }
 
     @Override
-    public int clearCaches() {
+    public int clearCaches() throws StorageException {
         return managedConnectionFactory.clearCaches();
     }
 

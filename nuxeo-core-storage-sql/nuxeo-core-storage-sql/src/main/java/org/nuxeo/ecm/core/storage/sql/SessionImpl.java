@@ -57,7 +57,7 @@ import org.nuxeo.ecm.core.storage.Credentials;
 import org.nuxeo.ecm.core.storage.EventConstants;
 import org.nuxeo.ecm.core.storage.PartialList;
 import org.nuxeo.ecm.core.storage.StorageException;
-import org.nuxeo.ecm.core.storage.sql.Invalidations.InvalidationsPair;
+import org.nuxeo.ecm.core.storage.sql.InvalidationsRows.InvalidationsPair;
 import org.nuxeo.ecm.core.storage.sql.PersistenceContext.PathAndId;
 import org.nuxeo.ecm.core.storage.sql.RowMapper.RowBatch;
 import org.nuxeo.ecm.core.work.api.Work;
@@ -66,7 +66,6 @@ import org.nuxeo.ecm.core.work.api.WorkManager.Scheduling;
 import org.nuxeo.runtime.api.Framework;
 import org.nuxeo.runtime.metrics.MetricsService;
 import org.nuxeo.runtime.services.streaming.FileSource;
-
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.SharedMetricRegistries;
 import com.codahale.metrics.Timer;
@@ -91,7 +90,7 @@ public class SessionImpl implements Session, XAResource {
      */
     public static final String COMPAT_REPOSITORY_NAME_KEY = "org.nuxeo.vcs.repository.name.default.compat";
 
-    private static final boolean COMPAT_REPOSITORY_NAME = Boolean.parseBoolean(Framework.getProperty(
+    protected static final boolean COMPAT_REPOSITORY_NAME = Boolean.parseBoolean(Framework.getProperty(
             COMPAT_REPOSITORY_NAME_KEY, "true"));
 
     protected final RepositoryImpl repository;
@@ -109,8 +108,6 @@ public class SessionImpl implements Session, XAResource {
 
     private boolean inTransaction;
 
-    private Node rootNode;
-
     private long threadId;
 
     private String threadName;
@@ -119,6 +116,7 @@ public class SessionImpl implements Session, XAResource {
 
     private boolean readAclsChanged;
 
+    private Node rootNode;
 
     // @since 5.7
     protected final MetricRegistry registry = SharedMetricRegistries.getOrCreate(MetricsService.class.getName());
@@ -129,7 +127,7 @@ public class SessionImpl implements Session, XAResource {
 
     private final Timer aclrUpdateTimer;
 
-    public SessionImpl(RepositoryImpl repository, Model model, Mapper mapper,
+    public SessionImpl(RepositoryImpl repository, Mapper mapper,
             Credentials credentials) throws StorageException {
         this.repository = repository;
         this.mapper = mapper;
@@ -137,7 +135,7 @@ public class SessionImpl implements Session, XAResource {
             ((CachingMapper) mapper).setSession(this);
         }
         // this.credentials = credentials;
-        this.model = model;
+        model = repository.getModel();
         context = new PersistenceContext(model, mapper, this);
         live = true;
         readAclsChanged = false;
@@ -150,7 +148,10 @@ public class SessionImpl implements Session, XAResource {
         saveTimer =  registry.timer(MetricRegistry.name("nuxeo", "repositories", repository.getName(), "saves"));
         queryTimer =  registry.timer(MetricRegistry.name("nuxeo", "repositories", repository.getName(), "queries"));
         aclrUpdateTimer =  registry.timer(MetricRegistry.name("nuxeo", "repositories", repository.getName(), "aclr-updates"));
+    }
 
+    public void open() throws StorageException {
+        mapper.open();
         computeRootNode();
     }
 
@@ -236,6 +237,7 @@ public class SessionImpl implements Session, XAResource {
     protected boolean isIdNew(Serializable id) {
         return context.isIdNew(id);
     }
+
 
     /*
      * ----- javax.resource.cci.Connection -----
@@ -539,10 +541,7 @@ public class SessionImpl implements Session, XAResource {
      */
     protected void collectModified(Invalidations invalidations,
             Set<String> docs, Set<String> parents) {
-        if (invalidations == null || invalidations.modified == null) {
-            return;
-        }
-        for (RowId rowId : invalidations.modified) {
+        for (RowId rowId : invalidations.getModified()) {
             Serializable id = rowId.id;
             Serializable docId;
             try {
@@ -578,7 +577,7 @@ public class SessionImpl implements Session, XAResource {
      */
     protected void sendInvalidationEvent(Invalidations invalidations,
             boolean local) {
-        sendInvalidationEvent(new InvalidationsPair(invalidations, null));
+        sendInvalidationEvent(new InvalidationsPair(invalidations, Invalidations.EMPTY));
     }
 
     /**
@@ -878,7 +877,7 @@ public class SessionImpl implements Session, XAResource {
         }
         list.add(mixin);
         String[] mixins = list.toArray(new String[list.size()]);
-        node.hierFragment.put(model.MAIN_MIXIN_TYPES_KEY, mixins);
+        node.hierFragment.put(Model.MAIN_MIXIN_TYPES_KEY, mixins);
         // immediately create child nodes (for complex properties) in order
         // to avoid concurrency issue later on
         Map<String, String> childrenTypes = model.getMixinComplexChildren(mixin);
@@ -902,7 +901,7 @@ public class SessionImpl implements Session, XAResource {
         if (mixins.length == 0) {
             mixins = null;
         }
-        node.hierFragment.put(model.MAIN_MIXIN_TYPES_KEY, mixins);
+        node.hierFragment.put(Model.MAIN_MIXIN_TYPES_KEY, mixins);
         // remove child nodes
         Map<String, String> childrenTypes = model.getMixinComplexChildren(mixin);
         for (String childName: childrenTypes.keySet()) {
@@ -1309,23 +1308,25 @@ public class SessionImpl implements Session, XAResource {
         readAclsChanged = false;
     }
 
-    private void computeRootNode() throws StorageException {
+    protected void computeRootNode() throws StorageException {
+        if (rootNode != null) {
+            return;
+        }
         String repositoryId = repository.getName();
         Serializable rootId = mapper.getRootId(repositoryId);
         if (rootId == null && COMPAT_REPOSITORY_NAME) {
             // compat, old repositories had fixed id "default"
             rootId = mapper.getRootId("default");
         }
-        if (rootId == null) {
-            log.debug("Creating root");
-            rootNode = addRootNode();
-            addRootACP();
-            save();
-            // record information about the root id
-            mapper.setRootId(repositoryId, rootNode.getId());
-        } else {
-            rootNode = getNodeById(rootId, false);
-        }
+        rootNode = getNodeById(rootId, false);
+    }
+
+    protected void createRootNode() throws StorageException {
+        rootNode = addRootNode();
+        addRootACP();
+        save();
+        // record information about the root id
+        mapper.setRootId(repository.getName(), rootNode.getId());
     }
 
     // TODO factor with addChildNode
@@ -1399,12 +1400,18 @@ public class SessionImpl implements Session, XAResource {
         if (flags == TMNOFLAGS) {
             try {
                 processReceivedInvalidations();
-            } catch (Exception e) {
-                log.error("Could not start transaction", e);
-                throw (XAException) new XAException(XAException.XAER_RMERR).initCause(e);
+            } catch (Exception cause) {
+                log.error("Could not start transaction", cause);
+                throw (XAException) new XAException(XAException.XAER_RMERR).initCause(cause);
             }
         }
         mapper.start(xid, flags);
+        try {
+            computeRootNode();
+        } catch (StorageException cause) {
+            log.error("Could not compute root node", cause);
+            throw (XAException) new XAException(XAException.XAER_RMERR).initCause(cause);
+        }
         inTransaction = true;
         checkThreadStart();
     }

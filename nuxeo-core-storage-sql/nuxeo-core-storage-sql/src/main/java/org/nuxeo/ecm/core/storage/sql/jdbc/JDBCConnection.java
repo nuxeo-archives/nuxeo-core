@@ -104,7 +104,6 @@ public class JDBCConnection {
         this.noSharing = noSharing;
         dialect = sqlInfo.dialect;
         connectionPropagator.addConnection(this);
-        open();
     }
 
     public Identification getIdentification() {
@@ -117,15 +116,9 @@ public class JDBCConnection {
         }
     }
 
-    protected void open() throws StorageException {
-        openConnections();
-    }
-
-    private void openConnections() throws StorageException {
+    public void openConnections() throws StorageException {
         try {
             openBaseConnection();
-            supportsBatchUpdates = connection.getMetaData().supportsBatchUpdates();
-            dialect.performPostOpenStatements(connection);
         } catch (SQLException e) {
             throw new StorageException(e);
         }
@@ -173,15 +166,24 @@ public class JDBCConnection {
             xaconnection = null;
             xaresource = new XAResourceConnectionAdapter(connection);
         }
+        supportsBatchUpdates = connection.getMetaData().supportsBatchUpdates();
+        dialect.performPostOpenStatements(connection);
     }
 
     public void close() {
-        connectionPropagator.removeConnection(this);
         closeConnections();
-        xaresource = null;
+        connectionPropagator.removeConnection(this);
     }
 
-    private void closeConnections() {
+    public void open() throws StorageException {
+        openConnections();
+    }
+
+    public boolean isOpen() {
+        return connection != null || xaconnection != null;
+    }
+
+    public void closeConnections() {
         if (connection != null) {
             try {
                 connection.close();
@@ -201,6 +203,7 @@ public class JDBCConnection {
                 xaconnection = null;
             }
         }
+        xaresource = null;
     }
 
     /**

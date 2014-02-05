@@ -18,11 +18,7 @@ package org.nuxeo.ecm.core.storage.sql.jdbc;
 
 import static javax.transaction.xa.XAException.XAER_INVAL;
 import static javax.transaction.xa.XAException.XAER_PROTO;
-import static javax.transaction.xa.XAException.XAER_RMERR;
-
 import java.sql.Connection;
-import java.sql.SQLException;
-
 import javax.transaction.xa.XAException;
 import javax.transaction.xa.XAResource;
 import javax.transaction.xa.Xid;
@@ -55,11 +51,6 @@ public class XAResourceConnectionAdapter implements XAResource {
                 throw newXAException(XAER_PROTO, "Already started");
             }
             this.xid = xid;
-            try {
-                connection.setAutoCommit(false);
-            } catch (SQLException e) {
-                throw newXAException(XAER_RMERR, "Cannot set autoCommit=false");
-            }
         } else {
             // cannot support resume
             throw newXAException(XAER_INVAL, "Invalid flag: " + flag);
@@ -87,17 +78,6 @@ public class XAResourceConnectionAdapter implements XAResource {
             throw newXAException(XAER_INVAL, "Invalid Xid");
         }
         this.xid = null;
-        try {
-            connection.commit();
-        } catch (SQLException e) {
-            throw newXAException(XAER_RMERR, "Cannot commit", e);
-        } finally {
-            try {
-                connection.setAutoCommit(true);
-            } catch (SQLException e) {
-                log.error("Cannot set autoCommit=true", e);
-            }
-        }
     }
 
     @Override
@@ -106,17 +86,6 @@ public class XAResourceConnectionAdapter implements XAResource {
             throw newXAException(XAER_INVAL, "Invalid Xid");
         }
         this.xid = null;
-        try {
-            connection.rollback();
-        } catch (SQLException e) {
-            throw newXAException(XAER_RMERR, "Cannot rollback", e);
-        } finally {
-            try {
-                connection.setAutoCommit(true);
-            } catch (SQLException e) {
-                log.error("Cannot set autoCommit=true", e);
-            }
-        }
     }
 
     @Override

@@ -192,20 +192,28 @@ public class DefaultStorageConnectionMonitor implements StorageConnectionMonitor
 
     protected ObjectInstance self;
 
+    protected String countPath;
+
+    protected String idlePath;
+
     @Override
     public void install() {
         self = DefaultMonitorComponent.bind(this, repositoryName);
-        registry.register(MetricRegistry.name("nuxeo", "repositories",
-                repositoryName, "connections", "count"), new JmxAttributeGauge(
+        countPath = MetricRegistry.name("nuxeo", "repositories",
+                repositoryName, "connections", "count");
+        registry.register(countPath, new JmxAttributeGauge(
                 self.getObjectName(), "ConnectionCount"));
-        registry.register(MetricRegistry.name("nuxeo", "repositories",
-                repositoryName, "connections", "idle"), new JmxAttributeGauge(
+        idlePath = MetricRegistry.name("nuxeo", "repositories",
+                repositoryName, "connections", "idle");
+        registry.register(idlePath, new JmxAttributeGauge(
                 self.getObjectName(), "IdleConnectionCount"));
     }
 
     @Override
     public void uninstall() {
         DefaultMonitorComponent.unbind(self);
+        registry.remove(countPath);
+        registry.remove(idlePath);
         self = null;
     }
 

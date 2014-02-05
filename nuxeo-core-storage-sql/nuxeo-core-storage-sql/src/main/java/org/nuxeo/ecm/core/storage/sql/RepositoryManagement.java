@@ -14,6 +14,8 @@ package org.nuxeo.ecm.core.storage.sql;
 
 import java.util.Calendar;
 
+import org.nuxeo.ecm.core.storage.StorageException;
+
 /**
  * @author Florent Guillaume
  */
@@ -52,8 +54,9 @@ public interface RepositoryManagement {
      * Clears all the caches.
      *
      * @return an indicative count of objects removed
+     * @throws StorageException
      */
-    int clearCaches();
+    int clearCaches() throws StorageException;
 
     /**
      * Makes sure that the next transaction will process cluster invalidations.

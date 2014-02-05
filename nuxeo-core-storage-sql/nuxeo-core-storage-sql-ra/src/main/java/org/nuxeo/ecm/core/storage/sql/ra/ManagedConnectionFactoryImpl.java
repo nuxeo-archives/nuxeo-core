@@ -186,7 +186,6 @@ public class ManagedConnectionFactoryImpl implements ManagedConnectionFactory,
             ConnectionRequestInfo connectionRequestInfo)
             throws ResourceException {
         assert connectionRequestInfo instanceof ConnectionRequestInfoImpl;
-        initialize();
         return new ManagedConnectionImpl(this,
                 (ConnectionRequestInfoImpl) connectionRequestInfo);
     }
@@ -205,7 +204,7 @@ public class ManagedConnectionFactoryImpl implements ManagedConnectionFactory,
                 continue;
             }
             ManagedConnectionImpl managedConnection = (ManagedConnectionImpl) candidate;
-            if (!this.equals(managedConnection.getManagedConnectionFactory())) {
+            if (!equals(managedConnection.getManagedConnectionFactory())) {
                 continue;
             }
             log.debug("matched: " + managedConnection);
@@ -230,7 +229,7 @@ public class ManagedConnectionFactoryImpl implements ManagedConnectionFactory,
     }
 
     @Override
-    public int clearCaches() {
+    public int clearCaches() throws StorageException {
         if (repository == null) {
             return 0;
         }
@@ -286,25 +285,15 @@ public class ManagedConnectionFactoryImpl implements ManagedConnectionFactory,
      * ----- -----
      */
 
-    private void initialize() throws StorageException {
-        synchronized (this) {
-            if (repository == null) {
-                repositoryDescriptor.mergeFrom(getRepositoryDescriptor(repositoryDescriptor.name));
-                repository = new RepositoryImpl(repositoryDescriptor);
-            }
-        }
+    public void startup() throws StorageException {
+        repositoryDescriptor.mergeFrom(getRepositoryDescriptor(repositoryDescriptor.name));
+        repository = new RepositoryImpl(repositoryDescriptor);
+        repository.initialize();
     }
 
-    public void shutdown() {
-        synchronized (this) {
-            if (repository != null) {
-                try {
-                    repository.close();
-                } catch (StorageException e) {
-                    log.error("Cannot close repository", e);
-                }
-            }
-        }
+
+    public void shutdown() throws StorageException {
+        repository.close();
     }
 
     /**
@@ -372,5 +361,6 @@ public class ManagedConnectionFactoryImpl implements ManagedConnectionFactory,
         }
         return props;
     }
+
 
 }

@@ -39,7 +39,9 @@ public interface Repository {
 
     Session[] getOpenedSessions() throws DocumentException;
 
-    void shutdown();
+    void startup() throws DocumentException;
+
+    void shutdown() throws DocumentException;
 
     // stats for debug
 

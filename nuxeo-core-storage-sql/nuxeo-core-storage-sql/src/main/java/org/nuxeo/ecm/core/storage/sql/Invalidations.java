@@ -1,29 +1,10 @@
-/*
- * Copyright (c) 2006-2011 Nuxeo SA (http://nuxeo.com/) and others.
- *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
- *
- * Contributors:
- *     Florent Guillaume
- */
 package org.nuxeo.ecm.core.storage.sql;
 
 import java.io.Serializable;
-import java.util.HashSet;
+import java.util.Collections;
 import java.util.Set;
 
-/**
- * A set of invalidations.
- * <p>
- * Records both modified and deleted fragments, as well as "parents modified"
- * fragments.
- */
-public class Invalidations implements Serializable {
-
-    private static final long serialVersionUID = 1L;
+public interface Invalidations {
 
     /** Pseudo-table for children invalidation. */
     public static final String PARENT = "__PARENT__";
@@ -38,149 +19,121 @@ public class Invalidations implements Serializable {
 
     public static final int DELETED = 2;
 
-    /** used locally when invalidating everything */
-    public boolean all;
+    boolean isEmpty();
 
-    /** null when empty */
-    public Set<RowId> modified;
-
-    /** null when empty */
-    public Set<RowId> deleted;
-
-    public Invalidations() {
-    }
-
-    public Invalidations(boolean all) {
-        this.all = all;
-    }
-
-    public boolean isEmpty() {
-        return modified == null && deleted == null && !all;
-    }
-
-    public void clear() {
-        all = false;
-        modified = null;
-        deleted = null;
-    }
+    void clear();
 
     /** only call this if it's to add at least one element in the set */
-    public Set<RowId> getKindSet(int kind) {
-        switch (kind) {
-        case MODIFIED:
-            if (modified == null) {
-                modified = new HashSet<RowId>();
-            }
-            return modified;
-        case DELETED:
-            if (deleted == null) {
-                deleted = new HashSet<RowId>();
-            }
-            return deleted;
-        }
-        throw new AssertionError();
-    }
+    Set<RowId> getKindSet(int kind);
 
-    public void add(Invalidations other) {
-        if (other == null) {
-            return;
-        }
-        if (all) {
-            return;
-        }
-        if (other.all) {
-            all = true;
-            modified = null;
-            deleted = null;
-            return;
-        }
-        if (other.modified != null) {
-            addModified(other.modified);
-        }
-        if (other.deleted != null) {
-            addDeleted(other.deleted);
-        }
-    }
+    Set<RowId> getModified();
 
-    public void addModified(RowId rowId) {
-        if (all) {
-            return;
-        }
-        if (modified == null) {
-            modified = new HashSet<RowId>();
-        }
-        modified.add(rowId);
-    }
+    Set<RowId> getDeleted();
 
-    protected void addModified(Set<RowId> rowIds) {
-        if (modified == null) {
-            modified = new HashSet<RowId>();
-        }
-        modified.addAll(rowIds);
-    }
+    Invalidations add(Invalidations other);
 
-    public void addDeleted(RowId rowId) {
-        if (all) {
-            return;
-        }
-        if (deleted == null) {
-            deleted = new HashSet<RowId>();
-        }
-        deleted.add(rowId);
-    }
+    void addModified(RowId rowId);
 
-    protected void addDeleted(Set<RowId> rowIds) {
-        if (deleted == null) {
-            deleted = new HashSet<RowId>();
-        }
-        deleted.addAll(rowIds);
-    }
+    void addDeleted(RowId rowId);
 
-    public void add(Serializable id, String[] tableNames, int kind) {
-        if (tableNames.length == 0) {
-            return;
-        }
-        Set<RowId> set = getKindSet(kind);
-        for (String tableName : tableNames) {
-            set.add(new RowId(tableName, id));
-        }
-    }
+    void add(Serializable id, String[] tableNames, int kind);
 
-    @Override
-    public String toString() {
-        StringBuilder sb = new StringBuilder(
-                this.getClass().getSimpleName() + '(');
-        if (all) {
-            sb.append("all=true");
+    public static Invalidations EMPTY = new Invalidations() {
+
+        @Override
+        public boolean isEmpty() {
+            return true;
         }
-        if (modified != null) {
-            sb.append("modified=");
-            sb.append(modified);
-            if (deleted != null) {
-                sb.append(',');
-            }
+
+        @Override
+        public void clear() {
+            ;
         }
-        if (deleted != null) {
-            sb.append("deleted=");
-            sb.append(deleted);
+
+        @Override
+        public Set<RowId> getKindSet(int kind) {
+            return Collections.emptySet();
         }
-        sb.append(')');
-        return sb.toString();
-    }
 
-    public static final class InvalidationsPair implements Serializable {
-
-        private static final long serialVersionUID = 1L;
-
-        public final Invalidations cacheInvalidations;
-
-        public final Invalidations eventInvalidations;
-
-        public InvalidationsPair(Invalidations cacheInvalidations,
-                Invalidations eventInvalidations) {
-            this.cacheInvalidations = cacheInvalidations;
-            this.eventInvalidations = eventInvalidations;
+        @Override
+        public Set<RowId> getModified() {
+            return Collections.emptySet();
         }
-    }
+
+        @Override
+        public Set<RowId> getDeleted() {
+            return Collections.emptySet();
+        }
+
+        @Override
+        public Invalidations add(Invalidations other) {
+            return other;
+        }
+
+        @Override
+        public void addModified(RowId rowId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void addDeleted(RowId rowId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void add(Serializable id, String[] tableNames, int kind) {
+            throw  new UnsupportedOperationException();
+        }
+
+    };
+    public static Invalidations ALL = new Invalidations() {
+
+        @Override
+        public boolean isEmpty() {
+            return false;
+        }
+
+        @Override
+        public void clear() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Set<RowId> getModified() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Set<RowId> getDeleted() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Set<RowId> getKindSet(int kind) {
+            throw new UnsupportedOperationException();
+        }
+
+
+        @Override
+        public Invalidations add(Invalidations other) {
+            return this;
+        }
+
+        @Override
+        public void addModified(RowId rowId) {
+            ;
+        }
+
+        @Override
+        public void addDeleted(RowId rowId) {
+           ;
+        }
+
+        @Override
+        public void add(Serializable id, String[] tableNames, int kind) {
+           ;
+        }
+
+    };
 
 }

@@ -22,6 +22,7 @@ import javax.naming.InitialContext;
 import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
 
+import org.nuxeo.ecm.core.storage.StorageException;
 import org.nuxeo.ecm.core.storage.sql.BinaryGarbageCollector;
 import org.nuxeo.ecm.core.storage.sql.BinaryManagerStatus;
 import org.nuxeo.ecm.core.storage.sql.Repository;
@@ -108,14 +109,22 @@ public class RepositoryStatus implements RepositoryStatusMBean {
     }
 
     @Override
-    public String clearCaches() {
+    public String clearCaches() throws StorageException {
         List<RepositoryManagement> repositories = repositories();
         StringBuilder buf = new StringBuilder();
         buf.append("Cleared cached objects for SQL repositories:<br />");
+        StorageException errors = new StorageException("clear caches errors, see suppressed");
         for (RepositoryManagement repository : repositories) {
             buf.append("<b>").append(repository.getName()).append("</b>: ");
-            buf.append(repository.clearCaches());
+            try {
+                buf.append(repository.clearCaches());
+            } catch (StorageException e) {
+                errors.addSuppressed(e);
+            }
             buf.append("<br />");
+        }
+        if (errors.getSuppressed().length > 0) {
+            throw errors;
         }
         return buf.toString();
     }

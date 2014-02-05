@@ -12,21 +12,18 @@
  */
 package org.nuxeo.ecm.core.repository;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.nuxeo.ecm.core.NXCore;
 import org.nuxeo.ecm.core.api.ClientException;
 import org.nuxeo.ecm.core.api.CoreSession;
 import org.nuxeo.ecm.core.api.UnrestrictedSessionRunner;
 import org.nuxeo.ecm.core.api.local.LocalSession;
-import org.nuxeo.ecm.core.model.NoSuchRepositoryException;
 import org.nuxeo.ecm.core.model.Repository;
+import org.nuxeo.runtime.api.Framework;
 import org.nuxeo.runtime.model.ComponentContext;
 import org.nuxeo.runtime.model.ComponentName;
 import org.nuxeo.runtime.model.DefaultComponent;
 import org.nuxeo.runtime.model.Extension;
 import org.nuxeo.runtime.services.event.Event;
-import org.nuxeo.runtime.services.event.EventListener;
 import org.nuxeo.runtime.services.event.EventService;
 import org.nuxeo.runtime.transaction.TransactionHelper;
 
@@ -36,11 +33,9 @@ import org.nuxeo.runtime.transaction.TransactionHelper;
  * @author Bogdan Stefanescu
  * @author Florent Guillaume
  */
-public class RepositoryService extends DefaultComponent implements EventListener {
+public class RepositoryService extends DefaultComponent {
 
     public static final ComponentName NAME = new ComponentName("org.nuxeo.ecm.core.repository.RepositoryService");
-
-    private static final Log log = LogFactory.getLog(RepositoryService.class);
 
     // event IDs
     public static final String REPOSITORY = "repository";
@@ -54,11 +49,7 @@ public class RepositoryService extends DefaultComponent implements EventListener
     @Override
     public void activate(ComponentContext context) throws Exception {
         repositoryMgr = new RepositoryManager(this);
-        eventService = (EventService) context.getRuntimeContext().getRuntime().getComponent(EventService.NAME);
-        if (eventService == null) {
-            throw new Exception("Event Service was not found");
-        }
-        eventService.addListener(REPOSITORY, this);
+        eventService = Framework.getLocalService(EventService.class);
     }
 
     @Override
@@ -68,31 +59,21 @@ public class RepositoryService extends DefaultComponent implements EventListener
     }
 
     void fireRepositoryRegistered(RepositoryDescriptor rd) {
-        eventService.sendEvent(new Event(REPOSITORY, REPOSITORY_REGISTERED, this, rd.getName()));
+        final String name = rd.getName();
+        eventService.sendEvent(new Event(REPOSITORY, REPOSITORY_REGISTERED, this, name));
     }
 
     void fireRepositoryUnRegistered(RepositoryDescriptor rd) {
-        eventService.sendEvent(new Event(REPOSITORY, REPOSITORY_UNREGISTERED, this, rd.getName()));
+        final String name = rd.getName();
+        eventService.sendEvent(new Event(REPOSITORY, REPOSITORY_UNREGISTERED, this, name));
     }
 
-    @Override
-    public boolean aboutToHandleEvent(Event event) {
-        return false;
-    }
 
-    @Override
-    public void handleEvent(Event event) {
-        if (event.getId().equals(REPOSITORY_UNREGISTERED)) {
-            String name = (String) event.getData();
-            try {
-                Repository repo = NXCore.getRepository(name);
-                log.info("Closing repository: " + name);
-                repo.shutdown();
-            } catch (NoSuchRepositoryException e) {
-                // already torn down
-            } catch (Exception e) {
-                log.error("Failed to close repository: " + name, e);
-            }
+    protected Repository getRepository(String name) {
+        try {
+            return NXCore.getRepository(name);
+        } catch (Exception cause) {
+           throw new RuntimeException("Cannot access to " + name + " repository", cause);
         }
     }
 
@@ -135,27 +116,25 @@ public class RepositoryService extends DefaultComponent implements EventListener
 
     @Override
     public void applicationStarted(ComponentContext context) throws Exception {
+        // initialize content
         RepositoryInitializationHandler handler = RepositoryInitializationHandler.getInstance();
         if (handler == null) {
             return;
         }
-        boolean started = false;
         boolean ok = false;
         try {
-            started = !TransactionHelper.isTransactionActive() && TransactionHelper.startTransaction();
+            TransactionHelper.startTransaction();
             for (String name : repositoryMgr.getRepositoryNames()) {
                 initializeRepository(handler, name);
             }
             ok = true;
         } finally {
-            if (started) {
-                try {
-                    if (!ok) {
-                        TransactionHelper.setTransactionRollbackOnly();
-                    }
-                } finally {
-                    TransactionHelper.commitOrRollbackTransaction();
+            try {
+                if (!ok) {
+                    TransactionHelper.setTransactionRollbackOnly();
                 }
+            } finally {
+                TransactionHelper.commitOrRollbackTransaction();
             }
         }
     }
@@ -174,5 +153,6 @@ public class RepositoryService extends DefaultComponent implements EventListener
                     + name + "': " + e.getMessage(), e);
         }
     }
+
 
 }

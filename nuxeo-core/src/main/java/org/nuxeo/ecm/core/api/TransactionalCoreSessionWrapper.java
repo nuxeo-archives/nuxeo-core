@@ -115,12 +115,15 @@ public class TransactionalCoreSessionWrapper implements InvocationHandler,
             // first call in thread
             try {
                 main = TransactionHelper.lookupTransactionManager().getTransaction();
-
                 if (main != null) {
                     if (main.getStatus() == Status.STATUS_ACTIVE) {
                         // register last, we want post-commit stuff to be
                         // executed after everything else is committed
-                        ConnectionHelper.registerSynchronizationLast(this);
+                        try {
+                            ConnectionHelper.registerSynchronizationLast(this);
+                        } catch (Exception cause) {
+                            throw new RuntimeException("Cannot register core session tx synchronizer", cause);
+                        }
                         session.afterBegin();
                         threadBound.set(main);
                     }
@@ -128,7 +131,7 @@ public class TransactionalCoreSessionWrapper implements InvocationHandler,
             } catch (NamingException e) {
                 // no transaction manager, ignore
             } catch (Exception e) {
-                log.error("Error on transaction synchronizer registration", e);
+                throw new RuntimeException("Error on transaction manager lookup", e);
             }
             checkTxActiveRequired(method);
         }

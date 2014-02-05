@@ -24,6 +24,7 @@ import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.nuxeo.ecm.core.api.DocumentException;
 import org.nuxeo.ecm.core.model.Repository;
 
 /**
@@ -86,8 +87,9 @@ public class RepositoryManager {
      * shutdown.
      *
      * @param name the repository name
+     * @throws DocumentException
      */
-    public void releaseRepository(String name) {
+    public void releaseRepository(String name) throws DocumentException {
         if (log.isTraceEnabled()) {
             log.trace("Entering releaseRepository : " + name);
         }
@@ -151,7 +153,7 @@ public class RepositoryManager {
         }
     }
 
-    public void unregisterRepository(RepositoryDescriptor rd) {
+    public void unregisterRepository(RepositoryDescriptor rd) throws DocumentException {
         log.info("Unregistering repository: " + rd.getName());
         if (descriptors.contains(rd)) {
             synchronized (repositories) {
@@ -159,23 +161,32 @@ public class RepositoryManager {
                 Ref ref = repositories.remove(rd.getName());
                 if (ref != null) {
                     log.info("Unregistering repository: " + rd.getName());
-                    repositoryService.fireRepositoryUnRegistered(rd);
                     ref.dispose();
+                    repositoryService.fireRepositoryUnRegistered(rd);
                 }
             }
         }
     }
 
-    public void shutdown() {
+    public void shutdown() throws DocumentException {
         log.info("Shutting down repository manager");
         synchronized (repositories) {
+            DocumentException errors = new DocumentException("Shutting down errors");
             Iterator<Ref> it = repositories.values().iterator();
             while (it.hasNext()) {
                 Ref ref = it.next();
-                ref.dispose();
+                repositoryService.fireRepositoryUnRegistered(ref.descriptor);
+                try {
+                    ref.dispose();
+                } catch (DocumentException cause) {
+                    errors.addSuppressed(cause);
+                }
                 it.remove();
             }
             descriptors.clear();
+            if (errors.getSuppressed().length > 0) {
+                throw errors;
+            }
         }
     }
 
@@ -194,12 +205,13 @@ public class RepositoryManager {
             if (repository == null) {
                 refcnt = 0;
                 repository = descriptor.create();
+                repository.startup();
             }
             refcnt++;
             return repository;
         }
 
-        public synchronized void release() {
+        public synchronized void release() throws DocumentException {
             if (repository != null) {
                 if (--refcnt == 0) {
                     repository.shutdown();
@@ -208,7 +220,7 @@ public class RepositoryManager {
             }
         }
 
-        public void dispose() {
+        public void dispose() throws DocumentException {
             if (repository != null) {
                 repository.shutdown();
                 repository = null;

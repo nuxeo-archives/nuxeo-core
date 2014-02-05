@@ -12,6 +12,7 @@
 
 package org.nuxeo.ecm.core.storage.sql.management;
 
+import org.nuxeo.ecm.core.storage.StorageException;
 import org.nuxeo.ecm.core.storage.sql.BinaryManagerStatus;
 
 /**
@@ -36,8 +37,9 @@ public interface RepositoryStatusMBean {
 
     /**
      * Clears the caches.
+     * @throws StorageException
      */
-    String clearCaches();
+    String clearCaches() throws StorageException;
 
     /**
      * Evaluate caches size

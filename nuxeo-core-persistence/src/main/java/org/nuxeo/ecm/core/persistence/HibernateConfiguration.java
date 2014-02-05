@@ -140,16 +140,8 @@ public class HibernateConfiguration implements EntityManagerFactoryProvider {
         if (cfg == null) {
             setupConfiguration(properties);
         }
-        Properties props = cfg.getProperties();
-        if (props.get(Environment.URL) == null) {
-            // don't set up our connection provider for unit tests
-            // that use an explicit driver + connection URL and so use
-            // a DriverManagerConnectionProvider
-            props.put(Environment.CONNECTION_PROVIDER,
-                    NuxeoConnectionProvider.class.getName());
-        }
         if (txType.equals(RESOURCE_LOCAL)) {
-            props.remove(Environment.DATASOURCE);
+            cfg.getProperties().remove(Environment.DATASOURCE);
         }
         return createEntityManagerFactory(properties);
     }
@@ -160,7 +152,7 @@ public class HibernateConfiguration implements EntityManagerFactoryProvider {
     protected EntityManagerFactory createEntityManagerFactory(
             final Map<String, String> properties) {
         final EntityManagerFactory[] emf = new EntityManagerFactory[1];
-        Thread t = new Thread("persistence-init-"+name) {
+        Thread t = new Thread() {
             @SuppressWarnings("deprecation")
             @Override
             public void run() {
@@ -181,13 +173,17 @@ public class HibernateConfiguration implements EntityManagerFactoryProvider {
      */
     public static class NuxeoTransactionManagerLookup implements
             TransactionManagerLookup {
-        public NuxeoTransactionManagerLookup() {
-            // look up UserTransaction once to know its JNDI name
+
+        // look up UserTransaction once to know its JNDI name
+        static {
             try {
                 TransactionHelper.lookupUserTransaction();
             } catch (NamingException e) {
                 // ignore
             }
+        }
+
+        public NuxeoTransactionManagerLookup() {
         }
 
         @Override

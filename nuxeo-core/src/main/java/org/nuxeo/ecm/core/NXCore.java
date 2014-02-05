@@ -64,6 +64,14 @@ public final class NXCore {
             return (Repository) new InitialContext()
                     .lookup("java:NXRepository/" + name);
         } catch (NamingException e) {
+            try {
+                Repository repo = getRepositoryService().getRepositoryManager().getRepository(name);
+                if (repo != null) {
+                    return repo;
+                }
+            } catch (Exception e1) {
+                ;
+            }
             throw new NoSuchRepositoryException("Failed to lookup repository: "
                     + name, e);
         }

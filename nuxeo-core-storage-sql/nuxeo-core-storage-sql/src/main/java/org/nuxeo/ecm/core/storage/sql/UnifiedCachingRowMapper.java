@@ -21,6 +21,7 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -41,7 +42,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.nuxeo.ecm.core.storage.StorageException;
 import org.nuxeo.ecm.core.storage.sql.ACLRow.ACLRowPositionComparator;
-import org.nuxeo.ecm.core.storage.sql.Invalidations.InvalidationsPair;
+import org.nuxeo.ecm.core.storage.sql.InvalidationsRows.InvalidationsPair;
 import org.nuxeo.runtime.metrics.MetricsService;
 
 import com.codahale.metrics.Counter;
@@ -82,7 +83,7 @@ public class UnifiedCachingRowMapper implements RowMapper {
      * The local invalidations due to writes through this mapper that should be
      * propagated to other sessions at post-commit time.
      */
-    private final Invalidations localInvalidations;
+    private final InvalidationsRows localInvalidations;
 
     /**
      * The queue of cache invalidations received from other session, to process
@@ -136,7 +137,7 @@ public class UnifiedCachingRowMapper implements RowMapper {
     protected Timer sorGetTimer;
 
     public UnifiedCachingRowMapper() {
-        localInvalidations = new Invalidations();
+        localInvalidations = new InvalidationsRows();
         cacheQueue = new InvalidationsQueue("mapper-" + this);
         forRemoteClient = false;
     }
@@ -329,28 +330,18 @@ public class UnifiedCachingRowMapper implements RowMapper {
 
         // add local accumulated invalidations to remote ones
         Invalidations invalidations = cacheQueue.getInvalidations();
-        if (invals != null) {
-            invalidations.add(invals.cacheInvalidations);
-        }
-
+        invalidations = invalidations.add(invals.cacheInvalidations);
         // add local accumulated events to remote ones
         Invalidations events = eventQueue.getInvalidations();
-        if (invals != null) {
-            events.add(invals.eventInvalidations);
-        }
+        events = events.add(invals.eventInvalidations);
+
 
         // invalidate our cache
-        if (invalidations.all) {
+        if (invalidations.equals(Invalidations.ALL)) {
             clearCache();
         }
 
-        // nothing to do on modified or delete, because there is only one cache
-
-        if (invalidations.isEmpty() && events.isEmpty()) {
-            return null;
-        }
-        return new InvalidationsPair(invalidations.isEmpty() ? null
-                : invalidations, events.isEmpty() ? null : events);
+        return new InvalidationsPair(invalidations, events);
     }
 
     // propagate invalidations
@@ -358,29 +349,22 @@ public class UnifiedCachingRowMapper implements RowMapper {
     public void sendInvalidations(Invalidations invalidations)
             throws StorageException {
         // add local invalidations
-        if (!localInvalidations.isEmpty()) {
-            if (invalidations == null) {
-                invalidations = new Invalidations();
-            }
-            invalidations.add(localInvalidations);
-            localInvalidations.clear();
-        }
+        invalidations = invalidations.add(localInvalidations);
+        localInvalidations.clear();
 
-        if (invalidations != null && !invalidations.isEmpty()) {
-            // send to underlying mapper
-            rowMapper.sendInvalidations(invalidations);
+        // send to underlying mapper
+        rowMapper.sendInvalidations(invalidations);
 
-            // queue to other local mappers' caches
-            cachePropagator.propagateInvalidations(invalidations, cacheQueue);
+        // queue to other local mappers' caches
+        cachePropagator.propagateInvalidations(invalidations, cacheQueue);
 
-            // queue as events for other repositories
-            eventPropagator.propagateInvalidations(invalidations, eventQueue);
+        // queue as events for other repositories
+        eventPropagator.propagateInvalidations(invalidations, eventQueue);
 
-            // send event to local repository (synchronous)
-            // only if not the server-side part of a remote client
-            if (!forRemoteClient) {
-                session.sendInvalidationEvent(invalidations, true);
-            }
+        // send event to local repository (synchronous)
+        // only if not the server-side part of a remote client
+        if (!forRemoteClient && session != null) {
+            session.sendInvalidationEvent(invalidations, true);
         }
     }
 
@@ -422,6 +406,11 @@ public class UnifiedCachingRowMapper implements RowMapper {
                 }
             });
         }
+    }
+
+    @Override
+    public boolean isCached(RowId id) {
+        return cache.get(id) != null;
     }
 
     @Override
@@ -531,6 +520,24 @@ public class UnifiedCachingRowMapper implements RowMapper {
         rowMapper.write(batch);
     }
 
+    @Override
+    public void insertSimpleRows(String tableName, List<Row> singletonList)
+            throws StorageException {
+        rowMapper.insertSimpleRows(tableName, singletonList);
+        for (Row each:singletonList) {
+            cachePut(each);
+        }
+    }
+
+    @Override
+    public void deleteSimpleRows(String tableName, Set<Serializable> singleton)
+            throws StorageException {
+        rowMapper.deleteSimpleRows(tableName, singleton);
+        for (Serializable each:singleton) {
+            cachePutAbsent(new RowId(tableName, each));
+        }
+    }
+
     /*
      * ----- Read -----
      */
@@ -587,7 +594,7 @@ public class UnifiedCachingRowMapper implements RowMapper {
             String destName, Row overwriteRow) throws StorageException {
         CopyResult result = rowMapper.copy(source, destParentId, destName,
                 overwriteRow);
-        Invalidations invalidations = result.invalidations;
+        InvalidationsRows invalidations = result.invalidations;
         if (invalidations.modified != null) {
             for (RowId rowId : invalidations.modified) {
                 cacheRemove(rowId);
@@ -616,7 +623,7 @@ public class UnifiedCachingRowMapper implements RowMapper {
         }
         // we only put as absent the root fragment, to avoid polluting the cache
         // with lots of absent info. the rest is removed entirely
-        cachePutAbsent(new RowId(model.HIER_TABLE_NAME, rootInfo.id));
+        cachePutAbsent(new RowId(Model.HIER_TABLE_NAME, rootInfo.id));
         return infos;
     }
 

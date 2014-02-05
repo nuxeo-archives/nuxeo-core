@@ -15,7 +15,12 @@ package org.nuxeo.ecm.core.storage.sql;
 import java.io.Serializable;
 import java.util.Calendar;
 import java.util.Collection;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -37,7 +42,6 @@ import org.nuxeo.ecm.core.storage.sql.Session.PathResolver;
 import org.nuxeo.ecm.core.storage.sql.jdbc.JDBCBackend;
 import org.nuxeo.runtime.api.Framework;
 import org.nuxeo.runtime.metrics.MetricsService;
-
 import com.codahale.metrics.Counter;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.MetricRegistry;
@@ -75,7 +79,7 @@ public class RepositoryImpl implements Repository {
 
     protected final Counter sessionCount;
 
-    private LockManager lockManager;
+    protected ExecutorService executor;
 
     /** Propagator of invalidations to all local mappers' caches. */
     private final InvalidationsPropagator cachePropagator;
@@ -94,13 +98,8 @@ public class RepositoryImpl implements Repository {
 
     private Model model;
 
-    /**
-     * Transient id for this repository assigned by the server on first
-     * connection. This is not persisted.
-     */
-    public String repositoryId;
 
-    public RepositoryImpl(RepositoryDescriptor repositoryDescriptor)
+    public RepositoryImpl(final RepositoryDescriptor repositoryDescriptor)
             throws StorageException {
         this.repositoryDescriptor = repositoryDescriptor;
         sessions = new CopyOnWriteArrayList<SessionImpl>();
@@ -148,8 +147,8 @@ public class RepositoryImpl implements Repository {
     }
 
     protected void createMetricsGauges() {
-        String gaugeName = MetricRegistry.name("nuxeo", "repositories", repositoryDescriptor.name,
-                "caches", "size");
+        String gaugeName = MetricRegistry.name("nuxeo", "repositories",
+                repositoryDescriptor.name, "caches", "size");
         registry.remove(gaugeName);
         registry.register(gaugeName, new Gauge<Long>() {
             @Override
@@ -158,8 +157,8 @@ public class RepositoryImpl implements Repository {
             }
 
         });
-        gaugeName = MetricRegistry.name("nuxeo", "repositories", repositoryDescriptor.name,
-                "caches", "pristines");
+        gaugeName = MetricRegistry.name("nuxeo", "repositories",
+                repositoryDescriptor.name, "caches", "pristines");
         registry.remove(gaugeName);
         registry.register(gaugeName, new Gauge<Long>() {
             @Override
@@ -167,8 +166,9 @@ public class RepositoryImpl implements Repository {
                 return getCachePristineSize();
             }
         });
-        gaugeName = MetricRegistry.name("nuxeo", "repositories", repositoryDescriptor.name,
-                "caches", "selections");;
+        gaugeName = MetricRegistry.name("nuxeo", "repositories",
+                repositoryDescriptor.name, "caches", "selections");
+        ;
         registry.remove(gaugeName);
         registry.register(gaugeName, new Gauge<Long>() {
             @Override
@@ -176,8 +176,9 @@ public class RepositoryImpl implements Repository {
                 return getCacheSelectionSize();
             }
         });
-        gaugeName = MetricRegistry.name("nuxeo", "repositories", repositoryDescriptor.name,
-                "caches", "mappers");;
+        gaugeName = MetricRegistry.name("nuxeo", "repositories",
+                repositoryDescriptor.name, "caches", "mappers");
+        ;
         registry.remove(gaugeName);
         registry.register(gaugeName, new Gauge<Long>() {
             @Override
@@ -210,8 +211,6 @@ public class RepositoryImpl implements Repository {
             RepositoryBackend backend = backendClass.newInstance();
             backend.initialize(this);
             return backend;
-        } catch (StorageException e) {
-            throw e;
         } catch (Exception e) {
             throw new StorageException(e);
         }
@@ -255,7 +254,7 @@ public class RepositoryImpl implements Repository {
     }
 
     public LockManager getLockManager() {
-        return lockManager;
+        return backend.getLockManager();
     }
 
     public Model getModel() {
@@ -279,7 +278,9 @@ public class RepositoryImpl implements Repository {
      */
     @Override
     public SessionImpl getConnection() throws StorageException {
-        return getConnection(null);
+        SessionImpl session = getConnection(null);
+        session.open();
+        return session;
     }
 
     /**
@@ -293,45 +294,29 @@ public class RepositoryImpl implements Repository {
     @Override
     public synchronized SessionImpl getConnection(ConnectionSpec connectionSpec)
             throws StorageException {
-        if (model == null) {
-            initRepository();
-        }
         Credentials credentials = connectionSpec == null ? null
                 : ((ConnectionSpecImpl) connectionSpec).getCredentials();
         SessionPathResolver pathResolver = new SessionPathResolver();
-        Mapper mapper = backend.newMapper(model, pathResolver, null);
-        SessionImpl session = newSession(model, mapper, credentials);
+        Mapper mapper = backend.newMapper(model, pathResolver, MapperKind.SESSION);
+        SessionImpl session = newSession(mapper, credentials);
         pathResolver.setSession(session);
         sessions.add(session);
         sessionCount.inc();
         return session;
     }
 
-    protected void initRepository() throws StorageException {
-        log.debug("Initializing");
+    public void initializeModel() throws StorageException {
         ModelSetup modelSetup = new ModelSetup();
         modelSetup.repositoryDescriptor = repositoryDescriptor;
         modelSetup.schemaManager = schemaManager;
         backend.initializeModelSetup(modelSetup);
         model = new Model(modelSetup);
         backend.initializeModel(model);
+    }
 
-        // create the lock manager, which creates its own mapper
-        // creating this first, before the cluster node handler,
-        // as we don't want invalidations in the lock manager's mapper
-        Mapper lockManagerMapper = backend.newMapper(model, null,
-                MapperKind.LOCK_MANAGER);
-        lockManager = new LockManager(lockManagerMapper,
-                repositoryDescriptor.clusteringEnabled);
-
-        // create the mapper for the cluster node handler
-        if (repositoryDescriptor.clusteringEnabled) {
-            backend.newMapper(model, null, MapperKind.CLUSTER_NODE_HANDLER);
-            log.info("Clustering enabled with "
-                    + repositoryDescriptor.clusteringDelay
-                    + " ms delay for repository: " + getName());
-        }
-
+    public void initialize() throws StorageException {
+        log.debug("Initializing");
+        initializeModel();
         // log once which mapper cache is being used
         Class<? extends CachingMapper> cachingMapperClass = getCachingMapperClass();
         if (cachingMapperClass == null) {
@@ -341,10 +326,58 @@ public class RepositoryImpl implements Repository {
         }
     }
 
-    protected SessionImpl newSession(Model model, Mapper mapper,
+    protected void initializeDatabase(Mapper mapper)
+            throws StorageException {
+        mapper.createDatabase();
+        Serializable rootId = mapper.getRootId(repositoryDescriptor.name);
+        if (rootId == null) {
+            SessionImpl session =  new SessionImpl(this, mapper, null);
+            session.createRootNode();
+            session.save();
+        }
+    }
+
+    protected class NewMapper implements Callable<Mapper> {
+
+        protected final ExecutorService executor;
+
+        protected final MapperKind kind;
+
+        protected NewMapper(ExecutorService executor, MapperKind kind) {
+            this.executor = executor;
+            this.kind = kind;
+        }
+
+        @Override
+        public Mapper call() throws Exception {
+            Mapper mapper = backend.newMapper(model, null,
+                    kind);
+            return mapper;
+        }
+
+    }
+
+    protected Mapper newIsolatedMapper(final MapperKind kind) throws StorageException {
+        ExecutorService executor = Executors.newSingleThreadExecutor(new ThreadFactory() {
+
+            @Override
+            public Thread newThread(Runnable r) {
+                return new Thread(r, "nuxeo-"
+                        + repositoryDescriptor.name + "-" + kind.toString());
+            }
+
+        });
+        try {
+            return executor.submit(new NewMapper(executor, kind)).get();
+        } catch (InterruptedException | ExecutionException cause) {
+            throw new StorageException("Cannot create lock mapper of " + repositoryDescriptor.name, cause);
+        }
+    }
+
+    protected SessionImpl newSession(Mapper mapper,
             Credentials credentials) throws StorageException {
         mapper = createCachingMapper(model, mapper);
-        return new SessionImpl(this, model, mapper, credentials);
+        return new SessionImpl(this, mapper, credentials);
     }
 
     public static class SessionPathResolver implements PathResolver {
@@ -398,17 +431,25 @@ public class RepositoryImpl implements Repository {
 
     @Override
     public synchronized void close() throws StorageException {
-        closeAllSessions();
-
-        model = null;
-
-        backend.shutdown();
-        registry.remove(MetricRegistry.name(RepositoryImpl.class, getName(),
-                "cache-size"));
-        registry.remove(MetricRegistry.name(PersistenceContext.class,
-                getName(), "cache-size"));
-        registry.remove(MetricRegistry.name(SelectionContext.class, getName(),
-                "cache-size"));
+        try {
+            Framework.getLocalService(EventService.class).waitForAsyncCompletion();
+        } finally {
+            try {
+                closeAllSessions();
+            } finally {
+                try {
+                    backend.shutdown();
+                } finally {
+                    model = null;
+                    registry.remove(MetricRegistry.name(RepositoryImpl.class,
+                            getName(), "cache-size"));
+                    registry.remove(MetricRegistry.name(
+                            PersistenceContext.class, getName(), "cache-size"));
+                    registry.remove(MetricRegistry.name(SelectionContext.class,
+                            getName(), "cache-size"));
+                }
+            }
+        }
     }
 
     protected synchronized void closeAllSessions() throws StorageException {
@@ -420,9 +461,6 @@ public class RepositoryImpl implements Repository {
         }
         sessions.clear();
         sessionCount.dec(sessionCount.getCount());
-        if (lockManager != null) {
-            lockManager.shutdown();
-        }
     }
 
     /*
@@ -440,14 +478,12 @@ public class RepositoryImpl implements Repository {
     }
 
     @Override
-    public int clearCaches() {
+    public int clearCaches() throws StorageException {
         int n = 0;
         for (SessionImpl session : sessions) {
             n += session.clearCaches();
         }
-        if (lockManager != null) {
-            lockManager.clearCaches();
-        }
+        getLockManager().clearCaches();
         return n;
     }
 

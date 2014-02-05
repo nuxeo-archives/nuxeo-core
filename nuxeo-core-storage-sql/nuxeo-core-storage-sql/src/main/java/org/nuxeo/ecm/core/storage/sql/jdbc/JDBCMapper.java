@@ -16,7 +16,6 @@ import java.io.Serializable;
 import java.security.MessageDigest;
 import java.sql.Array;
 import java.sql.CallableStatement;
-import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -37,8 +36,10 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import javax.naming.NamingException;
 import javax.sql.XADataSource;
 import javax.transaction.xa.XAException;
 import javax.transaction.xa.XAResource;
@@ -50,17 +51,16 @@ import org.nuxeo.common.utils.StringUtils;
 import org.nuxeo.ecm.core.api.IterableQueryResult;
 import org.nuxeo.ecm.core.api.Lock;
 import org.nuxeo.ecm.core.query.QueryFilter;
-import org.nuxeo.ecm.core.storage.ConnectionResetException;
 import org.nuxeo.ecm.core.storage.PartialList;
 import org.nuxeo.ecm.core.storage.StorageException;
 import org.nuxeo.ecm.core.storage.sql.BinaryGarbageCollector;
 import org.nuxeo.ecm.core.storage.sql.ColumnType.WrappedId;
+import org.nuxeo.ecm.core.storage.sql.ClusterNodeHandler;
+import org.nuxeo.ecm.core.storage.sql.InvalidationsRows;
 import org.nuxeo.ecm.core.storage.sql.Invalidations;
-import org.nuxeo.ecm.core.storage.sql.LockManager;
 import org.nuxeo.ecm.core.storage.sql.Mapper;
 import org.nuxeo.ecm.core.storage.sql.Model;
 import org.nuxeo.ecm.core.storage.sql.RepositoryImpl;
-import org.nuxeo.ecm.core.storage.sql.Row;
 import org.nuxeo.ecm.core.storage.sql.RowId;
 import org.nuxeo.ecm.core.storage.sql.Session.PathResolver;
 import org.nuxeo.ecm.core.storage.sql.jdbc.SQLInfo.SQLInfoSelect;
@@ -70,6 +70,7 @@ import org.nuxeo.ecm.core.storage.sql.jdbc.db.Table;
 import org.nuxeo.ecm.core.storage.sql.jdbc.dialect.Dialect;
 import org.nuxeo.ecm.core.storage.sql.jdbc.dialect.DialectOracle;
 import org.nuxeo.runtime.api.Framework;
+import org.nuxeo.runtime.transaction.TransactionHelper;
 
 /**
  * A {@link JDBCMapper} maps objects to and from a JDBC database. It is specific
@@ -103,7 +104,9 @@ public class JDBCMapper extends JDBCRowMapper implements Mapper {
 
     private final RepositoryImpl repository;
 
-    protected boolean clusteringEnabled;
+    protected final boolean clusteringEnabled;
+
+    protected ExecutorService executor;
 
     /**
      * Creates a new Mapper.
@@ -119,7 +122,7 @@ public class JDBCMapper extends JDBCRowMapper implements Mapper {
     public JDBCMapper(Model model, PathResolver pathResolver, SQLInfo sqlInfo,
             XADataSource xadatasource, ClusterNodeHandler clusterNodeHandler,
             JDBCConnectionPropagator connectionPropagator, boolean noSharing,
-            RepositoryImpl repository) throws StorageException {
+            final RepositoryImpl repository) throws StorageException {
         super(model, sqlInfo, xadatasource, clusterNodeHandler,
                 connectionPropagator, noSharing);
         this.pathResolver = pathResolver;
@@ -132,12 +135,12 @@ public class JDBCMapper extends JDBCRowMapper implements Mapper {
         }
 
         tableUpgrader = new TableUpgrader(this);
-        tableUpgrader.add(model.VERSION_TABLE_NAME,
-                model.VERSION_IS_LATEST_KEY, "upgradeVersions",
+        tableUpgrader.add(Model.VERSION_TABLE_NAME,
+                Model.VERSION_IS_LATEST_KEY, "upgradeVersions",
                 TEST_UPGRADE_VERSIONS);
         tableUpgrader.add("dublincore", "lastContributor",
                 "upgradeLastContributor", TEST_UPGRADE_LAST_CONTRIBUTOR);
-        tableUpgrader.add(model.LOCK_TABLE_NAME, model.LOCK_OWNER_KEY,
+        tableUpgrader.add(Model.LOCK_TABLE_NAME, Model.LOCK_OWNER_KEY,
                 "upgradeLocks", TEST_UPGRADE_LOCKS);
 
     }
@@ -209,16 +212,16 @@ public class JDBCMapper extends JDBCRowMapper implements Mapper {
             for (Table table : database.getTables()) {
                 String tableName = getTableName(table.getPhysicalName());
                 if (tableNames.contains(tableName.toUpperCase())) {
-                    dialect.existingTableDetected(connection, table,
-                            model, sqlInfo.database);
+                    dialect.existingTableDetected(connection, table, model,
+                            sqlInfo.database);
                 } else {
 
                     /*
                      * Create missing table.
                      */
 
-                    boolean create = dialect.preCreateTable(connection,
-                            table, model, sqlInfo.database);
+                    boolean create = dialect.preCreateTable(connection, table,
+                            model, sqlInfo.database);
                     if (!create) {
                         log.warn("Creation skipped for table: " + tableName);
                         continue;
@@ -249,8 +252,8 @@ public class JDBCMapper extends JDBCRowMapper implements Mapper {
                                             + e.getMessage(), e);
                         }
                     }
-                    for (String s : dialect.getPostCreateTableSqls(
-                            table, model, sqlInfo.database)) {
+                    for (String s : dialect.getPostCreateTableSqls(table,
+                            model, sqlInfo.database)) {
                         logger.log(s);
                         try {
                             st.execute(s);
@@ -437,6 +440,7 @@ public class JDBCMapper extends JDBCRowMapper implements Mapper {
         }
     }
 
+
     @Override
     public void removeClusterNode() throws StorageException {
         try {
@@ -536,9 +540,9 @@ public class JDBCMapper extends JDBCRowMapper implements Mapper {
     }
 
     @Override
-    public Invalidations getClusterInvalidations(String nodeId)
+    public InvalidationsRows getClusterInvalidations(String nodeId)
             throws StorageException {
-        Invalidations invalidations = new Invalidations();
+        InvalidationsRows invalidations = new InvalidationsRows();
         String sql = dialect.getClusterGetInvalidations();
         String sqldel = dialect.getClusterDeleteInvalidations();
         if (nodeId != null) {
@@ -561,8 +565,7 @@ public class JDBCMapper extends JDBCRowMapper implements Mapper {
                 Serializable frags = columns.get(1).getFromResultSet(rs, 2);
                 int kind = ((Long) columns.get(2).getFromResultSet(rs, 3)).intValue();
                 String[] fragments;
-                if (dialect.supportsArrays()
-                        && frags instanceof String[]) {
+                if (dialect.supportsArrays() && frags instanceof String[]) {
                     fragments = (String[]) frags;
                 } else {
                     fragments = ((String) frags).split(" ");
@@ -620,7 +623,7 @@ public class JDBCMapper extends JDBCRowMapper implements Mapper {
                 Column column = sqlInfo.getSelectRootIdWhatColumn();
                 Serializable id = column.getFromResultSet(rs, 1);
                 if (logger.isLogEnabled()) {
-                    logger.log("  -> " + model.MAIN_KEY + '=' + id);
+                    logger.log("  -> " + Model.MAIN_KEY + '=' + id);
                 }
                 // check that we didn't get several rows
                 if (rs.next()) {
@@ -654,9 +657,9 @@ public class JDBCMapper extends JDBCRowMapper implements Mapper {
                     i++;
                     String key = column.getKey();
                     Serializable v;
-                    if (key.equals(model.MAIN_KEY)) {
+                    if (key.equals(Model.MAIN_KEY)) {
                         v = id;
-                    } else if (key.equals(model.REPOINFO_REPONAME_KEY)) {
+                    } else if (key.equals(Model.REPOINFO_REPONAME_KEY)) {
                         v = repositoryId;
                     } else {
                         throw new RuntimeException(key);
@@ -789,7 +792,7 @@ public class JDBCMapper extends JDBCRowMapper implements Mapper {
                     ResultSet.CONCUR_READ_ONLY);
             int i = 1;
             for (Serializable object : q.selectParams) {
-                 setToPreparedStatement(ps, i++, object);
+                setToPreparedStatement(ps, i++, object);
             }
             ResultSet rs = ps.executeQuery();
             countExecute();
@@ -936,7 +939,7 @@ public class JDBCMapper extends JDBCRowMapper implements Mapper {
                     }
                     break;
                 }
-                Serializable id = (Serializable) what.getFromResultSet(rs, 1);
+                Serializable id = what.getFromResultSet(rs, 1);
                 if (id != null) {
                     res.add(id);
                     if (logger.isLogEnabled()) {
@@ -993,8 +996,7 @@ public class JDBCMapper extends JDBCRowMapper implements Mapper {
                     debugIds = new LinkedList<Serializable>();
                 }
                 while (rs.next()) {
-                    Serializable id = (Serializable) what.getFromResultSet(rs,
-                            1);
+                    Serializable id = what.getFromResultSet(rs, 1);
                     if (id != null) {
                         res.add(id);
                         if (!done.contains(id)) {
@@ -1032,7 +1034,8 @@ public class JDBCMapper extends JDBCRowMapper implements Mapper {
             return;
         }
         if (log.isDebugEnabled()) {
-            log.debug(String.format("updateReadAcls: updating (concurrent=%b) ...",
+            log.debug(String.format(
+                    "updateReadAcls: updating (concurrent=%b) ...",
                     dialect.supportsConcurrentUpdateReadAcls()));
         }
         Statement st = null;
@@ -1103,146 +1106,57 @@ public class JDBCMapper extends JDBCRowMapper implements Mapper {
         log.debug("rebuildReadAcls: done.");
     }
 
-    /*
-     * ----- Locking -----
-     */
-
-    protected Connection connection(boolean autocommit) throws StorageException {
-        checkConnectionValid();
-        try {
-            connection.setAutoCommit(autocommit);
-        } catch (SQLException e) {
-            throw new StorageException("Cannot set auto commit mode onto " + this + "'s connection", e);
-        }
-        return connection;
-    }
     /**
      * Calls the callable, inside a transaction if in cluster mode.
      * <p>
      * Called under {@link #serializationLock}.
      */
-    protected Lock callInTransaction(Callable<Lock> callable, boolean tx)
-            throws StorageException {
-        boolean ok = false;
-        checkConnectionValid();
-        try {
-            connection.setAutoCommit(!tx);
-        } catch (SQLException e) {
-            throw new StorageException("Cannot set auto commit mode onto " + this + "'s connection", e);
+    protected Lock callInTransaction(Callable<Lock> callable, boolean tx,
+            ExecutorService executor) throws StorageException {
+        if (tx) {
+            callable = new CallInTransaction(callable);
         }
-        try {
-            Lock result;
+        throw new UnsupportedOperationException();
+//        return callWithConnection(callable);
+    }
+
+    protected class CallInTransaction implements Callable<Lock> {
+
+        protected final Callable<Lock> wrapped;
+
+        public CallInTransaction(Callable<Lock> callable) {
+            wrapped = callable;
+        }
+
+        @Override
+        public Lock call() throws Exception {
+            boolean ok = false;
+            checkConnectionValid();
+            boolean txStarted = TransactionHelper.startTransaction();
             try {
-                result = callable.call();
-            } catch (StorageException e) {
-                throw e;
-            } catch (Exception e) {
-                throw new StorageException(e);
-            }
-
-            ok = true;
-            return result;
-        } finally {
-            if (tx) {
+                Lock result;
                 try {
-                    if (ok) {
-                        connection.commit();
-                    } else {
-                        connection.rollback();
+                    result = wrapped.call();
+                } catch (Exception cause) {
+                    throw new StorageException(
+                            "Cannot operate lock on document", cause);
+                }
+                ok = true;
+                return result;
+            } finally {
+                if (txStarted) {
+                    if (!ok) {
+                        TransactionHelper.setTransactionRollbackOnly();
                     }
-                } catch (SQLException e) {
-                    throw new StorageException(e);
+                    TransactionHelper.commitOrRollbackTransaction();
                 }
             }
+
         }
+
     }
 
     @Override
-    public Lock getLock(Serializable id) throws StorageException {
-        RowId rowId = new RowId(Model.LOCK_TABLE_NAME, id);
-        Row row;
-        try {
-            row = readSimpleRow(rowId);
-        } catch (ConnectionResetException e) {
-            // retry once
-            row = readSimpleRow(rowId);
-        }
-        return row == null ? null : new Lock(
-                (String) row.get(Model.LOCK_OWNER_KEY),
-                (Calendar) row.get(Model.LOCK_CREATED_KEY));
-    }
-
-    @Override
-    public Lock setLock(final Serializable id, final Lock lock) throws StorageException {
-        SetLock call = new SetLock(id, lock);
-        return callInTransaction(call, clusteringEnabled);
-    }
-
-    protected class SetLock implements Callable<Lock> {
-        protected final Serializable id;
-
-        protected final Lock lock;
-
-        protected SetLock(Serializable id, Lock lock) {
-            super();
-            this.id = id;
-            this.lock = lock;
-        }
-
-        @Override
-        public Lock call() throws StorageException {
-            Lock oldLock = getLock(id);
-            if (oldLock == null) {
-                Row row = new Row(Model.LOCK_TABLE_NAME, id);
-                row.put(Model.LOCK_OWNER_KEY, lock.getOwner());
-                row.put(Model.LOCK_CREATED_KEY, lock.getCreated());
-                insertSimpleRows(Model.LOCK_TABLE_NAME,
-                        Collections.singletonList(row));
-            }
-            return oldLock;
-        }
-    }
-
-    @Override
-    public Lock removeLock(final Serializable id, final String owner, final boolean force)
-            throws StorageException {
-        RemoveLock call = new RemoveLock(id, owner, force);
-        return callInTransaction(call, !force);
-    }
-
-    protected class RemoveLock implements Callable<Lock> {
-        protected final Serializable id;
-        protected final String owner;
-        protected final boolean force;
-
-        protected RemoveLock(Serializable id, String owner, boolean force) {
-            super();
-            this.id = id;
-            this.owner = owner;
-            this.force = force;
-        }
-
-        @Override
-        public Lock call() throws StorageException {
-            Lock oldLock = force ? null : getLock(id);
-            if (!force && owner != null) {
-                if (oldLock == null) {
-                    // not locked, nothing to do
-                    return null;
-                }
-                if (!LockManager.canLockBeRemoved(oldLock, owner)) {
-                    // existing mismatched lock, flag failure
-                    return new Lock(oldLock, true);
-                }
-            }
-            if (force || oldLock != null) {
-                deleteRows(Model.LOCK_TABLE_NAME, Collections.singleton(id));
-            }
-            return oldLock;
-        }
-    }
-
-     @Override
     public void markReferencedBinaries(BinaryGarbageCollector gc)
             throws StorageException {
         log.debug("Starting binaries GC mark");
@@ -1297,13 +1211,18 @@ public class JDBCMapper extends JDBCRowMapper implements Mapper {
     @Override
     public void start(Xid xid, int flags) throws XAException {
         try {
-            checkConnectionValid();
+            if (connection == null) {
+                openConnections();
+            }
+            if (!inTransaction()) {
+                connection.setAutoCommit(false);
+            }
             xaresource.start(xid, flags);
             if (logger.isLogEnabled()) {
                 logger.log("XA start on " + systemToString(xid));
             }
-        } catch (StorageException e) {
-            throw (XAException) new XAException(XAException.XAER_RMERR).initCause(e);
+        } catch (SQLException |StorageException cause) {
+            throw (XAException) new XAException(XAException.XAER_RMERR).initCause(cause);
         } catch (XAException e) {
             checkConnectionReset(e);
             logger.error("XA start error on " + systemToString(xid), e);
@@ -1340,13 +1259,40 @@ public class JDBCMapper extends JDBCRowMapper implements Mapper {
         }
     }
 
+
+    @Override
+    public void rollback(Xid xid) throws XAException {
+        try {
+            xaresource.rollback(xid);
+            if (!inTransaction()) {
+                connection.rollback();
+            }
+        } catch (SQLException cause) {
+            throw (XAException) new XAException(XAException.XAER_RMERR).initCause(cause);
+        }  catch (XAException e) {
+            logger.error("XA error on rollback: " + e);
+            throw e;
+        }
+    }
+
     @Override
     public void commit(Xid xid, boolean onePhase) throws XAException {
         try {
             xaresource.commit(xid, onePhase);
+            if (!inTransaction()) {
+                try {
+                    connection.commit();
+                } finally {
+                    connection.setAutoCommit(true);
+                }
+            }
+        } catch (SQLException cause) {
+            throw (XAException) new XAException(XAException.XAER_RMERR).initCause(cause);
         } catch (XAException e) {
             logger.error("XA commit error on  " + systemToString(xid), e);
             throw e;
+        } finally {
+            close();
         }
     }
 
@@ -1377,4 +1323,11 @@ public class JDBCMapper extends JDBCRowMapper implements Mapper {
         throw new UnsupportedOperationException();
     }
 
+    protected boolean inTransaction() {
+        try {
+            return TransactionHelper.lookupUserTransaction() != null;
+        } catch (NamingException error) {
+            return false;
+        }
+    }
 }

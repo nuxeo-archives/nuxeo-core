@@ -25,8 +25,10 @@ import javax.naming.NamingException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.nuxeo.ecm.core.NXCore;
+import org.nuxeo.ecm.core.api.DocumentException;
 import org.nuxeo.ecm.core.model.Repository;
 import org.nuxeo.ecm.core.repository.RepositoryManager;
+import org.nuxeo.ecm.core.storage.StorageException;
 import org.nuxeo.runtime.reload.ReloadService;
 import org.nuxeo.runtime.services.event.Event;
 import org.nuxeo.runtime.services.event.EventListener;
@@ -92,19 +94,13 @@ public class RepositoryReloader implements EventListener {
     }
 
     public static void closeRepositories() throws Exception {
-        List<Repository> repos = getRepositories(); // this is working only on
-                                                    // jboss
-        if (!repos.isEmpty()) {
-            for (Repository repository : repos) {
-                repository.shutdown();
-            }
-        } else { // TODO remove the first method that is using JNDI lookups?
-            RepositoryManager mgr = NXCore.getRepositoryService().getRepositoryManager();
-            for (String name : mgr.getRepositoryNames()) {
-                Repository repo = mgr.getRepository(name);
+        applyOnRepositories(new Closure() {
+
+            @Override
+            public void call(Repository repo) throws Exception {
                 repo.shutdown();
             }
-        }
+        });
     }
 
     public static MBeanServer locateJBoss() {
@@ -144,6 +140,44 @@ public class RepositoryReloader implements EventListener {
      */
     public static void reloadRepositories() throws Exception {
         RepositoryReloader.flushJCAPool();
-        RepositoryReloader.closeRepositories();
+        applyOnRepositories(new Closure() {
+
+            @Override
+            public void call(Repository repo) throws Exception {
+                repo.shutdown();
+                repo.startup();
+            }
+
+        });
     }
+
+    interface Closure {
+        void call(Repository repo) throws Exception;
+    }
+
+    protected static void applyOnRepositories(Closure closure) throws NamingException,
+            DocumentException, Exception {
+        List<Repository> repos = getRepositories(); // this is working only on
+                                                    // jboss
+        if (!repos.isEmpty()) {
+            for (Repository repository : repos) {
+                repository.shutdown();
+            }
+        } else {
+            Exception errors = new StorageException("reload repositories errors (see supressed)");
+            RepositoryManager mgr = NXCore.getRepositoryService().getRepositoryManager();
+            for (String name : mgr.getRepositoryNames()) {
+                try {
+                    Repository repo = mgr.getRepository(name);
+                    closure.call(repo);
+                } catch (Exception error) {
+                    errors.addSuppressed(error);
+                }
+            }
+            if (errors.getSuppressed().length > 0) {
+                throw errors;
+            }
+        }
+    }
+
 }

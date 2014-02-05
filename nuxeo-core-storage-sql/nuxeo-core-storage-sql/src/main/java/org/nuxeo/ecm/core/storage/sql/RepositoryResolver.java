@@ -54,11 +54,6 @@ public class RepositoryResolver {
             repo = NXCore.getRepository(repositoryName);
         } catch (NoSuchRepositoryException e) {
             // No JNDI binding (embedded or unit tests)
-            try {
-                repo = NXCore.getRepositoryService().getRepositoryManager().getRepository(repositoryName);
-            } catch (Exception e1) {
-                ;
-            }
             if (repo == null) {
                 repo = repositories.get(repositoryName);
             }

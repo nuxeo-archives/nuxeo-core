@@ -33,6 +33,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.nuxeo.common.collections.ListenerList;
 import org.nuxeo.ecm.core.storage.Credentials;
+import org.nuxeo.ecm.core.storage.StorageException;
 import org.nuxeo.ecm.core.storage.sql.ConnectionSpecImpl;
 import org.nuxeo.ecm.core.storage.sql.SessionImpl;
 
@@ -97,7 +98,7 @@ public class ManagedConnectionImpl implements ManagedConnection,
         }
         out = managedConnectionFactory.getLogWriter();
         this.managedConnectionFactory = managedConnectionFactory;
-        this.connectionSpec = connectionRequestInfo.connectionSpec;
+        connectionSpec = connectionRequestInfo.connectionSpec;
         connections = new HashSet<ConnectionImpl>();
         listeners = new ListenerList();
         // create the underlying session
@@ -256,30 +257,33 @@ public class ManagedConnectionImpl implements ManagedConnection,
 
     /**
      * Adds a connection to those using this managed connection.
+     * @throws StorageException
      */
-    private void addConnection(ConnectionImpl connection) {
+    private void addConnection(ConnectionImpl connection) throws StorageException {
         synchronized (connections) {
             log.debug("addConnection: " + connection);
-            connections.add(connection);
             connection.associate(session);
+            connections.add(connection);
         }
     }
 
     /**
      * Removes a connection from those of this managed connection.
+     * @throws StorageException
      */
-    private void removeConnection(ConnectionImpl connection) {
+    private void removeConnection(ConnectionImpl connection) throws StorageException {
         synchronized (connections) {
             log.debug("removeConnection: " + connection);
-            connection.disassociate();
             connections.remove(connection);
+            connection.disassociate();
         }
     }
 
     /**
      * Called by {@link ConnectionImpl#close} when the connection is closed.
+     * @throws StorageException
      */
-    protected void close(ConnectionImpl connection) {
+    protected void close(ConnectionImpl connection) throws StorageException {
         log.debug("close: " + this);
         removeConnection(connection);
         sendClosedEvent(connection);
@@ -287,18 +291,27 @@ public class ManagedConnectionImpl implements ManagedConnection,
 
     /**
      * Called by {@link ConnectionAwareXAResource} at the end of a transaction.
+     * @throws StorageException
      */
-    protected void closeConnections() {
+    protected void closeConnections() throws StorageException {
         log.debug("closeConnections: " + this);
         synchronized (connections) {
+            StorageException errors= new StorageException("Cannot close some connections, see suppressed errors");
             // copy to avoid ConcurrentModificationException
             ConnectionImpl[] array = new ConnectionImpl[connections.size()];
             for (ConnectionImpl connection : connections.toArray(array)) {
                 log.debug("closing connection: " + connection);
-                connection.disassociate();
+                try {
+                    connection.disassociate();
+                } catch (StorageException cause) {
+                    errors.addSuppressed(cause);
+                }
                 sendClosedEvent(connection);
             }
             connections.clear();
+            if (errors.getSuppressed().length > 0) {
+                throw errors;
+            }
         }
     }
 

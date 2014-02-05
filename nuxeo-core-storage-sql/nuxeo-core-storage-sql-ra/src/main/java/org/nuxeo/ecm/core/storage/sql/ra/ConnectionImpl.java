@@ -37,6 +37,7 @@ import org.nuxeo.ecm.core.storage.sql.Node;
 import org.nuxeo.ecm.core.storage.sql.Session;
 import org.nuxeo.ecm.core.storage.sql.SessionImpl;
 import org.nuxeo.runtime.services.streaming.FileSource;
+import org.nuxeo.runtime.transaction.TransactionHelper;
 
 /**
  * A connection is a handle to the underlying storage. It is returned by the
@@ -81,16 +82,22 @@ public class ConnectionImpl implements Session {
     /**
      * Called by {@link ManagedConnectionImpl#addConnection}.
      */
-    protected void associate(SessionImpl session) {
+    protected void associate(SessionImpl session) throws StorageException {
         this.session = session;
+        if (!TransactionHelper.isTransactionActive()) {
+            session.getMapper().openConnections();
+        }
     }
 
     /**
      * Called by {@link ManagedConnectionImpl#removeConnection}.
      */
-    protected void disassociate() {
+    protected void disassociate() throws StorageException {
         session.checkLive();
         session = null;
+        if (!TransactionHelper.isTransactionActive()) {
+            session.getMapper().closeConnections();
+        }
     }
 
     /*

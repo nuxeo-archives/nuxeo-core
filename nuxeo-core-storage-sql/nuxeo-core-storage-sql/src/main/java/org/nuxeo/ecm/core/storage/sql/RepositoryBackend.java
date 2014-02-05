@@ -43,7 +43,18 @@ public interface RepositoryBackend {
      * The kind of mapper to create through {@link #newMapper}.
      */
     enum MapperKind {
-        LOCK_MANAGER, CLUSTER_NODE_HANDLER
+        LOCK_MANAGER("lock"), CLUSTER_NODE_HANDLER("cluster"), SESSION("session");
+
+        public final String name;
+
+        MapperKind(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public String toString() {
+            return name;
+        }
     }
 
     /**
@@ -61,5 +72,7 @@ public interface RepositoryBackend {
      * Shuts down the backend.
      */
     void shutdown() throws StorageException;
+
+    LockManager getLockManager();
 
 }

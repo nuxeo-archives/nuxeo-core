@@ -26,6 +26,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.logging.LogFactory;
 import org.nuxeo.common.utils.StringUtils;
 import org.nuxeo.ecm.core.NXCore;
 import org.nuxeo.ecm.core.api.security.SecurityConstants;
@@ -225,7 +226,7 @@ public class DialectH2 extends Dialect {
     public FulltextMatchInfo getFulltextScoredMatchInfo(String fulltextQuery,
             String indexName, int nthMatch, Column mainColumn, Model model,
             Database database) {
-        String phftname = database.getTable(model.FULLTEXT_TABLE_NAME).getPhysicalName();
+        String phftname = database.getTable(Model.FULLTEXT_TABLE_NAME).getPhysicalName();
         String fullIndexName = "PUBLIC_" + phftname + "_" + indexName;
         String nthSuffix = nthMatch == 1 ? "" : String.valueOf(nthMatch);
         String tableAlias = "_NXFTTBL" + nthSuffix;
@@ -310,6 +311,7 @@ public class DialectH2 extends Dialect {
                 // Timeout trying to lock table
                 return true;
             }
+            LogFactory.getLog(DialectH2.class).error("state " + sqlState);
         }
         return false;
     }

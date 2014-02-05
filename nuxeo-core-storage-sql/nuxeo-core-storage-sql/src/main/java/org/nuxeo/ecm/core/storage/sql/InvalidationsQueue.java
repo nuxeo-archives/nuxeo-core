@@ -19,13 +19,13 @@ package org.nuxeo.ecm.core.storage.sql;
  */
 public class InvalidationsQueue {
 
-    public Invalidations queue; // used under synchronization
+    public Invalidations  queue = Invalidations.EMPTY; // used under synchronization
 
     /** used for debugging */
     public final String name;
 
     public InvalidationsQueue(String name) {
-        queue = new Invalidations();
+        queue = new InvalidationsRows();
         this.name = name;
     }
 
@@ -35,7 +35,7 @@ public class InvalidationsQueue {
      * May be called asynchronously from multiple threads.
      */
     public synchronized void addInvalidations(Invalidations invalidations) {
-        queue.add(invalidations);
+        queue = queue.add(invalidations);
     }
 
     /**
@@ -43,7 +43,7 @@ public class InvalidationsQueue {
      */
     public synchronized Invalidations getInvalidations() {
         Invalidations invalidations = queue;
-        queue = new Invalidations();
+        queue = Invalidations.EMPTY;
         return invalidations;
     }
 

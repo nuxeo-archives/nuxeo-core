@@ -23,9 +23,11 @@ import org.apache.commons.beanutils.BeanUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.nuxeo.ecm.core.storage.StorageException;
+import org.nuxeo.ecm.core.storage.sql.LockManager;
 import org.nuxeo.ecm.core.storage.sql.Mapper;
 import org.nuxeo.ecm.core.storage.sql.Model;
 import org.nuxeo.ecm.core.storage.sql.Model.IdType;
+import org.nuxeo.ecm.core.storage.sql.ClusterNodeHandler;
 import org.nuxeo.ecm.core.storage.sql.ModelSetup;
 import org.nuxeo.ecm.core.storage.sql.RepositoryBackend;
 import org.nuxeo.ecm.core.storage.sql.RepositoryDescriptor;
@@ -52,6 +54,8 @@ public class JDBCBackend implements RepositoryBackend {
 
     private SQLInfo sqlInfo;
 
+    private LockManager lockManager;
+
     private ClusterNodeHandler clusterNodeHandler;
 
     private JDBCConnectionPropagator connectionPropagator;
@@ -63,8 +67,7 @@ public class JDBCBackend implements RepositoryBackend {
     @Override
     public void initialize(RepositoryImpl repository) throws StorageException {
         this.repository = repository;
-        RepositoryDescriptor repositoryDescriptor = repository.getRepositoryDescriptor();
-        pseudoDataSourceName = ConnectionHelper.getPseudoDataSourceNameForRepository(repositoryDescriptor.name);
+        pseudoDataSourceName = ConnectionHelper.getPseudoDataSourceNameForRepository(repository.getName());
 
         // try single-datasource non-XA mode
         Connection connection = null;
@@ -80,6 +83,7 @@ public class JDBCBackend implements RepositoryBackend {
 
         // standard XA mode
         // instantiate the XA datasource
+        final RepositoryDescriptor repositoryDescriptor = repository.getRepositoryDescriptor();
         String className = repositoryDescriptor.xaDataSourceName;
         Class<?> klass;
         try {
@@ -175,43 +179,38 @@ public class JDBCBackend implements RepositoryBackend {
     @Override
     public void initializeModel(Model model) throws StorageException {
         sqlInfo = new SQLInfo(model, dialect);
+        lockManager = new LockManager(repository, new JDBCMapper(
+                model, null, sqlInfo, xadatasource, null, connectionPropagator,
+                true, repository));
+        lockManager.startup();
+        if (repository.getRepositoryDescriptor().clusteringEnabled) {
+            clusterNodeHandler = new ClusterNodeHandler(repository,
+                    new JDBCMapper(model, null, sqlInfo, xadatasource, null,
+                            connectionPropagator, true, repository));
+            clusterNodeHandler.startup();
+        }
     }
 
     @Override
     public Mapper newMapper(Model model, PathResolver pathResolver,
             MapperKind kind) throws StorageException {
-        boolean create = kind == MapperKind.LOCK_MANAGER;
-        boolean noSharing = kind == MapperKind.LOCK_MANAGER
-                || kind == MapperKind.CLUSTER_NODE_HANDLER;
-        RepositoryDescriptor repositoryDescriptor = repository.getRepositoryDescriptor();
-
-        // The first mapper is used for the lock manager and must not accumulate
-        // invalidations from the cluster. Fortunately if first then there is
-        // no cluster node handler yet.
-        Mapper mapper = new JDBCMapper(model, pathResolver, sqlInfo,
+        return new JDBCMapper(model, pathResolver, sqlInfo,
                 xadatasource, clusterNodeHandler, connectionPropagator,
-                noSharing, repository);
-        if (create) {
-            if (repositoryDescriptor.noDDL) {
-                log.info("Skipping database creation");
-            } else {
-                // first connection, initialize the database
-                mapper.createDatabase();
-            }
-        }
-        if (kind == MapperKind.CLUSTER_NODE_HANDLER) {
-            clusterNodeHandler = new ClusterNodeHandler(mapper,
-                    repositoryDescriptor);
-            connectionPropagator.setClusterNodeHandler(clusterNodeHandler);
-        }
-        return mapper;
+                false, repository);
+
     }
 
     @Override
     public void shutdown() throws StorageException {
+        lockManager.shutdown();
         if (clusterNodeHandler != null) {
-            clusterNodeHandler.close();
+            clusterNodeHandler.shutdown();
         }
+    }
+
+    @Override
+    public LockManager getLockManager() {
+        return lockManager;
     }
 
 }
