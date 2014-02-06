@@ -94,10 +94,10 @@ public class ConnectionImpl implements Session {
      */
     protected void disassociate() throws StorageException {
         session.checkLive();
-        session = null;
         if (!TransactionHelper.isTransactionActive()) {
             session.getMapper().closeConnections();
         }
+        session = null;
     }
 
     /*

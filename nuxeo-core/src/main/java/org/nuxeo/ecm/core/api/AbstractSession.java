@@ -339,6 +339,7 @@ public abstract class AbstractSession implements CoreSession, OperationHandler,
 
     @Override
     public void afterBegin() {
+        disposeConnectionIfAlive();
         if (log.isTraceEnabled()) {
             log.trace("Transaction started");
         }
@@ -369,12 +370,16 @@ public abstract class AbstractSession implements CoreSession, OperationHandler,
         } catch (Exception e) {
             log.error("Error while notifying transaction completion", e);
         } finally {
-            if (isSessionAlive()) {
-                try {
-                    getSession().dispose();
-                } catch (ClientException e) {
-                    log.error("Cannot dispose session", e);
-                }
+            disposeConnectionIfAlive();
+        }
+    }
+
+    protected void disposeConnectionIfAlive() {
+        if (isSessionAlive()) {
+            try {
+                getSession().dispose();
+            } catch (ClientException e) {
+                log.error("Cannot dispose session", e);
             }
         }
     }

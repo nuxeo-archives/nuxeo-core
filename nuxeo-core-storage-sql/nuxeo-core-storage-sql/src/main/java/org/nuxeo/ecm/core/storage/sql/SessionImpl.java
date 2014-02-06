@@ -1397,6 +1397,13 @@ public class SessionImpl implements Session, XAResource {
 
     @Override
     public void start(Xid xid, int flags) throws XAException {
+        mapper.start(xid, flags);
+        try {
+            computeRootNode();
+        } catch (StorageException cause) {
+            log.error("Could not compute root node", cause);
+            throw (XAException) new XAException(XAException.XAER_RMERR).initCause(cause);
+        }
         if (flags == TMNOFLAGS) {
             try {
                 processReceivedInvalidations();
@@ -1404,13 +1411,6 @@ public class SessionImpl implements Session, XAResource {
                 log.error("Could not start transaction", cause);
                 throw (XAException) new XAException(XAException.XAER_RMERR).initCause(cause);
             }
-        }
-        mapper.start(xid, flags);
-        try {
-            computeRootNode();
-        } catch (StorageException cause) {
-            log.error("Could not compute root node", cause);
-            throw (XAException) new XAException(XAException.XAER_RMERR).initCause(cause);
         }
         inTransaction = true;
         checkThreadStart();
