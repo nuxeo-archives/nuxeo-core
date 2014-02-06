@@ -25,6 +25,17 @@
     </dependency>
 
     <dependency>
+      <groupId>org.nuxeo.runtime</groupId>
+      <artifactId>nuxeo-runtime-jtajca</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.nuxeo.runtime</groupId>
+      <artifactId>nuxeo-runtime-datasource</artifactId>
+    </dependency>
+
+
+    <dependency>
       <groupId>org.jmock</groupId>
       <artifactId>jmock-junit4</artifactId>
       <scope>compile</scope>
@@ -79,6 +90,7 @@
     </dependency>
 
     <!-- test-only dependencies -->
+
 
     <dependency>
       <groupId>javax.script</groupId>
