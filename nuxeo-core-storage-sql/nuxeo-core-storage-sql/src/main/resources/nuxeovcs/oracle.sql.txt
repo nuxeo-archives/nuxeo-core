@@ -92,7 +92,7 @@ END;
 
 #CATEGORY: afterTableCreation
 
--- DEPRECATED SINCE 9.2
+# -- DEPRECATED SINCE 5.9.2
 CREATE OR REPLACE FUNCTION NX_IN_TREE(id ${idTypeParam}, baseid ${idTypeParam})
 RETURN NUMBER IS
   curid hierarchy.id%TYPE := id;
