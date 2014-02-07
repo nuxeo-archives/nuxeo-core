@@ -253,6 +253,9 @@ public abstract class AbstractWork implements Work {
      * @return the session (also available in {@code session} field)
      */
     public CoreSession initSession(String repositoryName) throws Exception {
+        if (session != null) {
+            return session;
+        }
         if (loginContext == null) {
             try {
                 loginContext = Framework.login();
@@ -466,7 +469,6 @@ public abstract class AbstractWork implements Work {
      * @since 5.8
      */
     public void rollbackAndRetryTransaction() {
-        closeSession();
         TransactionHelper.setTransactionRollbackOnly();
         TransactionHelper.commitOrRollbackTransaction();
         TransactionHelper.startTransaction();

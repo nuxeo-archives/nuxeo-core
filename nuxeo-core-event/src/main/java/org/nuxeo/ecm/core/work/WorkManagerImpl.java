@@ -49,6 +49,8 @@ import org.nuxeo.ecm.core.work.api.WorkManager;
 import org.nuxeo.ecm.core.work.api.WorkQueueDescriptor;
 import org.nuxeo.ecm.core.work.api.WorkQueuingImplDescriptor;
 import org.nuxeo.ecm.core.work.api.WorkSchedulePath;
+import org.nuxeo.runtime.RuntimeService;
+import org.nuxeo.runtime.api.Framework;
 import org.nuxeo.runtime.metrics.MetricsService;
 import org.nuxeo.runtime.model.ComponentContext;
 import org.nuxeo.runtime.model.ComponentInstance;
@@ -588,6 +590,11 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
          * @see #execute(Runnable)
          */
         public void execute(Work work) {
+            RuntimeService runtime = Framework.getRuntime();
+            if (runtime == null || !runtime.isStarted()) {
+                log.warn("Cannot execute " + work + ", runtime isn't started");
+                return;
+            }
             scheduledCount.inc();
             if (scheduledCount.getCount() > scheduledMax.getCount()) {
                 scheduledMax.inc();
