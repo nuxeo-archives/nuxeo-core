@@ -57,18 +57,7 @@ public class ConnectionAwareXAResource implements XAResource {
     // synchronized keyword
     @Override
     public synchronized void end(Xid xid, int flags) throws XAException {
-        try {
-            xaresource.end(xid, flags);
-        } finally {
-            try {
-                managedConnection.closeConnections();
-            } catch (StorageException cause) {
-                XAException error = new XAException("Cannot close connections");
-                error.initCause(cause);
-                error.errorCode = XAException.XA_RBBASE;
-                throw error;
-            }
-        }
+        xaresource.end(xid, flags);
     }
 
     @Override
@@ -78,12 +67,20 @@ public class ConnectionAwareXAResource implements XAResource {
 
     @Override
     public void commit(Xid xid, boolean onePhase) throws XAException {
-        xaresource.commit(xid, onePhase);
+        try {
+            xaresource.commit(xid, onePhase);
+        } finally {
+            closeConnection();
+        }
     }
 
     @Override
     public void rollback(Xid xid) throws XAException {
-        xaresource.rollback(xid);
+        try {
+            xaresource.rollback(xid);
+        } finally {
+            closeConnection();
+        }
     }
 
     @Override
@@ -106,4 +103,11 @@ public class ConnectionAwareXAResource implements XAResource {
         return xaresource.getTransactionTimeout();
     }
 
+    protected void closeConnection() throws XAException {
+        try {
+            managedConnection.closeConnections();
+        } catch (StorageException e) {
+            throw (XAException)new XAException(XAException.XAER_RMERR).initCause(e);
+        }
+    }
 }

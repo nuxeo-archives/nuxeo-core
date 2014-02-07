@@ -94,7 +94,7 @@ public class ConnectionImpl implements Session {
      */
     protected void disassociate() throws StorageException {
         session.checkLive();
-        if (!TransactionHelper.isTransactionActive()) {
+        if (!TransactionHelper.isTransactionActiveOrMarkedRollback()) {
             session.getMapper().closeConnections();
         }
         session = null;
