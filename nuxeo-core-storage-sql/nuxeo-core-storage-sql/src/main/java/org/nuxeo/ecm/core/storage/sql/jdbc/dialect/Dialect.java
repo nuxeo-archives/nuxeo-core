@@ -64,10 +64,10 @@ import org.nuxeo.runtime.api.Framework;
 public abstract class Dialect {
 
     // change to have deterministic pseudo-UUID generation for debugging
-    public static final boolean DEBUG_UUIDS = false;
+    public static boolean DEBUG_UUIDS = false;
 
     // if true then debug UUIDs (above) are actual UUIDs, not short strings
-    public static final boolean DEBUG_REAL_UUIDS = false;
+    public static boolean DEBUG_REAL_UUIDS = false;
 
     // for debug
     private final AtomicLong temporaryIdCounter = new AtomicLong(0);

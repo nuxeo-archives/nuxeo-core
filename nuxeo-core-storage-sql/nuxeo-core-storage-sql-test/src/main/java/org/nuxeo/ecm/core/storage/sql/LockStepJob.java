@@ -14,6 +14,9 @@ package org.nuxeo.ecm.core.storage.sql;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 /**
  * Helper class to run jobs in lock step in several threads.
  * <p>
@@ -39,6 +42,8 @@ import java.util.concurrent.TimeUnit;
  */
 public abstract class LockStepJob implements Runnable {
 
+	protected final Log log = LogFactory.getLog(LockStepJob.class);
+	
     protected int n;
 
     protected CyclicBarrier barrier;
@@ -59,6 +64,7 @@ public abstract class LockStepJob implements Runnable {
             // System.err.println("Exception in thread " +
             // Thread.currentThread());
             // t.printStackTrace();
+        	log.error("Error in job " + Thread.currentThread().getName(), t);
             throwable = t;
         }
     }

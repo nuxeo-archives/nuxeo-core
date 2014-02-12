@@ -2,10 +2,10 @@
 
 <component name="org.nuxeo.virusscan.service.ScanComponent" version="1.0">
 
-  <implementation class="org.nuxeo.ecm.core.event.test.virusscan.service.ScanComponent" />
+  <implementation class="org.nuxeo.ecm.core.event.test.virusscan.ScanComponent" />
 
   <service>
-      <provide interface="org.nuxeo.ecm.core.event.test.virusscan.service.ScanService" />
+      <provide interface="org.nuxeo.ecm.core.event.test.virusscan.ScanService" />
   </service>
 
 </component>

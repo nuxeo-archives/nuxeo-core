@@ -18,22 +18,20 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.nuxeo.ecm.core.test.CoreFeature;
 import org.nuxeo.ecm.core.work.AbstractWork;
 import org.nuxeo.ecm.core.work.api.Work;
 import org.nuxeo.ecm.core.work.api.WorkManager;
 import org.nuxeo.ecm.core.work.api.WorkSchedulePath;
-import org.nuxeo.runtime.test.runner.Deploy;
 import org.nuxeo.runtime.test.runner.Features;
 import org.nuxeo.runtime.test.runner.FeaturesRunner;
 import org.nuxeo.runtime.test.runner.LogCaptureFeature;
 import org.nuxeo.runtime.test.runner.LogCaptureFeature.NoLogCaptureFilterException;
-import org.nuxeo.runtime.test.runner.RuntimeFeature;
 
 import com.google.inject.Inject;
 
 @RunWith(FeaturesRunner.class)
-@Features({ RuntimeFeature.class, LogCaptureFeature.class })
-@Deploy({ "org.nuxeo.ecm.core.event" })
+@Features({ CoreFeature.class, LogCaptureFeature.class })
 @LogCaptureFeature.FilterWith(WorkErrorsAreTracableTest.ChainFilter.class)
 public class WorkErrorsAreTracableTest {
 

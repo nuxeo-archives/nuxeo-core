@@ -25,6 +25,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.nuxeo.ecm.core.repository.RepositoryFactory;
 import org.nuxeo.ecm.core.storage.sql.coremodel.SQLRepositoryFactory;
+import org.nuxeo.ecm.core.storage.sql.jdbc.dialect.Dialect;
 import org.nuxeo.runtime.api.ConnectionHelper;
 
 public abstract class DatabaseHelper {
@@ -54,7 +55,13 @@ public abstract class DatabaseHelper {
         setDatabaseForTests(className);
         setRepositoryFactory(defaultRepositoryFactory);
         setSingleDataSourceMode();
+    	setDebugUUIDs();
     }
+
+	private static void setDebugUUIDs() {
+//		Dialect.DEBUG_UUIDS = true;
+//    	Dialect.DEBUG_REAL_UUIDS = true;
+	}
 
     public static final String REPOSITORY_PROPERTY = "nuxeo.test.vcs.repository";
 

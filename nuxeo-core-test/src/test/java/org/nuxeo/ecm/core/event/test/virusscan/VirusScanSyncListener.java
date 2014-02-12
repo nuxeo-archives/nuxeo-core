@@ -17,7 +17,7 @@
  */
 
 
-package org.nuxeo.ecm.core.event.test.virusscan.listeners;
+package org.nuxeo.ecm.core.event.test.virusscan;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,7 +32,6 @@ import org.nuxeo.ecm.core.event.Event;
 import org.nuxeo.ecm.core.event.EventListener;
 import org.nuxeo.ecm.core.event.EventService;
 import org.nuxeo.ecm.core.event.impl.DocumentEventContext;
-import org.nuxeo.ecm.core.event.test.virusscan.VirusScanConsts;
 import org.nuxeo.ecm.core.utils.BlobsExtractor;
 import org.nuxeo.runtime.api.Framework;
 

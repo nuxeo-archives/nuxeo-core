@@ -16,7 +16,7 @@
  *
  */
 
-package org.nuxeo.ecm.core.event.test.virusscan.service;
+package org.nuxeo.ecm.core.event.test.virusscan;
 
 import java.util.ArrayList;
 import java.util.List;

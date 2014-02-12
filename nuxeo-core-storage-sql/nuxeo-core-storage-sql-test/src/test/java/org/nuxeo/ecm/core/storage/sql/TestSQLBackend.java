@@ -696,7 +696,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
 
     @Test
     public void testUpdateReadAclsDeadlock() throws Exception {
-        repository.close();
+        closeRepository(repository);
         try {
             aclOptimizationsConcurrentUpdate = Boolean.FALSE;
             repository = newRepository(-1, false);
@@ -1301,7 +1301,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
             return;
         }
 
-        repository.close();
+        closeRepository(repository);
         // get two clustered repositories
         long DELAY = 500; // ms
         repository = newRepository(DELAY, false);
@@ -1310,8 +1310,6 @@ public class TestSQLBackend extends SQLBackendTestCase {
         ClusterTestJob r1 = new ClusterTestJob(repository, repository2);
         ClusterTestJob r2 = new ClusterTestJob(repository, repository2);
         ClusterTestJob.run(r1, r2);
-        repository = null; // already closed
-        repository2 = null; // already closed
     }
 
     protected static class ClusterTestJob extends LockStepJob {
@@ -1430,14 +1428,6 @@ public class TestSQLBackend extends SQLBackendTestCase {
                 assertEquals("glop", title2.getString());
             }
 
-            // final close
-
-            if (thread(1)) {
-                repository1.close();
-            }
-            if (thread(2)) {
-                repository2.close();
-            }
         }
 
     }
@@ -2677,7 +2667,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
     @Test
     public void testFulltextDisabled() throws Exception {
         // reconfigure repository with fulltext disabled
-        repository.close();
+        closeRepository(repository);
         boolean fulltextDisabled = true;
         repository = newRepository(-1, fulltextDisabled);
 
@@ -3038,7 +3028,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
         Serializable nodeId = createNode();
 
         // get two clustered repositories
-        repository.close();
+        closeRepository(repository);
         long DELAY = 50; // ms
         repository = newRepository(DELAY, false);
         repository2 = newRepository(DELAY, false);
@@ -3238,7 +3228,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
                     + DatabaseHelper.DATABASE.getClass().getName());
             return;
         }
-        repository.close();
+        closeRepository(repository);
 
         // get a clustered repository
         long DELAY = 500; // ms
@@ -3274,7 +3264,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
                     + DatabaseHelper.DATABASE.getClass().getName());
             return;
         }
-        repository.close();
+        closeRepository(repository);
 
         // get a clustered repository
         long DELAY = 0; // ms
@@ -4036,7 +4026,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
 
     @Test
     public void testPathOptimizationsActivation() throws Exception {
-        repository.close();
+        closeRepository(repository);
         // open a repository without path optimization
         RepositoryDescriptor descriptor = newDescriptor(-1, false);
         descriptor.pathOptimizationsEnabled = false;

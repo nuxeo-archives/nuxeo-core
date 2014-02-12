@@ -31,13 +31,7 @@ import org.nuxeo.ecm.core.storage.sql.coremodel.SQLRepository;
  */
 public class RepositoryResolver {
 
-    public static final Map<String,RepositoryImpl> repositories = new HashMap<String,RepositoryImpl>();
-
     private RepositoryResolver() {
-    }
-
-    public static void registerTestRepository(RepositoryImpl repo) {
-        repositories.put(repo.getName(), repo);
     }
 
     public static List<Repository> getRepositories() {
@@ -58,9 +52,6 @@ public class RepositoryResolver {
                 repo = NXCore.getRepositoryService().getRepositoryManager().getRepository(repositoryName);
             } catch (Exception e1) {
                 ;
-            }
-            if (repo == null) {
-                repo = repositories.get(repositoryName);
             }
             if (repo == null) {
                 throw new ClientRuntimeException("Cannot find repository " + repositoryName);

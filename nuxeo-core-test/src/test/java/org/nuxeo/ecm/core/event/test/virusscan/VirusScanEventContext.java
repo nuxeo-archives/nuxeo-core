@@ -15,7 +15,7 @@
  *     Nuxeo - initial API and implementation
  *
  */
-package org.nuxeo.ecm.core.event.test.virusscan.listeners;
+package org.nuxeo.ecm.core.event.test.virusscan;
 
 import java.io.Serializable;
 import java.util.List;
@@ -23,7 +23,6 @@ import java.util.List;
 import org.nuxeo.ecm.core.event.Event;
 import org.nuxeo.ecm.core.event.EventContext;
 import org.nuxeo.ecm.core.event.impl.DocumentEventContext;
-import org.nuxeo.ecm.core.event.test.virusscan.VirusScanConsts;
 
 /**
  * Custom EventContext used to propagate info between the synchronous listener

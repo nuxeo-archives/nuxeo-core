@@ -16,7 +16,7 @@
  *
  */
 
-package org.nuxeo.ecm.core.event.test.virusscan.listeners;
+package org.nuxeo.ecm.core.event.test.virusscan;
 
 import java.util.HashMap;
 import java.util.List;
@@ -29,9 +29,6 @@ import org.nuxeo.ecm.core.event.Event;
 import org.nuxeo.ecm.core.event.EventBundle;
 import org.nuxeo.ecm.core.event.impl.AbstractLongRunningListener;
 import org.nuxeo.ecm.core.event.impl.DocumentEventContext;
-import org.nuxeo.ecm.core.event.test.virusscan.VirusScanConsts;
-import org.nuxeo.ecm.core.event.test.virusscan.service.ScanResult;
-import org.nuxeo.ecm.core.event.test.virusscan.service.ScanService;
 import org.nuxeo.runtime.api.Framework;
 
 /**

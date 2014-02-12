@@ -27,6 +27,7 @@ import org.nuxeo.common.xmap.annotation.XNode;
 import org.nuxeo.common.xmap.annotation.XNodeList;
 import org.nuxeo.common.xmap.annotation.XNodeMap;
 import org.nuxeo.common.xmap.annotation.XObject;
+import org.nuxeo.ecm.core.storage.sql.jdbc.JDBCBackend;
 
 /**
  * Repository descriptor.
@@ -88,6 +89,10 @@ public class RepositoryDescriptor {
             setName(name);
         }
 
+        public String getXNodeContent() {
+        	return field;
+        }
+        
         @XNode("@table")
         public String table;
 
@@ -130,10 +135,10 @@ public class RepositoryDescriptor {
     public String name;
 
     @XNode("backendClass")
-    public Class<? extends RepositoryBackend> backendClass;
+    public Class<? extends RepositoryBackend> backendClass = JDBCBackend.class;
 
     @XNode("cachingMapper@class")
-    public Class<? extends CachingMapper> cachingMapperClass;
+    public Class<? extends CachingMapper> cachingMapperClass = SoftRefCachingMapper.class;
 
     @XNode("cachingMapper@enabled")
     public boolean cachingMapperEnabled = true;
@@ -145,28 +150,28 @@ public class RepositoryDescriptor {
     public boolean noDDL = false;
 
     @XNodeList(value = "sqlInitFile", type = ArrayList.class, componentType = String.class)
-    public List<String> sqlInitFiles;
+    public List<String> sqlInitFiles = new ArrayList<String>();
 
     @XNode("softDelete@enabled")
-    public boolean softDeleteEnabled;
+    public boolean softDeleteEnabled = false;
 
     @XNode("proxies@enabled")
     public boolean proxiesEnabled = true;
 
     @XNode("idType")
-    public String idType; // "varchar", "uuid", "sequence"
+    public String idType = null; // "varchar", "uuid", "sequence"
 
     @XNode("clustering@enabled")
-    public boolean clusteringEnabled;
+    public boolean clusteringEnabled = false;
 
     @XNode("clustering@delay")
-    public long clusteringDelay;
+    public long clusteringDelay = -1L;
 
     @XNodeList(value = "schema/field", type = ArrayList.class, componentType = FieldDescriptor.class)
     public List<FieldDescriptor> schemaFields = Collections.emptyList();
 
     @XNode("indexing/fulltext@disabled")
-    public boolean fulltextDisabled;
+    public boolean fulltextDisabled = false;
 
     @XNode("indexing/fulltext@analyzer")
     public String fulltextAnalyzer;
@@ -182,6 +187,10 @@ public class RepositoryDescriptor {
         log.warn("Setting queryMaker from repository configuration is now deprecated");
     }
 
+    public String getQueryMakerDeprecated() {
+    	return null;
+    }
+    
     @XNodeList(value = "indexing/fulltext/index", type = ArrayList.class, componentType = FulltextIndexDescriptor.class)
     public List<FulltextIndexDescriptor> fulltextIndexes;
 

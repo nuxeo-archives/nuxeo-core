@@ -123,16 +123,15 @@ public class RepositoryManager {
 
     public void registerRepository(RepositoryDescriptor rd) {
         log.info("Registering repository: " + rd.getName());
-        if (!descriptors.contains(rd)) {
-            synchronized (repositories) {
-                if (!descriptors.contains(rd)) {
-                    String name = rd.getName();
-                    descriptors.add(rd);
-                    repositories.put(name, new Ref(rd));
-                    repositoryService.fireRepositoryRegistered(rd);
-                }
-            }
-        }
+        synchronized (repositories) {
+			if (descriptors.contains(rd)) {
+				log.warn("Overriding repository descriptor " + rd.getName() + " with " + rd.getConfigurationFile());
+			}
+			String name = rd.getName();
+			descriptors.add(rd);
+			repositories.put(name, new Ref(rd));
+			repositoryService.fireRepositoryRegistered(rd);
+		}
     }
 
     public Repository getOrRegisterRepository(RepositoryDescriptor rd)

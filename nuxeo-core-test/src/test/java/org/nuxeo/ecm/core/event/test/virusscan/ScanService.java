@@ -16,39 +16,28 @@
  *
  */
 
-package org.nuxeo.ecm.core.event.test.virusscan.service;
 
-import org.nuxeo.runtime.model.DefaultComponent;
+package org.nuxeo.ecm.core.event.test.virusscan;
+
+import org.nuxeo.ecm.core.api.Blob;
+import org.nuxeo.ecm.core.api.ClientException;
 
 /**
+ * Interface that should be implemented to encapsulate call to a Virus Scanning
+ * service : command line or WebService
+ *
  * @author <a href="mailto:tdelprat@nuxeo.com">Tiry</a>
+ *
  */
-public class ScanComponent extends DefaultComponent {
-
-    protected ScanService scanService;
-
-    @Override
-    public <T> T getAdapter(Class<T> adapter) {
-
-        if (true) {
-            return adapter.cast(getScanService());
-        }
-
-        if (adapter.getName().equals(ScanService.class.getName())) {
-            return adapter.cast(getScanService());
-        }
-        return super.getAdapter(adapter);
-    }
+public interface ScanService {
 
     /**
-     * build the scanService singleton instance.
+     * Scan a Blob and returns info about the scan result
      *
-     * @return
+     * @param blob the blob to be scaned
+     * @return the status
+     * @throws ClientException
      */
-    protected ScanService getScanService() {
-        if (scanService == null) {
-            scanService = new DummyVirusScanner();
-        }
-        return scanService;
-    }
+    ScanResult scanBlob(Blob blob) throws ClientException;
+
 }

@@ -14,8 +14,13 @@ package org.nuxeo.ecm.core.storage.sql;
 
 import java.util.Arrays;
 
+import org.nuxeo.common.xmap.XMap;
+import org.nuxeo.ecm.core.api.repository.RepositoryManager;
 import org.nuxeo.ecm.core.event.EventService;
+import org.nuxeo.ecm.core.repository.RepositoryService;
 import org.nuxeo.ecm.core.storage.sql.RepositoryDescriptor.FieldDescriptor;
+import org.nuxeo.ecm.core.storage.sql.coremodel.SQLRepositoryFactory;
+import org.nuxeo.ecm.core.storage.sql.jdbc.dialect.Dialect;
 import org.nuxeo.runtime.api.Framework;
 import org.nuxeo.runtime.test.NXRuntimeTestCase;
 
@@ -36,6 +41,7 @@ public abstract class SQLBackendTestCase extends NXRuntimeTestCase {
     @Override
     public void setUp() throws Exception {
         super.setUp();
+        deployBundle("org.nuxeo.ecm.core.api");
         deployBundle("org.nuxeo.ecm.core");
         deployBundle("org.nuxeo.ecm.core.schema");
         deployBundle("org.nuxeo.ecm.core.event");
@@ -46,15 +52,31 @@ public abstract class SQLBackendTestCase extends NXRuntimeTestCase {
         repository = newRepository(-1, false);
     }
 
+    protected int repoCount = 0;
+    
     protected Repository newRepository(long clusteringDelay,
             boolean fulltextDisabled) throws Exception {
-        RepositoryDescriptor descriptor = newDescriptor(clusteringDelay,
+        RepositoryDescriptor sqlDescriptor = newDescriptor(clusteringDelay,
                 fulltextDisabled);
-        RepositoryImpl repo = new RepositoryImpl(descriptor);
-        RepositoryResolver.registerTestRepository(repo);
-        return repo;
+        XMap xmap = new XMap();
+        xmap.register(org.nuxeo.ecm.core.storage.sql.RepositoryDescriptor.class);
+        String config = xmap.toXML(sqlDescriptor);
+        String name = sqlDescriptor.name;
+        org.nuxeo.ecm.core.repository.RepositoryDescriptor coreDescriptor = new org.nuxeo.ecm.core.repository.RepositoryDescriptor();
+		coreDescriptor.setName(name);
+		coreDescriptor.setFactoryClass(SQLRepositoryFactory.class);
+		coreDescriptor.setConfigurationContent(config);
+		Framework.getLocalService(RepositoryService.class).getRepositoryManager().registerRepository(coreDescriptor);
+        Framework.getLocalService(RepositoryManager.class).addRepository(new org.nuxeo.ecm.core.api.repository.Repository(name));
+		return RepositoryResolver.getRepository(name);
     }
-
+    
+    
+    protected void closeRepository(Repository repository) {
+    	Framework.getLocalService(RepositoryService.class).getRepositoryManager().releaseRepository(repository.getName());
+    	Framework.getLocalService(RepositoryManager.class).removeRepository(repository.getName());
+    }
+    
     protected RepositoryDescriptor newDescriptor(long clusteringDelay,
             boolean fulltextDisabled) {
         RepositoryDescriptor descriptor = DatabaseHelper.DATABASE.getRepositoryDescriptor();
@@ -85,11 +107,11 @@ public abstract class SQLBackendTestCase extends NXRuntimeTestCase {
     protected void closeRepository() throws Exception {
         Framework.getLocalService(EventService.class).waitForAsyncCompletion();
         if (repository != null) {
-            repository.close();
+            closeRepository(repository);
             repository = null;
         }
         if (repository2 != null) {
-            repository2.close();
+            closeRepository(repository2);
             repository2 = null;
         }
     }

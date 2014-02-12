@@ -16,7 +16,7 @@
  *
  */
 
-package org.nuxeo.ecm.core.event.test.virusscan.service;
+package org.nuxeo.ecm.core.event.test.virusscan;
 
 /**
  * Encapsulate result from a virus scan on a Blob

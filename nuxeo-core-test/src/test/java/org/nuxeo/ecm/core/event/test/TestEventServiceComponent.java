@@ -43,6 +43,8 @@ public class TestEventServiceComponent extends NXRuntimeTestCase {
     @Before
     public void setUp() throws Exception {
         super.setUp();
+        deployBundle("org.nuxeo.ecm.core");
+        deployBundle("org.nuxeo.ecm.core.api");
         deployBundle("org.nuxeo.ecm.core.event");
         // 2 quartz threads launched by the event contribs above
         Thread.sleep(100);

@@ -42,7 +42,7 @@ public class RepositoryDescriptor {
     private String name;
 
     @XNode("@factory")
-    private Class<RepositoryFactory> factoryClass;
+    private Class<? extends RepositoryFactory> factoryClass;
 
     /**
      * Note, this xpath corresponds to an element two levels deep, that will
@@ -124,11 +124,11 @@ public class RepositoryDescriptor {
         this.config = config;
     }
 
-    public void setFactoryClass(Class<RepositoryFactory> factoryClass) {
+    public void setFactoryClass(Class<? extends RepositoryFactory> factoryClass) {
         this.factoryClass = factoryClass;
     }
 
-    public Class<RepositoryFactory> getFactoryClass() {
+    public Class<? extends RepositoryFactory> getFactoryClass() {
         return factoryClass;
     }
 
