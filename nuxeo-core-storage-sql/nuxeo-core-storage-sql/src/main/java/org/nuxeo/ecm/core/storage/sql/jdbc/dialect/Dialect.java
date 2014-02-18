@@ -1179,6 +1179,15 @@ public abstract class Dialect {
     }
 
     /**
+     * Gets the array result as a converted array of Serializable.
+     *
+     * @since 5.9.3
+     */
+    public Serializable[] getArrayResult(Array array) throws SQLException {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
      * Checks if the dialect supports storing arrays of system names (for mixins
      * for instance).
      */

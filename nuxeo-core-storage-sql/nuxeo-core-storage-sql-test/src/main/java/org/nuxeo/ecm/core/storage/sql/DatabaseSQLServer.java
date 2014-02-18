@@ -130,4 +130,9 @@ public class DatabaseSQLServer extends DatabaseHelper {
         return true;
     }
 
+    @Override
+    public boolean supportsSequenceId() {
+        return true;
+    }
+
 }

@@ -36,7 +36,7 @@ public class JDBCConnection {
      * Maximum number of time we retry a connection if the server says it's
      * overloaded.
      */
-    public static final int MAX_CONNECTION_TRIES = 3;
+    public static final int MAX_CONNECTION_TRIES = 5;
 
     /** The model used to do the mapping. */
     protected final Model model;
@@ -117,8 +117,7 @@ public class JDBCConnection {
 
     private void openConnections() throws StorageException {
         try {
-            int tryNo = 0;
-            for (;;) {
+            for (int tryNo = 1;; tryNo++) {
                 try {
                     xaconnection = xadatasource.getXAConnection();
                     break;
@@ -143,6 +142,7 @@ public class JDBCConnection {
                     } catch (InterruptedException ie) {
                         // restore interrupted status
                         Thread.currentThread().interrupt();
+                        throw new RuntimeException("interrupted");
                     }
                 }
             }

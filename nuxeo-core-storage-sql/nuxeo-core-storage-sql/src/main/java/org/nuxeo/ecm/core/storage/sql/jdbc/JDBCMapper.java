@@ -935,8 +935,8 @@ public class JDBCMapper extends JDBCRowMapper implements Mapper {
             }
             while (rs.next()) {
                 if (dialect.supportsArraysReturnInsteadOfRows()) {
-                    String[] resultIds = (String[]) rs.getArray(1).getArray();
-                    for (String id : resultIds) {
+                    Serializable[] resultIds = dialect.getArrayResult(rs.getArray(1));
+                    for (Serializable id : resultIds) {
                         if (id != null) {
                             res.add(id);
                             if (logger.isLogEnabled()) {
@@ -944,13 +944,14 @@ public class JDBCMapper extends JDBCRowMapper implements Mapper {
                             }
                         }
                     }
-                    break;
-                }
-                Serializable id = (Serializable) what.getFromResultSet(rs, 1);
-                if (id != null) {
-                    res.add(id);
-                    if (logger.isLogEnabled()) {
-                        debugIds.add(id);
+                } else {
+                    Serializable id = (Serializable) what.getFromResultSet(rs,
+                            1);
+                    if (id != null) {
+                        res.add(id);
+                        if (logger.isLogEnabled()) {
+                            debugIds.add(id);
+                        }
                     }
                 }
             }
