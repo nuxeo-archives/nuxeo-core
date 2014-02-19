@@ -53,6 +53,7 @@ import javax.transaction.xa.XAResource;
 import javax.transaction.xa.Xid;
 
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
@@ -2506,6 +2507,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
     }
 
     @Test
+    @Ignore // not needed for backport
     public void testFulltextCompatibilityPostgreSQL() throws Exception {
         if (this instanceof TestSQLBackendNet
                 || this instanceof ITSQLBackendNet) {
