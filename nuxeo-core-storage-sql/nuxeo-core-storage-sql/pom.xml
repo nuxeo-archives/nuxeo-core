@@ -7,6 +7,7 @@
     <version>5.6.0-HF23</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
+  <version>5.6.0-HF24-soaz-SNAPSHOT</version>
 
   <artifactId>nuxeo-core-storage-sql</artifactId>
   <name>Nuxeo Core SQL Storage</name>
