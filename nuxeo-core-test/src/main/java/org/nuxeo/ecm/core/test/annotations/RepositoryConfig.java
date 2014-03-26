@@ -46,5 +46,5 @@ public @interface RepositoryConfig {
 
     Granularity cleanup() default Granularity.CLASS;
 
-    String user() default "Administrator";
+    String user() default "system";
 }
