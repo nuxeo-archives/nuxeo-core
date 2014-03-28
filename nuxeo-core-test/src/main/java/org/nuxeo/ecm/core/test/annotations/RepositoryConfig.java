@@ -17,6 +17,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import org.nuxeo.ecm.core.api.security.SecurityConstants;
 import org.nuxeo.ecm.core.repository.RepositoryFactory;
 import org.nuxeo.ecm.core.storage.sql.DatabaseHelper;
 import org.nuxeo.ecm.core.storage.sql.coremodel.SQLRepositoryFactory;
@@ -27,13 +28,14 @@ import org.nuxeo.ecm.core.test.NoopRepositoryInit;
  */
 @Inherited
 @Retention(RetentionPolicy.RUNTIME)
-@Target( { ElementType.TYPE })
+@Target({ ElementType.TYPE })
 public @interface RepositoryConfig {
 
     Class<? extends RepositoryFactory> repositoryFactoryClass() default SQLRepositoryFactory.class;
 
     /**
-     * @deprecated since 5.6 replaced by system properties, see {@link DatabaseHelper}
+     * @deprecated since 5.6 replaced by system properties, see
+     *             {@link DatabaseHelper}
      */
     @Deprecated
     BackendType type() default BackendType.H2;
@@ -46,5 +48,5 @@ public @interface RepositoryConfig {
 
     Granularity cleanup() default Granularity.CLASS;
 
-    String user() default "system";
+    String user() default SecurityConstants.SYSTEM_USERNAME;
 }
