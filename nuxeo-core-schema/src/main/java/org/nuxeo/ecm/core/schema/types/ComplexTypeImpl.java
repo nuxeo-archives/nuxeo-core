@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 
 import org.nuxeo.ecm.core.schema.Namespace;
@@ -72,7 +73,11 @@ public class ComplexTypeImpl extends AbstractType implements ComplexType {
         fields.put(name, field);
         fieldsByName.put(name.getLocalName(), field);
         fieldsByName.put(name.getPrefixedName(), field);
-        fieldsCollection = Collections.unmodifiableCollection(fields.values());
+        makeFieldsCollection();
+    }
+
+    protected Collection<Field> makeFieldsCollection() {
+        return fieldsCollection = Collections.unmodifiableCollection(new HashSet<Field>(fields.values()));
     }
 
     public ComplexTypeImpl(ComplexType superType, String schema, String name) {
