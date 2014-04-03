@@ -1,0 +1,117 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<div xmlns:nxthemes="http://nuxeo.org/nxthemes"
+  xmlns:ui="http://java.sun.com/jsf/facelets"
+  xmlns:f="http://java.sun.com/jsf/core"
+  xmlns:h="http://java.sun.com/jsf/html"
+  xmlns:nxu="http://nuxeo.org/nxweb/util"
+  xmlns:nxl="http://nuxeo.org/nxforms/layout"
+  xmlns:a4j="https://ajax4jsf.dev.java.net/ajax"
+  id="adminLinksEhCacheConfig">
+  
+<ui:remove>
+<!--
+ Sorry for this CSS block JSF component....
+-->
+</ui:remove>
+<style>
+	.cacheInfoLabel{
+	       display: block;
+		   float: left;
+		   font-weight: bold;
+		   width: 130px;
+	}
+	.cacheInfoValue{
+	   float: left;
+	}
+	.clean{
+	   clear: both;
+	}
+</style>
+  
+  
+  
+<a4j:outputPanel id="admin_subtab_ehcache">
+
+    <ui:include src="/incl/message_banner.xhtml" />
+    <ui:include src="/incl/admin_subview_selector.xhtml" />
+
+    <div style="clear: both"></div>
+    <div class="tabsContent">
+      <nxu:set var="adminTabLink" value="#{currentAdminSubView.link}">
+         
+         <h1 id="adminLinksEhCacheConfig_title">#{messages['tab.ehcache.config.title']}</h1>
+         
+         <ui:repeat var="region" value="#{cacheAdminCenter.regionsNames()}" id="cacheRegions">
+         
+            <f:subview id="#{region}_view">
+                <a4j:form id="formCacheAjax">
+                
+                
+	            <div id="#{region}_bloc" class="cacheRegion">
+	            
+	                <div id="#{region}_label" class="cacheRegionLabel">
+	                    <h2 id="#{region}_label_title">#{region}</h2>
+	                </div>
+	                <div id="#{region}_info" class="cacheRegionInfo">
+	                    <div>
+	                        <h:outputLabel id="memorySizeLabel"
+	                                       for="memorySize"
+	                                       styleClass="cacheInfoLabel"
+	                                       value="#{messages['tab.ehcache.region.memory.size']}"/>
+	                        
+	                        <h:outputText id="memorySize"
+	                                      styleClass="cacheInfoValue"
+	                                      value="#{ehCacheControl.regionMemorySize(region)}"/>
+	                                      
+	                        <div class="clear"></div>
+	                    </div>
+	                    
+	                    <div>
+	                        <h:outputLabel id="diskSizeLabel"
+	                                       for="diskSize"
+	                                       styleClass="cacheInfoLabel"
+	                                       value="#{messages['tab.ehcache.region.disk.size']}"/>
+                            
+                            <h:outputText id="diskSize"
+                                          styleClass="cacheInfoValue"
+                                          value="#{ehCacheControl.regionDiskStoreSize(region)}"/>
+                                          
+                            <div class="clear"></div>
+	                    </div>
+	                    
+	                    <div>
+	                        <h:outputLabel id="itemsSizeLabel"
+	                                       for="itemsSize"
+	                                       styleClass="cacheInfoLabel"
+	                                       value="#{messages['tab.ehcache.region.items.size']}"/>
+	                                       
+                            <h:outputText id="itemsSize"
+                                          styleClass="cacheInfoValue"
+                                          value="#{ehCacheControl.regionItemSize(region)}"/>
+                                          
+                            <div class="clear"></div>
+	                    </div>
+	                </div>
+	                
+	                <div id="#{region}_actions" class="cacheRegionAction">
+	                    <a4j:commandButton  id="cleanCache"
+	                                        action="#{cacheAdminCenter.cleanCache(region)}"
+	                                        value="#{messages['tab.ehcache.region.action.clean']}"
+	                                        reRender="admin_subtab_ehcache"/>
+	                </div>
+	            </div>
+	            
+	            </a4j:form>
+            </f:subview>
+         </ui:repeat>
+
+         
+      </nxu:set>
+    </div>
+
+  </a4j:outputPanel>
+
+
+</div>
+  

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="org.nuxeo.ecm.core.ehcache.management.actions">
+
+    <extension target="org.nuxeo.ecm.platform.actions.ActionService"
+        point="actions">
+
+        !-- Admin center actions -->
+        <action id="EhCacheConfig" link="view_ehcache_config_admin-fragment.xhtml"
+            label="adm.ehcache.config.link" order="45">
+            <category>NUXEO_ADMIN</category>
+            <filter-id>only_for_manager</filter-id>
+        </action>
+
+        <action id="TAB_VIEW_EHCACHE_CONFIG"
+                link="/incl/tabs/ehcache-config.xhtml"
+                label="tab.ehcache.config"
+                order="10">
+            <category>EhCacheConfig_sub_tab</category>
+            <filter-id>only_for_manager</filter-id>
+        </action>
+
+
+    </extension>
+
+</component>
+  
