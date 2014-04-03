@@ -329,6 +329,20 @@ public class TestDialectQuerySyntax {
                 "\"foo bar\" -\"gee man\"");
         assertDialectFT("foo*", "foo*");
         assertDialectFT("(foo AND bar*)", "foo bar*");
+
+        // test special characters escaping while preserving prefix search
+        assertDialectFT("(foo AND bar*)", "foo: :bar:*");
+        assertDialectFT("foo", ":foo");
+        assertDialectFT("(foo* AND bar)", "foo% %bar");
+        assertDialectFT("(foo* AND bar)", "foo* *bar");
+
+        // other special characters escaping
+        assertDialectFT("(foo AND bar)", "foo) bar");
+        assertDialectFT("(foo AND bar)", "foo (bar");
+        assertDialectFT("(foo AND bar)", "foo& bar");
+        assertDialectFT("(foo AND bar)", "foo &bar");
+        assertDialectFT("(foo AND bar)", "foo| bar");
+        assertDialectFT("(foo AND bar)", "foo |bar");
     }
 
     @Test
@@ -423,6 +437,20 @@ public class TestDialectQuerySyntax {
         assertDialectFT("(foo & bar:*)", "foo bar*");
         assertDialectFT("(foo & bar:*) @#AND#@ ?? LIKE '% foo bar%'",
                 "\"foo bar*\"");
+
+        // test special characters escaping while preserving prefix search
+        assertDialectFT("foo", ":foo");
+        assertDialectFT("(foo & bar:*)", "foo: :bar:*");
+        assertDialectFT("(foo:* & bar)", "foo% %bar");
+        assertDialectFT("(foo:* & bar)", "foo* *bar");
+
+        // other special characters escaping
+        assertDialectFT("(foo & bar)", "foo) bar");
+        assertDialectFT("(foo & bar)", "foo (bar");
+        assertDialectFT("(foo & bar)", "foo& bar");
+        assertDialectFT("(foo & bar)", "foo &bar");
+        assertDialectFT("(foo & bar)", "foo| bar");
+        assertDialectFT("(foo & bar)", "foo |bar");
     }
 
     @Test
@@ -451,6 +479,20 @@ public class TestDialectQuerySyntax {
                 "\"foo bar\" -\"gee man\"");
         assertDialectFT("foo*", "foo*");
         assertDialectFT("(+foo +bar*)", "foo bar*");
+
+        // test special characters escaping while preserving prefix search
+        assertDialectFT("foo", ":foo");
+        assertDialectFT("(+foo +bar*)", "foo: :bar:*");
+        assertDialectFT("(+foo* +bar)", "foo% %bar");
+        assertDialectFT("(+foo* +bar)", "foo* *bar");
+
+        // other special characters escaping
+        assertDialectFT("(+foo +bar)", "foo) bar");
+        assertDialectFT("(+foo +bar)", "foo (bar");
+        assertDialectFT("(+foo +bar)", "foo& bar");
+        assertDialectFT("(+foo +bar)", "foo &bar");
+        assertDialectFT("(+foo +bar)", "foo| bar");
+        assertDialectFT("(+foo +bar)", "foo |bar");
     }
 
     @Test
@@ -484,6 +526,8 @@ public class TestDialectQuerySyntax {
         // reserved words
         assertDialectFT("({word} AND {and})", "word and");
         assertDialectFT("{word} {and}", "\"word and\"");
+
+        // TODO write tests for special chars
     }
 
     @Test
@@ -515,6 +559,8 @@ public class TestDialectQuerySyntax {
         assertDialectFT("\"foo*\"", "foo*");
         assertDialectFT("(\"foo\" AND \"bar*\")", "foo bar*");
         assertDialectFT("\"foo bar*\"", "\"foo bar*\"");
+
+        // TODO write tests for special chars
     }
 
 }
