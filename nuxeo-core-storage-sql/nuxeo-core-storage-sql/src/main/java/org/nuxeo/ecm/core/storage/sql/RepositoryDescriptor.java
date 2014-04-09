@@ -183,8 +183,13 @@ public class RepositoryDescriptor {
         return !Boolean.FALSE.equals(bool);
     }
 
-    @XNode("@name")
     public String name;
+
+    @XNode("@name")
+    public void setName(String name) {
+        this.name = name;
+        pool.setName("NuxeoConnectionManager/"+name);
+    }
 
     @XNode("@label")
     public String label;
@@ -212,11 +217,11 @@ public class RepositoryDescriptor {
     @XNode("repository")
     public RepositoryDescriptor repositoryDescriptor;
 
-    public NuxeoConnectionManagerConfiguration pool;
+    public NuxeoConnectionManagerConfiguration pool = new NuxeoConnectionManagerConfiguration();
 
     @XNode("pool")
     public void setPool(NuxeoConnectionManagerConfiguration pool) {
-        pool.setName(pool.getName() + "/" + name);
+        pool.setName("NuxeoConnectionManager/"+name);
         this.pool = pool;
     }
 
