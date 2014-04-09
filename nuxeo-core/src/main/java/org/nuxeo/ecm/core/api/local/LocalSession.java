@@ -22,6 +22,8 @@ import javax.naming.NamingException;
 import javax.transaction.RollbackException;
 import javax.transaction.Synchronization;
 import javax.transaction.SystemException;
+import javax.transaction.Transaction;
+import javax.transaction.TransactionManager;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -126,13 +128,6 @@ public class LocalSession extends AbstractSession implements Synchronization {
                 throw new ClientRuntimeException(
                         "No transaction, cannot reconnect: " + sessionId);
             }
-            try {
-                TransactionHelper.lookupTransactionManager().getTransaction().registerSynchronization(
-                        this);
-            } catch (NamingException | SystemException | RollbackException e) {
-                throw new ClientRuntimeException(
-                        "Cannot register synchronization", e);
-            }
             si = createSession();
         }
         return si.session;
@@ -158,9 +153,30 @@ public class LocalSession extends AbstractSession implements Synchronization {
         SessionInfo si = new SessionInfo(session);
         threadSessions.set(si);
         allSessions.add(si);
+        registerTxCleanup();
         log.debug("Adding thread " + Thread.currentThread().getName()
                 + " for CoreSession: " + sessionId);
         return si;
+    }
+
+    protected void registerTxCleanup() throws IllegalStateException,
+            ClientRuntimeException {
+        TransactionManager tm;
+        try {
+            tm = TransactionHelper.lookupTransactionManager();
+        } catch (NamingException error) {
+            return;
+        }
+        try {
+            final Transaction tx = tm.getTransaction();
+            if (tx == null) {
+                return;
+            }
+            tx.registerSynchronization(this);
+        } catch (SystemException | RollbackException e) {
+            throw new ClientRuntimeException("Cannot register synchronization",
+                    e);
+        }
     }
 
     @Override
@@ -170,6 +186,7 @@ public class LocalSession extends AbstractSession implements Synchronization {
 
     @Override
     public void beforeCompletion() {
+        closeInThisThread();
     }
 
     /**
@@ -178,7 +195,6 @@ public class LocalSession extends AbstractSession implements Synchronization {
      */
     @Override
     public void afterCompletion(int status) {
-        closeInThisThread();
     }
 
     protected void closeInThisThread() {

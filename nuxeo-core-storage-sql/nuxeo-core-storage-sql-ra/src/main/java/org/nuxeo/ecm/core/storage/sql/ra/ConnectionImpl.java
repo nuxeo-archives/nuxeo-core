@@ -95,9 +95,7 @@ public class ConnectionImpl implements Session {
 
     @Override
     public void close() throws ResourceException {
-        disassociate();
-        // don't close managedConnection, it's not our job
-        managedConnection = null;
+        managedConnection.close(this);
     }
 
     @Override
