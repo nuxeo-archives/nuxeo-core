@@ -33,10 +33,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.After;
 import org.junit.Before;
@@ -189,8 +187,9 @@ public class TestSQLRepositoryAPI extends SQLRepositoryTestCase {
         assertTrue(strings instanceof String[]);
         assertEquals(Arrays.asList("e", "f"), Arrays.asList((String[]) strings));
         Object participants = child.getProperty("testList", "participants");
-        assertTrue(participants instanceof List);
-        assertEquals(Arrays.asList("c", "d"), participants);
+        assertTrue(participants instanceof String[]);
+        assertEquals(Arrays.asList("c", "d"),
+                Arrays.asList((String[]) participants));
     }
 
     @Test
@@ -402,7 +401,8 @@ public class TestSQLRepositoryAPI extends SQLRepositoryTestCase {
         String title = (String) doc.getProperty("dublincore", "title");
         assertEquals("title2", title);
         Object participants = doc.getProperty("testList", "participants");
-        assertEquals(Arrays.asList("c", "d"), participants);
+        assertEquals(Arrays.asList("c", "d"),
+                Arrays.asList((String[]) participants));
     }
 
     @Test
