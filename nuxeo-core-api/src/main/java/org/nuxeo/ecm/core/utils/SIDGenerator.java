@@ -25,7 +25,7 @@ package org.nuxeo.ecm.core.utils;
  */
 public final class SIDGenerator {
 
-    private static int count = 0;
+    private static long last = 0;
 
     private static final int COUNT_OFFSET = 32;
 
@@ -45,13 +45,17 @@ public final class SIDGenerator {
      * @return the next unique id in this JVM
      */
     public static synchronized long next() {
-        if (count == Integer.MAX_VALUE) {
-            count = 0;
-        }
         long ms = System.currentTimeMillis();
-        long id = (int) ms;
-        id = Long.rotateLeft(id, COUNT_OFFSET);
-        return id + count++;
+        if (last != ms) {
+            last = ms;
+            return ms;
+        }
+        try {
+            Thread.sleep(1);
+        } catch (InterruptedException e) {
+            Thread.interrupted();
+        }
+        return next();
     }
 
 }

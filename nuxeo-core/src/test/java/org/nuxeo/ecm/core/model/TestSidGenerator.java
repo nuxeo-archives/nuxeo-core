@@ -13,58 +13,35 @@
 
 package org.nuxeo.ecm.core.model;
 
-import java.lang.reflect.Field;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.fail;
+
 import java.util.HashSet;
 import java.util.Set;
 
 import org.junit.Test;
-import static org.junit.Assert.*;
-
 import org.nuxeo.ecm.core.utils.SIDGenerator;
 
 public class TestSidGenerator {
 
     @Test
-    public void testGenerator() {
-        Set<Long> ids = new HashSet<Long>();
-        for (int i = 0; i < 1000; i++) {
-            long id = SIDGenerator.next();
-            if (!ids.add(id)) {
-                fail("ID already generated: " + id);
-            }
-        }
+    public void testTwoDistincts() {
+        long id1= SIDGenerator.next();
+        long id2 = SIDGenerator.next();
+        assertNotSame(id2, id1);
     }
 
     @Test
-    public void testGeneratorReset() throws Exception {
-        if (System.getProperty("os.name").startsWith("Windows")) {
-            // windows doesn't have enough time granularity for such
-            // a high-speed test
-            return;
-        }
-
+    public void testOneThousandDistincts() {
         Set<Long> ids = new HashSet<Long>();
+        Long[] index = new Long[1000];
         for (int i = 0; i < 1000; i++) {
-            long id = SIDGenerator.next();
-            if (!ids.add(id)) {
-                fail("ID already generated: " + id);
+            index[i]  = SIDGenerator.next();
+            if (!ids.add(index[i])) {
+                fail("ID already generated: " + Long.toBinaryString(index[i]) + " for " + i);
             }
         }
-
-        // change the counter to a value near the max one to force a counter reset
-        Field field = SIDGenerator.class.getDeclaredField("count");
-        field.setAccessible(true);
-        field.set(null, Integer.MAX_VALUE - 1000);
-
-        for (int i = 0; i < 3000; i++) {
-            long id = SIDGenerator.next();
-            if (!ids.add(id)) {
-                fail("ID already generated: " + id);
-            }
-        }
-
-        Integer counter = (Integer) field.get(null);
-        assertEquals(2000, counter.intValue());
     }
+
 
 }

@@ -18,7 +18,10 @@ public class Defaults {
     }
 
     public String name(Class<?> clazz, String name) {
-        return clazz.getPackage().getName() + ":type=" + clazz.getSimpleName()
+        final Package pkg = clazz.getPackage();
+        final String pkgName = pkg.getName();
+        final String className = clazz.getSimpleName();
+        return pkgName + ":type=" + className
                 + ",name=" + name;
     }
 

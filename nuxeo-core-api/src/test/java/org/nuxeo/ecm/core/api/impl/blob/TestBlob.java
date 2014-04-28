@@ -50,6 +50,7 @@ public class TestBlob extends NXRuntimeTestCase {
 
     private byte[] blobContent;
 
+    @Override
     @Before
     public void setUp() throws Exception {
         super.setUp();
@@ -62,6 +63,7 @@ public class TestBlob extends NXRuntimeTestCase {
         assertTrue(bytesRead > 0);
     }
 
+    @Override
     @After
     public void tearDown() throws Exception {
         blobContent = null;
@@ -185,9 +187,6 @@ public class TestBlob extends NXRuntimeTestCase {
         assertFalse(blob.isPersistent());
 
         Blob blob2 = blob.persist();
-        String s2 = blob2.getString();
-        assertEquals(new String(blobContent), s2);
-        s2 = null;
 
         byte[] blobContent2 = blob2.getByteArray();
         assertEquals(blobContent.length, blobContent2.length);

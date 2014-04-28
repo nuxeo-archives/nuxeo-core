@@ -21,6 +21,7 @@ import org.nuxeo.ecm.core.api.impl.blob.StringBlob;
 import org.nuxeo.ecm.core.event.EventService;
 import org.nuxeo.ecm.core.event.test.virusscan.service.DummyVirusScanner;
 import org.nuxeo.ecm.core.test.CoreFeature;
+import org.nuxeo.ecm.core.test.RepositorySettings;
 import org.nuxeo.ecm.core.test.TransactionalFeature;
 import org.nuxeo.ecm.core.test.annotations.TransactionalConfig;
 import org.nuxeo.ecm.core.work.api.WorkManager;
@@ -44,6 +45,9 @@ import com.google.inject.Inject;
 @Deploy({"org.nuxeo.ecm.core.test"})
 @LocalDeploy({"org.nuxeo.ecm.core.test:vscan/core-types-contrib.xml","org.nuxeo.ecm.core.test:vscan/virusscan-service-contrib.xml","org.nuxeo.ecm.core.test:vscan/listeners-contrib.xml"})
 public class TestDummyVirusScanner {
+
+    @Inject
+    protected RepositorySettings settings;
 
     @Inject
     protected CoreSession session;
@@ -79,8 +83,6 @@ public class TestDummyVirusScanner {
             file.setPropertyValue("file:content",
                     (Serializable) getFakeBlob(100, "Test1.txt"));
             file = session.createDocument(file);
-
-            session.save();
         } finally {
             TransactionHelper.commitOrRollbackTransaction();
         }
@@ -99,8 +101,6 @@ public class TestDummyVirusScanner {
             file3.setPropertyValue("file:content",
                     (Serializable) getFakeBlob(100, "Test3doFail.txt"));
             file3 = session.createDocument(file3);
-
-            session.save();
         } finally {
             TransactionHelper.commitOrRollbackTransaction();
         }
@@ -111,7 +111,6 @@ public class TestDummyVirusScanner {
             file4.setPropertyValue("file:content",
                     (Serializable) getFakeBlob(100, "Test4.txt"));
             file4 = session.createDocument(file4);
-            session.save();
         } finally {
             TransactionHelper.commitOrRollbackTransaction();
         }
@@ -131,7 +130,6 @@ public class TestDummyVirusScanner {
 
             file4.setPropertyValue("files:files", (Serializable) files);
             file4 = session.saveDocument(file4);
-            session.save();
         } finally {
             TransactionHelper.commitOrRollbackTransaction();
         }
@@ -147,14 +145,11 @@ public class TestDummyVirusScanner {
             files.add(map);
             file4.setPropertyValue("files:files", (Serializable) files);
             file4 = session.saveDocument(file4);
-            session.save();
         } finally {
             TransactionHelper.commitOrRollbackTransaction();
         }
 
         // wait for processing to be done
-        Thread.sleep(1000);
-        // eventService.waitForAsyncCompletion(5000);
         workManager.awaitCompletion(10, TimeUnit.SECONDS);
 
         List<String> scannedFiles = DummyVirusScanner.getProcessedFiles();
@@ -173,8 +168,9 @@ public class TestDummyVirusScanner {
                 "Test4-4.txt", //
                 "Test4-b.txt")), new HashSet<String>(scannedFiles));
 
-        session.save();
 
+        settings.releaseSession();
+        session = settings.openSession();
         TransactionHelper.startTransaction();
         try {
 

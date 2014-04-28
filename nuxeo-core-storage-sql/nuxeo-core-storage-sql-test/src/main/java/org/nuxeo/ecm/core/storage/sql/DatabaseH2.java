@@ -23,6 +23,7 @@ import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.nuxeo.common.Environment;
 import org.nuxeo.runtime.api.Framework;
 
 /**
@@ -35,7 +36,7 @@ public class DatabaseH2 extends DatabaseHelper {
     private static final Log log = LogFactory.getLog(DatabaseH2.class);
 
     /** This directory will be deleted and recreated. */
-    protected static final String DIRECTORY = "target/test/h2";
+    protected static final String DIRECTORY = "target";
 
     protected static final String DEF_USER = "sa";
 
@@ -49,23 +50,22 @@ public class DatabaseH2 extends DatabaseHelper {
 
     protected String h2Path;
 
-    protected String origUrl;
-
     protected String url;
 
     protected String url2;
 
-    protected Error owner;
+    protected String user;
+
+    protected String password;
 
     protected void setProperties() {
-        url = String.format(URL_FORMAT, h2Path, databaseName);
-        origUrl = setProperty(URL_PROPERTY, url);
+        url = setProperty(URL_PROPERTY, String.format(URL_FORMAT, h2Path, databaseName));
 
-        Framework.getProperties().setProperty(REPOSITORY_PROPERTY,
+        setProperty(REPOSITORY_PROPERTY,
                 repositoryName);
         setProperty(DATABASE_PROPERTY, databaseName);
-        setProperty(USER_PROPERTY, DEF_USER);
-        setProperty(PASSWORD_PROPERTY, DEF_PASSWORD);
+        user = setProperty(USER_PROPERTY, DEF_USER);
+        password = setProperty(PASSWORD_PROPERTY, DEF_PASSWORD);
         // for sql directory tests
         setProperty(DRIVER_PROPERTY, DRIVER);
     }
@@ -79,18 +79,9 @@ public class DatabaseH2 extends DatabaseHelper {
 
     @Override
     public void setUp() throws Exception {
-        if (owner != null) {
-            Error e = new Error("Second call to setUp() without tearDown()",
-                    owner);
-            log.fatal(e.getMessage(), e);
-            throw e;
-        }
-        owner = new Error("Database not released");
+        super.setUp();
+        h2Path = new File(Environment.getDefault().getData(), "h2").getPath();
         Class.forName(DRIVER);
-        File dir = new File(DIRECTORY);
-        FileUtils.deleteQuietly(dir);
-        dir.mkdirs();
-        h2Path = new File(dir, getId()).getAbsolutePath();
         setProperties();
     }
 
@@ -104,12 +95,6 @@ public class DatabaseH2 extends DatabaseHelper {
 
     @Override
     public void tearDown() throws SQLException {
-        owner = null;
-        if (origUrl == null) {
-            System.clearProperty(URL_PROPERTY);
-        } else {
-            System.setProperty(URL_PROPERTY, origUrl);
-        }
         try {
             tearDownDatabase(url);
             if (url2 != null) {
@@ -122,14 +107,15 @@ public class DatabaseH2 extends DatabaseHelper {
 
     protected void tearDownDatabase(String url) throws SQLException {
         Connection connection = DriverManager.getConnection(url,
-                System.getProperty(USER_PROPERTY),
-                System.getProperty(PASSWORD_PROPERTY));
+                user,
+                password);
         Statement st = connection.createStatement();
         String sql = "SHUTDOWN";
         log.trace(sql);
         st.execute(sql);
         st.close();
         connection.close();
+        FileUtils.deleteQuietly(new File(h2Path));
     }
 
     @Override
@@ -143,8 +129,8 @@ public class DatabaseH2 extends DatabaseHelper {
         descriptor.xaDataSourceName = "org.h2.jdbcx.JdbcDataSource";
         Map<String, String> properties = new HashMap<String, String>();
         properties.put("URL", url);
-        properties.put("User", System.getProperty(USER_PROPERTY));
-        properties.put("Password", System.getProperty(PASSWORD_PROPERTY));
+        properties.put("User", Framework.getProperty(USER_PROPERTY));
+        properties.put("Password", Framework.getProperty(PASSWORD_PROPERTY));
         descriptor.properties = properties;
         return descriptor;
     }

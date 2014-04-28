@@ -734,7 +734,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
         protected DocCreator(Repository repository, String name) {
             this.repository = repository;
             this.name = name;
-            this.random = new Random();
+            random = new Random();
         }
 
         @Override
@@ -911,7 +911,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
         DeadlockTestJob r1 = new DeadlockTestJob("foo1");
         DeadlockTestJob r2 = new DeadlockTestJob("foo2");
         try {
-            DeadlockTestJob.run(r1, r2);
+            LockStepJob.run(r1, r2);
             fail("Expected ConcurrentUpdateStorageException");
         } catch (ConcurrentUpdateStorageException e) {
             // ok, detected
@@ -1295,7 +1295,7 @@ public class TestSQLBackend extends SQLBackendTestCase {
 
         ClusterTestJob r1 = new ClusterTestJob(repository, repository2);
         ClusterTestJob r2 = new ClusterTestJob(repository, repository2);
-        ClusterTestJob.run(r1, r2);
+        LockStepJob.run(r1, r2);
         repository = null; // already closed
         repository2 = null; // already closed
     }
