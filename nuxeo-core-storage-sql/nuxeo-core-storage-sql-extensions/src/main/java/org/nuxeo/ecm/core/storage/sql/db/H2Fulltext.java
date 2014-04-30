@@ -346,11 +346,9 @@ public class H2Fulltext {
             QueryParser parser = new QueryParser(LUCENE_VERSION, defaultField,
                     analyzer);
             query.add(parser.parse(text), BooleanClause.Occur.MUST);
-
-            getIndexWriter(indexPath, analyzerName).commit();
-
-            IndexReader reader = DirectoryReader.open(FSDirectory.open(new File(
-                    indexPath)));
+            IndexWriter writer = getIndexWriter(indexPath, analyzerName);
+            writer.commit();
+            IndexReader reader = DirectoryReader.open(writer, true);
             IndexSearcher searcher = new IndexSearcher(reader);
             Collector collector = new ResultSetCollector(rs, reader, type);
             searcher.search(query, collector);
