@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +31,8 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 import javax.naming.NamingException;
 import javax.transaction.RollbackException;
@@ -70,11 +71,6 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
 
     private static final Log log = LogFactory.getLog(WorkManagerImpl.class);
 
-    public static final String DEFAULT_WORK_QUEUING = MemoryWorkQueuing.class.getName();
-
-    // public static final String DEFAULT_WORK_QUEUING =
-    // "org.nuxeo.ecm.core.work.redis.RedisWorkQueuing";
-
     protected static final String QUEUES_EP = "queues";
 
     protected static final String IMPL_EP = "implementation";
@@ -87,32 +83,27 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
 
     protected static final String THREAD_PREFIX = "Nuxeo-Work-";
 
+    protected final MetricRegistry registry = SharedMetricRegistries.getOrCreate(MetricsService.class.getName());
+
     // @GuardedBy("itself")
-    protected WorkQueueDescriptorRegistry workQueueDescriptors;
+    protected final WorkQueueDescriptorRegistry workQueueDescriptors = new WorkQueueDescriptorRegistry();
 
     // used synchronized
-    protected Map<String, WorkThreadPoolExecutor> executors;
+    protected final Map<String, WorkThreadPoolExecutor> executors = new HashMap<String, WorkThreadPoolExecutor>();
 
-    // @GuardedBy("itself")
-    protected Map<String, WorkAndScheduling> scheduledAfterCommit = new LinkedHashMap<String, WorkAndScheduling>();
+    protected final AtomicInteger scheduledOrRunning = new AtomicInteger();
 
-    protected WorkQueuing queuing;
+    protected WorkQueuing queuing = newWorkQueuing(MemoryWorkQueuing.class);
 
     @Override
     public void activate(ComponentContext context) throws Exception {
         super.activate(context);
-        workQueueDescriptors = new WorkQueueDescriptorRegistry();
-        if (queuing == null) {
-            queuing = newWorkQueuingDefault();
-        }
         init();
     }
 
     @Override
     public void deactivate(ComponentContext context) throws Exception {
         closeQueuing();
-        queuing = null;
-        workQueueDescriptors = null;
         super.deactivate(context);
     }
 
@@ -212,32 +203,15 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
     protected void unregisterWorkQueuingDescriptor(
             WorkQueuingImplDescriptor descr) {
         closeQueuing();
-        // fall back to memory-based
-        queuing = newWorkQueuingDefault();
-    }
-
-    protected WorkQueuing newWorkQueuingDefault() {
-        Class<?> klass;
-        try {
-            klass = Class.forName(DEFAULT_WORK_QUEUING);
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
-        }
-        if (!(WorkQueuing.class.isAssignableFrom(klass))) {
-            throw new RuntimeException("Class is not a "
-                    + WorkQueuing.class.getSimpleName() + " implementation: "
-                    + DEFAULT_WORK_QUEUING);
-        }
-        @SuppressWarnings("unchecked")
-        Class<? extends WorkQueuing> workQueuingClass = (Class<? extends WorkQueuing>) klass;
-        return newWorkQueuing(workQueuingClass);
+        queuing = newWorkQueuing(MemoryWorkQueuing.class);
     }
 
     protected WorkQueuing newWorkQueuing(Class<? extends WorkQueuing> klass) {
         WorkQueuing q;
         try {
-            Constructor<? extends WorkQueuing> ctor = klass.getConstructor(WorkQueueDescriptorRegistry.class);
-            q = ctor.newInstance(workQueueDescriptors);
+            Constructor<? extends WorkQueuing> ctor = klass.getConstructor(
+                    WorkManagerImpl.class, WorkQueueDescriptorRegistry.class);
+            q = ctor.newInstance(this, workQueueDescriptors);
         } catch (ReflectiveOperationException | SecurityException e) {
             throw new RuntimeException(e);
         }
@@ -294,12 +268,11 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
 
     @Override
     public void init() {
-        executors = new HashMap<String, WorkThreadPoolExecutor>();
         queuing.init();
         startExecutors();
     }
 
-    private void startExecutors() {
+    protected void startExecutors() {
         for (String queueId : getWorkQueueIds()) {
             // make sure the executor runs (even if processing disabled)
             getExecutor(queueId);
@@ -325,7 +298,7 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
                 workQueueDescriptor.maxThreads = maxPoolSize;
             }
             executor = new WorkThreadPoolExecutor(queueId, maxPoolSize,
-                    maxPoolSize, 0, TimeUnit.SECONDS, queuing, threadFactory);
+                    maxPoolSize, 0, TimeUnit.SECONDS, threadFactory);
             // prestart all core threads so that direct additions to the queue
             // (from another Nuxeo instance) can be seen
             executor.prestartAllCoreThreads();
@@ -400,69 +373,30 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
      *
      * @since 5.8
      */
-    public static class WorkAndScheduling {
+    public class WorkScheduling implements Synchronization {
         public final Work work;
 
         public final Scheduling scheduling;
 
-        public WorkAndScheduling(Work work, Scheduling scheduling) {
+        public WorkScheduling(Work work, Scheduling scheduling) {
             this.work = work;
             this.scheduling = scheduling;
         }
 
-        public static List<Work> getWorkList(Collection<WorkAndScheduling> lws) {
-            List<Work> list = new LinkedList<Work>();
-            for (WorkAndScheduling ws : lws) {
-                list.add(ws.work);
-            }
-            return list;
-        }
-    }
-
-    /**
-     * Synchronization holding a list of {@link Work} instances with their
-     * {@link Scheduling} until commit time, at which point each {@link Work}
-     * instance will be scheduled.
-     *
-     * @since 5.7
-     */
-    public static class WorkSchedulingSynchronization implements
-            Synchronization {
-
-        protected final Map<String, WorkAndScheduling> scheduledAfterCommit;
-
-        protected final WorkManager workManager;
-
-        public WorkSchedulingSynchronization(
-                Map<String, WorkAndScheduling> scheduledAfterCommit,
-                WorkManager workManager) {
-            this.scheduledAfterCommit = scheduledAfterCommit;
-            this.workManager = workManager;
-        }
-
         @Override
         public void beforeCompletion() {
+            ;
         }
 
         @Override
         public void afterCompletion(int status) {
-            WorkAndScheduling[] copy;
-            synchronized (scheduledAfterCommit) {
-                // use a copy and clear asap, as scheduling may check
-                // already scheduled work to avoid duplicates
-                copy = scheduledAfterCommit.values().toArray(
-                        new WorkAndScheduling[0]);
-                scheduledAfterCommit.clear();
-            }
-            for (WorkAndScheduling ws : copy) {
-                Work work = ws.work;
-                if (status == Status.STATUS_COMMITTED) {
-                    workManager.schedule(work, ws.scheduling, false);
-                } else if (status == Status.STATUS_ROLLEDBACK) {
-                    work.setWorkInstanceState(State.CANCELED);
-                } else {
-                    log.error("Unexpected status after completion: " + status);
-                }
+            if (status == Status.STATUS_COMMITTED) {
+                schedule(work, scheduling, false);
+            } else if (status == Status.STATUS_ROLLEDBACK) {
+                work.setWorkInstanceState(State.CANCELED);
+            } else {
+                throw new IllegalArgumentException(
+                        "Unsupported transaction status " + status);
             }
         }
     }
@@ -519,11 +453,9 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
      *
      * @since 5.6
      */
-    public static class WorkThreadPoolExecutor extends ThreadPoolExecutor {
+    protected class WorkThreadPoolExecutor extends ThreadPoolExecutor {
 
         protected final String queueId;
-
-        protected final WorkQueuing queuing;
 
         /**
          * Count of scheduled or running instances.
@@ -539,8 +471,6 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
 
         // metrics
 
-        protected final MetricRegistry registry = SharedMetricRegistries.getOrCreate(MetricsService.class.getName());
-
         protected final Counter scheduledCount;
 
         protected final Counter scheduledMax;
@@ -551,13 +481,12 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
 
         protected final Timer workTimer;
 
-        public WorkThreadPoolExecutor(String queueId, int corePoolSize,
+        protected WorkThreadPoolExecutor(String queueId, int corePoolSize,
                 int maximumPoolSize, long keepAliveTime, TimeUnit unit,
-                WorkQueuing queuing, ThreadFactory threadFactory) {
+                ThreadFactory threadFactory) {
             super(corePoolSize, maximumPoolSize, keepAliveTime, unit,
                     queuing.getScheduledQueue(queueId), threadFactory);
             this.queueId = queueId;
-            this.queuing = queuing;
             running = new LinkedList<Work>();
             // init metrics
             scheduledCount = registry.counter(MetricRegistry.name("nuxeo",
@@ -595,20 +524,29 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
             scheduledOrRunning.incrementAndGet();
             boolean ok = false;
             try {
-                // go through the queue instead of using super.execute
-                // which may skip the queue and hand off to a thread directly
-                BlockingQueue<Runnable> queue = queuing.getScheduledQueue(queueId);
-                boolean added = queue.offer(new WorkHolder(work));
-                if (!added) {
-                    throw new RuntimeException("queue should have blocked");
-                }
-                // DO NOT super.execute(new WorkHolder(work));
+                submit(work);
                 ok = true;
             } finally {
                 if (!ok) {
                     scheduledOrRunning.decrementAndGet();
                 }
             }
+        }
+
+        /**
+         * go through the queue instead of using super.execute which may skip
+         * the queue and hand off to a thread directly
+         *
+         * @param work
+         * @throws RuntimeException
+         */
+        protected void submit(Work work) throws RuntimeException {
+            BlockingQueue<Runnable> queue = queuing.getScheduledQueue(queueId);
+            boolean added = queue.offer(new WorkHolder(work));
+            if (!added) {
+                throw new RuntimeException("queue should have blocked");
+            }
+            // DO NOT super.execute(new WorkHolder(work));
         }
 
         @Override
@@ -626,28 +564,32 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
 
         @Override
         protected void afterExecute(Runnable r, Throwable t) {
-            scheduledOrRunning.decrementAndGet();
-            Work work = WorkHolder.getWork(r);
-            synchronized (running) {
-                running.remove(work);
-            }
-            State state;
-            if (t == null) {
-                if (work.isWorkInstanceSuspended()) {
-                    state = State.SCHEDULED;
-                } else {
-                    state = State.COMPLETED;
+            try {
+                Work work = WorkHolder.getWork(r);
+                synchronized (running) {
+                    running.remove(work);
                 }
-            } else {
-                state = State.FAILED;
+                State state;
+                if (t == null) {
+                    if (work.isWorkInstanceSuspended()) {
+                        state = State.SCHEDULED;
+                    } else {
+                        state = State.COMPLETED;
+                    }
+                } else {
+                    state = State.FAILED;
+                }
+                work.setWorkInstanceState(state);
+                queuing.workCompleted(queueId, work);
+                // metrics
+                runningCount.dec();
+                completedCount.inc();
+                workTimer.update(
+                        work.getCompletionTime() - work.getStartTime(),
+                        TimeUnit.MILLISECONDS);
+            } finally {
+                signalCompletion();
             }
-            work.setWorkInstanceState(state);
-            queuing.workCompleted(queueId, work);
-            // metrics
-            runningCount.dec();
-            completedCount.inc();
-            workTimer.update(work.getCompletionTime() - work.getStartTime(),
-                    TimeUnit.MILLISECONDS);
         }
 
         // called during shutdown
@@ -656,6 +598,9 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
         protected void removedFromQueue(Runnable r) {
             Work work = WorkHolder.getWork(r);
             work.setWorkInstanceState(State.CANCELED);
+            if (scheduledOrRunning.decrementAndGet() == 0) {
+                signalCompletion();
+            }
         }
 
         /**
@@ -708,41 +653,11 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
         public Work removeScheduled(String workId) {
             Work w = queuing.removeScheduled(queueId, workId);
             if (w != null) {
-                scheduledOrRunning.decrementAndGet();
+                signalCompletion();
             }
             return w;
         }
 
-    }
-
-    protected Work findScheduledAfterCommit(String workId) {
-        synchronized (scheduledAfterCommit) {
-            WorkAndScheduling ws = scheduledAfterCommit.get(workId);
-            return ws == null ? null : ws.work;
-        }
-    }
-
-    protected Work removeScheduledAfterCommit(String workId) {
-        synchronized (scheduledAfterCommit) {
-            WorkAndScheduling ws = scheduledAfterCommit.remove(workId);
-            return ws == null ? null : ws.work;
-        }
-    }
-
-    /**
-     * Gets the scheduled after commit tasks. Returns a copy.
-     */
-    protected List<Work> getScheduledAfterCommit() {
-        synchronized (scheduledAfterCommit) {
-            return WorkAndScheduling.getWorkList(scheduledAfterCommit.values());
-        }
-    }
-
-    protected void executeAfterCommit(Work work, Scheduling scheduling) {
-        synchronized (scheduledAfterCommit) {
-            WorkAndScheduling ws = new WorkAndScheduling(work, scheduling);
-            scheduledAfterCommit.put(work.getId(), ws);
-        }
     }
 
     @Override
@@ -761,17 +676,21 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
     }
 
     @Override
-    public void schedule(Work work, Scheduling scheduling, boolean afterCommit) {
+    public void schedule(Work work, Scheduling scheduling,
+            boolean afterCommit) {
         String workId = work.getId();
         String queueId = getCategoryQueueId(work.getCategory());
         if (!isQueuingEnabled(queueId)) {
             work.setWorkInstanceState(State.CANCELED);
             return;
         }
-        work.setWorkInstanceState(State.SCHEDULED);
-        if (afterCommit && scheduleAfterCommit(work, scheduling)) {
-            return;
+        if (afterCommit) {
+            if (scheduleAfterCommit(work, scheduling)) {
+                return;
+            }
+            log.warn("scheduling " + work + ", cannot wait for tx commit");
         }
+        work.setWorkInstanceState(State.SCHEDULED);
         WorkSchedulePath.newInstance(work);
         if (log.isTraceEnabled()) {
             log.trace("Scheduling work: " + work + " using queue: " + queueId,
@@ -783,14 +702,11 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
         case ENQUEUE:
             break;
         case CANCEL_SCHEDULED:
-            Work w = removeScheduledAfterCommit(workId);
-            if (w == null) {
-                w = getExecutor(queueId).removeScheduled(workId);
-            }
+            Work w = getExecutor(queueId).removeScheduled(workId);
             if (w != null) {
                 w.setWorkInstanceState(State.CANCELED);
                 if (log.isDebugEnabled()) {
-                    log.debug("Canceling existing scheduled work before scheduling");
+                    log.debug("Canceling existing scheduled work before scheduling (" + scheduledOrRunning.get() + ")");
                 }
             }
             break;
@@ -812,7 +728,11 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
             break;
 
         }
-        getExecutor(queueId).execute(work);
+        try {
+            getExecutor(queueId).execute(work);
+        } finally {
+            signalSchedule();
+        }
     }
 
     /**
@@ -830,7 +750,7 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
         }
         if (transactionManager == null) {
             if (log.isDebugEnabled()) {
-                log.debug("Not scheduling work after commit because of missing transaction manager: "
+                log.warn("Not scheduling work after commit because of missing transaction manager: "
                         + work);
             }
             return false;
@@ -839,7 +759,7 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
             Transaction transaction = transactionManager.getTransaction();
             if (transaction == null) {
                 if (log.isDebugEnabled()) {
-                    log.debug("Not scheduling work after commit because of missing transaction: "
+                    log.warn("Not scheduling work after commit because of missing transaction: "
                             + work);
                 }
                 return false;
@@ -849,9 +769,8 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
                 if (log.isDebugEnabled()) {
                     log.debug("Scheduling work after commit: " + work);
                 }
-                executeAfterCommit(work, scheduling);
-                transaction.registerSynchronization(new WorkSchedulingSynchronization(
-                        scheduledAfterCommit, this));
+                transaction.registerSynchronization(new WorkScheduling(work,
+                        scheduling));
                 return true;
             } else {
                 if (log.isDebugEnabled()) {
@@ -873,32 +792,16 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
             pos[0] = 0; // compat
         }
         String workId = work.getId();
-        // check scheduled after commit
-        if (state == null || state == State.SCHEDULED) {
-            Work w = findScheduledAfterCommit(workId);
-            if (w != null) {
-                return w;
-            }
-        }
         return queuing.find(workId, state);
     }
 
     /** @param state SCHEDULED, RUNNING or null for both */
     protected boolean hasWorkInState(String workId, State state) {
-        // check scheduled after commit
-        if (state == null || state == State.SCHEDULED) {
-            if (findScheduledAfterCommit(workId) != null) {
-                return true;
-            }
-        }
         return queuing.isWorkInState(workId, state);
     }
 
     @Override
     public State getWorkState(String workId) {
-        if (findScheduledAfterCommit(workId) != null) {
-            return State.SCHEDULED;
-        }
         return queuing.getWorkState(workId);
     }
 
@@ -915,11 +818,8 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
 
     @Override
     public int getQueueSize(String queueId, State state) {
-        if (state == null) {
-            return getScheduledAfterCommitSize()
-                    + getScheduledOrRunningSize(queueId);
-        } else if (state == State.SCHEDULED) {
-            return getScheduledAfterCommitSize() + getScheduledSize(queueId);
+        if (state == State.SCHEDULED) {
+            return getScheduledSize(queueId);
         } else if (state == State.RUNNING) {
             return getRunningSize(queueId);
         } else if (state == State.COMPLETED) {
@@ -933,10 +833,6 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
     @Deprecated
     public int getNonCompletedWorkSize(String queueId) {
         return getScheduledOrRunningSize(queueId);
-    }
-
-    protected int getScheduledAfterCommitSize() {
-        return scheduledAfterCommit.size();
     }
 
     protected int getScheduledSize(String queueId) {
@@ -959,39 +855,61 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
     }
 
     @Override
-    public boolean awaitCompletion(String queueId, long timeout, TimeUnit unit)
+    public boolean awaitCompletion(String queueId, long duration, TimeUnit unit)
             throws InterruptedException {
-        return awaitCompletion(Collections.singleton(queueId), timeout, unit);
+        return awaitCompletion(unit.toNanos(duration)) > 0;
     }
 
     @Override
-    public boolean awaitCompletion(long timeout, TimeUnit unit)
+    public boolean awaitCompletion(long duration, TimeUnit unit)
             throws InterruptedException {
-        return awaitCompletion(getWorkQueueIds(), timeout, unit);
+        return awaitCompletion(unit.toNanos(duration)) > 0;
     }
 
-    private boolean awaitCompletion(Collection<String> queueIds, long timeout,
-            TimeUnit unit) throws InterruptedException {
-        long t0 = System.currentTimeMillis();
-        long delay = unit.toMillis(timeout);
-        for (;;) {
-            boolean completed = true;
-            for (String queueId : queueIds) {
-                if (getScheduledAfterCommitSize() != 0
-                        || getScheduledOrRunningSize(queueId) != 0) {
-                    completed = false;
-                    break;
-                }
+    protected final ReentrantLock completionLock = new ReentrantLock();
+
+    protected final Condition completion = completionLock.newCondition();
+
+    protected long awaitCompletion(long timeout) throws InterruptedException {
+        completionLock.lock();
+        try {
+            while (timeout > 0 && scheduledOrRunning.get() > 0) {
+                timeout = completion.awaitNanos(timeout);
             }
-            if (completed) {
-                return true;
+        } finally {
+            if (log.isTraceEnabled()) {
+                log.trace("returning from await");
             }
-            if (System.currentTimeMillis() - t0 > delay) {
-                return false;
-            }
-            // TODO use wait/notify instead
-            Thread.sleep(50);
+            completionLock.unlock();
         }
+        return timeout;
+    }
+
+    protected void signalSchedule() {
+        int value = scheduledOrRunning.incrementAndGet();
+        if (log.isTraceEnabled()) {
+            logScheduleAndRunning(value);
+        }
+    }
+
+
+    protected void signalCompletion() {
+        final int value = scheduledOrRunning.decrementAndGet();
+        if (value == 0) {
+            completionLock.lock();
+            try {
+                completion.signalAll();
+            } finally {
+                completionLock.unlock();
+            }
+        }
+        if (log.isTraceEnabled()) {
+            logScheduleAndRunning(value);
+        }
+    }
+
+    protected void logScheduleAndRunning(int value) {
+        log.trace("schedule or running ["+ value + "]", new Throwable("stack trace"));;
     }
 
     @Override
