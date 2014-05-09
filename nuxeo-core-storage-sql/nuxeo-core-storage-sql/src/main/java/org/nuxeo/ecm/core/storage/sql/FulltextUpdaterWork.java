@@ -12,6 +12,7 @@
  */
 package org.nuxeo.ecm.core.storage.sql;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -54,7 +55,8 @@ public class FulltextUpdaterWork extends AbstractWork {
     protected final boolean isJob;
 
     /** The indexes and text to be updated. */
-    protected final List<IndexAndText> indexesAndText;
+    protected final List<IndexAndText> indexesAndText =
+            new ArrayList<IndexAndText>();
 
     public static class IndexAndText {
         public String indexName;
@@ -68,13 +70,19 @@ public class FulltextUpdaterWork extends AbstractWork {
     }
 
     public FulltextUpdaterWork(String repositoryName, String docId,
-            boolean isSimpleText, boolean isJob,
-            List<IndexAndText> indexesAndText) {
+            boolean isSimpleText, boolean isJob, List<IndexAndText> data
+            ) {
+        this(repositoryName, docId, isSimpleText, isJob);
+        indexesAndText.addAll(data);
+    }
+
+    public FulltextUpdaterWork(String repositoryName, String docId,
+            boolean isSimpleText, boolean isJob
+            ) {
         super(); // random id, for unique job
         setDocument(repositoryName, docId);
         this.isSimpleText = isSimpleText;
         this.isJob = isJob;
-        this.indexesAndText = indexesAndText;
     }
 
     @Override

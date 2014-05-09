@@ -118,6 +118,9 @@ public class RepositoryImpl implements Repository {
                     + className, e);
         }
         if (!FulltextParser.class.isAssignableFrom(klass)) {
+            ClassLoader ftloader = FulltextParser.class.getClassLoader();
+            ClassLoader rloader = RepositoryImpl.class.getClassLoader();
+            ClassLoader kloader = klass.getClassLoader();
             throw new StorageException("Invalid fulltext parser class: "
                     + className);
         }

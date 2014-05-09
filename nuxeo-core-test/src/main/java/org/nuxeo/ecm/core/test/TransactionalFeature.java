@@ -20,7 +20,6 @@ import org.nuxeo.ecm.core.test.annotations.Granularity;
 import org.nuxeo.ecm.core.test.annotations.RepositoryConfig;
 import org.nuxeo.ecm.core.test.annotations.TransactionalConfig;
 import org.nuxeo.runtime.jtajca.JtaActivator;
-import org.nuxeo.runtime.test.runner.Defaults;
 import org.nuxeo.runtime.test.runner.Deploy;
 import org.nuxeo.runtime.test.runner.FeaturesRunner;
 import org.nuxeo.runtime.test.runner.SimpleFeature;
@@ -40,11 +39,7 @@ public class TransactionalFeature extends SimpleFeature {
 
     @Override
     public void initialize(FeaturesRunner runner) throws Exception {
-        config = runner.getDescription().getAnnotation(
-                TransactionalConfig.class);
-        if (config == null) {
-            config = Defaults.of(TransactionalConfig.class);
-        }
+        config = runner.getConfig(TransactionalConfig.class);
     }
 
     @Override

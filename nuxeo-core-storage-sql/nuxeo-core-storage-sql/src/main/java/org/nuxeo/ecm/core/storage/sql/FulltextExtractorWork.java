@@ -13,8 +13,6 @@
 package org.nuxeo.ecm.core.storage.sql;
 
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -23,18 +21,15 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.nuxeo.ecm.core.api.Blob;
 import org.nuxeo.ecm.core.api.ClientException;
-import org.nuxeo.ecm.core.api.DocumentLocation;
 import org.nuxeo.ecm.core.api.DocumentModel;
 import org.nuxeo.ecm.core.api.IdRef;
 import org.nuxeo.ecm.core.api.blobholder.BlobHolder;
 import org.nuxeo.ecm.core.api.blobholder.SimpleBlobHolder;
-import org.nuxeo.ecm.core.api.impl.DocumentLocationImpl;
 import org.nuxeo.ecm.core.convert.api.ConversionException;
 import org.nuxeo.ecm.core.convert.api.ConversionService;
 import org.nuxeo.ecm.core.storage.sql.FulltextUpdaterWork.IndexAndText;
 import org.nuxeo.ecm.core.utils.BlobsExtractor;
 import org.nuxeo.ecm.core.work.AbstractWork;
-import org.nuxeo.ecm.core.work.api.Work;
 import org.nuxeo.ecm.core.work.api.WorkManager;
 import org.nuxeo.runtime.api.Framework;
 
@@ -100,9 +95,14 @@ public class FulltextExtractorWork extends AbstractWork {
     }
 
     protected void extractBinaryText() throws ClientException {
+        FulltextUpdaterWork work = new FulltextUpdaterWork(repositoryName, docId, false,
+                true);
+        WorkManager workManager = Framework.getLocalService(WorkManager.class);
+        workManager.schedule(work, true);
+
         IdRef docRef = new IdRef(docId);
         if (!session.exists(docRef)) {
-            // doc is gone
+            workManager.schedule(work, WorkManager.Scheduling.CANCEL_SCHEDULED);
             return;
         }
         DocumentModel doc = session.getDocument(docRef);
@@ -118,7 +118,7 @@ public class FulltextExtractorWork extends AbstractWork {
 
         // Iterate on each index to set the binaryText column
         BlobsExtractor extractor = new BlobsExtractor();
-        List<IndexAndText> indexesAndText = new LinkedList<IndexAndText>();
+        List<IndexAndText> indexesAndText = work.indexesAndText;
         for (String indexName : fulltextInfo.indexNames) {
             if (!fulltextInfo.indexesAllBinary.contains(indexName)
                     && fulltextInfo.propPathsByIndexBinary.get(indexName) == null) {
@@ -136,11 +136,9 @@ public class FulltextExtractorWork extends AbstractWork {
             text = StringUtils.join(fulltextParser.getStrings(), " ");
             indexesAndText.add(new IndexAndText(indexName, text));
         }
-        if (!indexesAndText.isEmpty()) {
-            Work work = new FulltextUpdaterWork(repositoryName, docId, false,
-                    true, indexesAndText);
-            WorkManager workManager = Framework.getLocalService(WorkManager.class);
-            workManager.schedule(work, true);
+
+        if (indexesAndText.isEmpty()) {
+            workManager.schedule(work, WorkManager.Scheduling.CANCEL_SCHEDULED);
         }
     }
 

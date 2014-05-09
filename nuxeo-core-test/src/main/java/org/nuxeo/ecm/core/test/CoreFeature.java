@@ -23,6 +23,7 @@ import org.nuxeo.ecm.core.test.annotations.BackendType;
 import org.nuxeo.ecm.core.test.annotations.Granularity;
 import org.nuxeo.ecm.core.test.annotations.RepositoryInit;
 import org.nuxeo.runtime.api.Framework;
+import org.nuxeo.runtime.management.ManagementFeature;
 import org.nuxeo.runtime.test.runner.Deploy;
 import org.nuxeo.runtime.test.runner.Features;
 import org.nuxeo.runtime.test.runner.FeaturesRunner;
@@ -47,7 +48,7 @@ import com.google.inject.Binder;
         "org.nuxeo.ecm.core", "org.nuxeo.ecm.core.convert",
         "org.nuxeo.ecm.core.convert.plugins", "org.nuxeo.ecm.core.storage.sql",
         "org.nuxeo.ecm.core.storage.sql.test" })
-@Features(RuntimeFeature.class)
+@Features({RuntimeFeature.class, ManagementFeature.class})
 public class CoreFeature extends SimpleFeature {
 
     private static final Log log = LogFactory.getLog(CoreFeature.class);
@@ -188,12 +189,16 @@ public class CoreFeature extends SimpleFeature {
         }
         CoreScope.INSTANCE.enter();
         CoreSession session = repository.createSession();
+        if (session == null) {
+            throw new AssertionError("Cannot open session");
+        }
         RepositoryInit factory = repository.getInitializer();
         if (factory != null) {
             factory.populate(session);
             session.save();
             waitForAsyncCompletion();
         }
+        CoreScope.INSTANCE.enter();
     }
 
     public void setRepositorySettings(RepositorySettings settings) {

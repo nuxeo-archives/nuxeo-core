@@ -62,6 +62,8 @@ import org.h2.store.fs.FileUtils;
 import org.h2.tools.SimpleResultSet;
 import org.h2.util.IOUtils;
 import org.h2.util.StringUtils;
+import org.nuxeo.common.Environment;
+import org.nuxeo.runtime.api.Framework;
 
 /**
  * An optimized Lucene-based fulltext indexing trigger and search.
@@ -453,8 +455,11 @@ public class H2Fulltext {
         rs.next();
         String path = rs.getString(1);
         if (path == null) {
-            throw new SQLException(
-                    "Fulltext search for in-memory databases is not supported.");
+            File data = Environment.getDefault().getData();
+            if (data == null) {
+                data = Framework.getRuntime().getHome();
+            }
+            path = data.getAbsolutePath();
         }
         st.close();
         return path + ".lucene";

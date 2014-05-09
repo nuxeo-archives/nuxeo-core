@@ -19,6 +19,8 @@ package org.nuxeo.ecm.core.test;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.commons.logging.LogFactory;
+
 import com.google.inject.Key;
 import com.google.inject.OutOfScopeException;
 import com.google.inject.Provider;
@@ -32,6 +34,7 @@ public class CoreScope implements Scope {
 
     protected final ThreadLocal<Map<Key<?>, Object>> values =
             new ThreadLocal<Map<Key<?>, Object>>() {
+        @Override
         protected java.util.Map<Key<?>,Object> initialValue() {
             return new HashMap<Key<?>, Object>();
         };
@@ -44,10 +47,12 @@ public class CoreScope implements Scope {
     }
     public void enter() {
         values.get();
+        LogFactory.getLog(CoreScope.class).trace("entered core");
     }
 
     public void exit() {
         values.remove();
+        LogFactory.getLog(CoreScope.class).trace("exited core");
     }
 
     @Override

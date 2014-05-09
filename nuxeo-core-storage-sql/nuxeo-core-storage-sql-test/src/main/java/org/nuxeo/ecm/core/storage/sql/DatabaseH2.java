@@ -12,7 +12,6 @@
 
 package org.nuxeo.ecm.core.storage.sql;
 
-import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -20,10 +19,8 @@ import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.nuxeo.common.Environment;
 import org.nuxeo.runtime.api.Framework;
 
 /**
@@ -46,9 +43,7 @@ public class DatabaseH2 extends DatabaseHelper {
 
     protected static final String DRIVER = "org.h2.Driver";
 
-    protected static final String URL_FORMAT = "jdbc:h2:%s/%s";
-
-    protected String h2Path;
+    protected static final String URL_FORMAT = "jdbc:h2:mem:%s;DB_CLOSE_DELAY=-1";
 
     protected String url;
 
@@ -59,7 +54,7 @@ public class DatabaseH2 extends DatabaseHelper {
     protected String password;
 
     protected void setProperties() {
-        url = setProperty(URL_PROPERTY, String.format(URL_FORMAT, h2Path, databaseName));
+        url = setProperty(URL_PROPERTY, String.format(URL_FORMAT, databaseName));
 
         setProperty(REPOSITORY_PROPERTY,
                 repositoryName);
@@ -71,7 +66,7 @@ public class DatabaseH2 extends DatabaseHelper {
     }
 
     protected void setProperties2() {
-        url2 = String.format(URL_FORMAT, h2Path, databaseName + "2");
+        url2 = String.format(URL_FORMAT, databaseName + "2");
         setProperty(URL_PROPERTY + "2", url2);
         Framework.getProperties().setProperty(REPOSITORY_PROPERTY + "2",
                 repositoryName + "2");
@@ -80,7 +75,6 @@ public class DatabaseH2 extends DatabaseHelper {
     @Override
     public void setUp() throws Exception {
         super.setUp();
-        h2Path = new File(Environment.getDefault().getData(), "h2").getPath();
         Class.forName(DRIVER);
         setProperties();
     }
@@ -115,7 +109,6 @@ public class DatabaseH2 extends DatabaseHelper {
         st.execute(sql);
         st.close();
         connection.close();
-        FileUtils.deleteQuietly(new File(h2Path));
     }
 
     @Override

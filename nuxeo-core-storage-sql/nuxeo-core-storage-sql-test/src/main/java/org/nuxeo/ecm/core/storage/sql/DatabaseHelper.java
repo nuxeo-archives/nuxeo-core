@@ -300,7 +300,7 @@ public abstract class DatabaseHelper {
             // ConnectionHelper.getDataSource ignores it and uses
             // nuxeo.test.vcs.url etc. for connections in test mode
             String dataSourceName = "jdbc/NuxeoTestDS";
-            System.setProperty(ConnectionHelper.SINGLE_DS, dataSourceName);
+            Framework.getProperties().setProperty(ConnectionHelper.SINGLE_DS, dataSourceName);
         }
     }
 
