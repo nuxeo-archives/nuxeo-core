@@ -91,7 +91,7 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
     // used synchronized
     protected final Map<String, WorkThreadPoolExecutor> executors = new HashMap<String, WorkThreadPoolExecutor>();
 
-    protected final AtomicInteger scheduledOrRunning = new AtomicInteger();
+    protected final WorkCompletionSynchronizer completionSynchronizer = new WorkCompletionSynchronizer("all");
 
     protected WorkQueuing queuing = newWorkQueuing(MemoryWorkQueuing.class);
 
@@ -442,6 +442,73 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
         }
     }
 
+    public class WorkCompletionSynchronizer {
+
+        protected final AtomicInteger scheduledOrRunning = new AtomicInteger(0);
+
+        protected final ReentrantLock completionLock = new ReentrantLock();
+
+        protected final Condition completion = completionLock.newCondition();
+
+        protected final Log log = LogFactory.getLog(WorkCompletionSynchronizer.class);
+
+        protected final String queueid;
+
+        protected WorkCompletionSynchronizer(String id) {
+           queueid = id;
+        }
+
+
+        protected long await(long timeout) throws InterruptedException {
+            completionLock.lock();
+            try {
+                while (timeout > 0 && scheduledOrRunning.get() > 0) {
+                    timeout = completion.awaitNanos(timeout);
+                }
+            } finally {
+                if (log.isTraceEnabled()) {
+                    log.trace("returning from await");
+                }
+                completionLock.unlock();
+            }
+            return timeout;
+        }
+
+        protected void signalSchedule() {
+            int value = scheduledOrRunning.incrementAndGet();
+            if (log.isTraceEnabled()) {
+                logScheduleAndRunning("scheduled", value);
+            }
+            if (completionSynchronizer != this) {
+                completionSynchronizer.signalSchedule();
+            }
+        }
+
+        protected void signalCompletion() {
+            final int value = scheduledOrRunning.decrementAndGet();
+            if (value == 0) {
+                completionLock.lock();
+                try {
+                    completion.signalAll();
+                } finally {
+                    completionLock.unlock();
+                }
+            }
+            if (log.isTraceEnabled()) {
+                logScheduleAndRunning("completed", value);
+            }
+            if (completionSynchronizer != this) {
+                completionSynchronizer.signalCompletion();
+            }
+        }
+
+        protected void logScheduleAndRunning(String event, int value) {
+            log.trace(event + " [" + queueid + "," + value + "]",
+                    new Throwable("stack trace"));
+        }
+
+    }
+
     /**
      * A {@link ThreadPoolExecutor} that keeps available the list of running
      * tasks.
@@ -457,10 +524,7 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
 
         protected final String queueId;
 
-        /**
-         * Count of scheduled or running instances.
-         */
-        protected final AtomicInteger scheduledOrRunning = new AtomicInteger();
+        protected final WorkCompletionSynchronizer completionSynchronizer;
 
         /**
          * List of running Work instances, in order to be able to interrupt them
@@ -487,6 +551,7 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
             super(corePoolSize, maximumPoolSize, keepAliveTime, unit,
                     queuing.getScheduledQueue(queueId), threadFactory);
             this.queueId = queueId;
+            completionSynchronizer = new WorkCompletionSynchronizer(queueId);
             running = new LinkedList<Work>();
             // init metrics
             scheduledCount = registry.counter(MetricRegistry.name("nuxeo",
@@ -502,7 +567,7 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
         }
 
         public int getScheduledOrRunningSize() {
-            return scheduledOrRunning.get();
+            return completionSynchronizer.scheduledOrRunning.get();
         }
 
         @Override
@@ -521,14 +586,14 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
             if (scheduledCount.getCount() > scheduledMax.getCount()) {
                 scheduledMax.inc();
             }
-            scheduledOrRunning.incrementAndGet();
+            completionSynchronizer.signalSchedule();
             boolean ok = false;
             try {
                 submit(work);
                 ok = true;
             } finally {
                 if (!ok) {
-                    scheduledOrRunning.decrementAndGet();
+                    completionSynchronizer.signalCompletion();
                 }
             }
         }
@@ -588,7 +653,7 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
                         work.getCompletionTime() - work.getStartTime(),
                         TimeUnit.MILLISECONDS);
             } finally {
-                signalCompletion();
+                completionSynchronizer.signalCompletion();
             }
         }
 
@@ -598,9 +663,7 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
         protected void removedFromQueue(Runnable r) {
             Work work = WorkHolder.getWork(r);
             work.setWorkInstanceState(State.CANCELED);
-            if (scheduledOrRunning.decrementAndGet() == 0) {
-                signalCompletion();
-            }
+            completionSynchronizer.signalCompletion();
         }
 
         /**
@@ -617,7 +680,7 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
             shutdown();
             // request all scheduled work instances to suspend (cancel)
             int n = queuing.setSuspending(queueId);
-            scheduledOrRunning.addAndGet(-n);
+            completionSynchronizer.scheduledOrRunning.addAndGet(-n);
             // request all running work instances to suspend (stop)
             synchronized (running) {
                 for (Work work : running) {
@@ -653,7 +716,7 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
         public Work removeScheduled(String workId) {
             Work w = queuing.removeScheduled(queueId, workId);
             if (w != null) {
-                signalCompletion();
+                completionSynchronizer.signalCompletion();
             }
             return w;
         }
@@ -706,7 +769,7 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
             if (w != null) {
                 w.setWorkInstanceState(State.CANCELED);
                 if (log.isDebugEnabled()) {
-                    log.debug("Canceling existing scheduled work before scheduling (" + scheduledOrRunning.get() + ")");
+                    log.debug("Canceling existing scheduled work before scheduling (" + completionSynchronizer.scheduledOrRunning.get() + ")");
                 }
             }
             break;
@@ -728,11 +791,7 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
             break;
 
         }
-        try {
-            getExecutor(queueId).execute(work);
-        } finally {
-            signalSchedule();
-        }
+        getExecutor(queueId).execute(work);
     }
 
     /**
@@ -818,6 +877,9 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
 
     @Override
     public int getQueueSize(String queueId, State state) {
+        if (state == null) {
+            return getScheduledOrRunningSize(queueId);
+        }
         if (state == State.SCHEDULED) {
             return getScheduledSize(queueId);
         } else if (state == State.RUNNING) {
@@ -857,60 +919,15 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
     @Override
     public boolean awaitCompletion(String queueId, long duration, TimeUnit unit)
             throws InterruptedException {
-        return awaitCompletion(unit.toNanos(duration)) > 0;
+        return getExecutor(queueId).completionSynchronizer.await(unit.toNanos(duration)) > 0;
     }
 
     @Override
     public boolean awaitCompletion(long duration, TimeUnit unit)
             throws InterruptedException {
-        return awaitCompletion(unit.toNanos(duration)) > 0;
+        return completionSynchronizer.await(unit.toNanos(duration)) > 0;
     }
 
-    protected final ReentrantLock completionLock = new ReentrantLock();
-
-    protected final Condition completion = completionLock.newCondition();
-
-    protected long awaitCompletion(long timeout) throws InterruptedException {
-        completionLock.lock();
-        try {
-            while (timeout > 0 && scheduledOrRunning.get() > 0) {
-                timeout = completion.awaitNanos(timeout);
-            }
-        } finally {
-            if (log.isTraceEnabled()) {
-                log.trace("returning from await");
-            }
-            completionLock.unlock();
-        }
-        return timeout;
-    }
-
-    protected void signalSchedule() {
-        int value = scheduledOrRunning.incrementAndGet();
-        if (log.isTraceEnabled()) {
-            logScheduleAndRunning(value);
-        }
-    }
-
-
-    protected void signalCompletion() {
-        final int value = scheduledOrRunning.decrementAndGet();
-        if (value == 0) {
-            completionLock.lock();
-            try {
-                completion.signalAll();
-            } finally {
-                completionLock.unlock();
-            }
-        }
-        if (log.isTraceEnabled()) {
-            logScheduleAndRunning(value);
-        }
-    }
-
-    protected void logScheduleAndRunning(int value) {
-        log.trace("schedule or running ["+ value + "]", new Throwable("stack trace"));;
-    }
 
     @Override
     public synchronized void clearCompletedWork(String queueId) {
@@ -940,5 +957,6 @@ public class WorkManagerImpl extends DefaultComponent implements WorkManager {
             }
         }
     }
+
 
 }
