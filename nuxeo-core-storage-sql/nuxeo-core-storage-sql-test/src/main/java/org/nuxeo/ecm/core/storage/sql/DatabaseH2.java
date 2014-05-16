@@ -103,12 +103,18 @@ public class DatabaseH2 extends DatabaseHelper {
         Connection connection = DriverManager.getConnection(url,
                 user,
                 password);
-        Statement st = connection.createStatement();
-        String sql = "SHUTDOWN";
-        log.trace(sql);
-        st.execute(sql);
-        st.close();
-        connection.close();
+        try {
+            Statement st = connection.createStatement();
+            try {
+                String sql = "SHUTDOWN";
+                log.trace(sql);
+                st.execute(sql);
+            } finally {
+                st.close();
+            }
+        } finally {
+            connection.close();
+        }
     }
 
     @Override

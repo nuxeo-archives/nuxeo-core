@@ -16,7 +16,6 @@
  */
 package org.nuxeo.ecm.core.management.jtajca.internal;
 
-import java.lang.management.ManagementFactory;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.HashMap;
@@ -245,7 +244,7 @@ public class DefaultMonitorComponent extends DefaultComponent {
     }
 
     protected static void unbind(ObjectInstance instance) {
-        MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
+        MBeanServer mbs = Framework.getLocalService(ServerLocator.class).lookupServer();
         try {
             mbs.unregisterMBean(instance.getObjectName());
         } catch (MBeanRegistrationException | InstanceNotFoundException e) {

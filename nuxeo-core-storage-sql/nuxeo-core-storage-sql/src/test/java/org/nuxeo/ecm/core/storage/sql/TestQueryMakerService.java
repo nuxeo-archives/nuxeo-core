@@ -75,7 +75,7 @@ public class TestQueryMakerService extends NXRuntimeTestCase {
     @Before
     public void setUp() throws Exception {
         super.setUp();
-        deployContrib("org.nuxeo.ecm.core.storage.sql.test",
+        deployTestContrib("org.nuxeo.ecm.core.storage.sql",
                 "OSGI-INF/querymaker-service.xml");
     }
 

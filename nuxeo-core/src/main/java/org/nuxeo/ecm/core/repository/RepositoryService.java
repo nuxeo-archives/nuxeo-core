@@ -55,6 +55,10 @@ public class RepositoryService extends DefaultComponent {
         log.info("Shutting down repository manager");
         synchronized (repositories) {
             for (Repository repository : repositories.values()) {
+                final RepositoryFactory factory = getFactory(repository.getName());
+                if (factory != null) {
+                    factory.dispose();
+                }
                 repository.shutdown();
             }
             repositories.clear();
@@ -157,26 +161,34 @@ public class RepositoryService extends DefaultComponent {
         synchronized (repositories) {
             Repository repository = repositories.get(repositoryName);
             if (repository == null) {
-                RepositoryManager repositoryManager = Framework.getLocalService(RepositoryManager.class);
-                if (repositoryManager == null) {
-                    // tests with no high-level repository manager
+                RepositoryFactory factory = getFactory(repositoryName);
+                if (factory == null) {
                     return null;
                 }
-                org.nuxeo.ecm.core.api.repository.Repository repo = repositoryManager.getRepository(repositoryName);
-                if (repo == null) {
-                    return null;
-                }
-                RepositoryFactory repositoryFactory = (RepositoryFactory) repo.getRepositoryFactory();
-                if (repositoryFactory == null) {
-                    throw new NullPointerException(
-                            "Missing repositoryFactory for repository: "
-                                    + repositoryName);
-                }
-                repository = (Repository) repositoryFactory.call();
+                repository = (Repository) factory.call();
                 repositories.put(repositoryName, repository);
             }
             return repository;
         }
+    }
+
+    protected RepositoryFactory getFactory(String repositoryName) {
+        RepositoryManager repositoryManager = Framework.getLocalService(RepositoryManager.class);
+        if (repositoryManager == null) {
+            // tests with no high-level repository manager
+            return null;
+        }
+        org.nuxeo.ecm.core.api.repository.Repository repo = repositoryManager.getRepository(repositoryName);
+        if (repo == null) {
+            return null;
+        }
+        RepositoryFactory repositoryFactory = (RepositoryFactory) repo.getRepositoryFactory();
+        if (repositoryFactory == null) {
+            throw new NullPointerException(
+                    "Missing repositoryFactory for repository: "
+                            + repositoryName);
+        }
+        return repositoryFactory;
     }
 
     public List<String> getRepositoryNames() {

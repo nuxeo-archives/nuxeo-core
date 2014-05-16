@@ -49,8 +49,8 @@ import org.nuxeo.runtime.jtajca.NuxeoContainer;
  * @author matic
  *
  */
-public class DefaultTransactionMonitor implements TransactionManagerMonitor,
-        TransactionMonitor, Synchronization {
+public class DefaultTransactionMonitor implements
+        TransactionMonitor, TransactionManagerMonitor, Synchronization {
 
     protected static final Log log = LogFactory.getLog(DefaultTransactionMonitor.class);
 
@@ -146,7 +146,7 @@ public class DefaultTransactionMonitor implements TransactionManagerMonitor,
         synchronized (this) {
             activeStatistics.put(key, info);
         }
-        tm.registerInterposedSynchronization(this); // register end status
+        tm.registerInterposedSynchronization(this);
         if (log.isTraceEnabled()) {
             log.trace(info.toString());
         }

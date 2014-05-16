@@ -41,10 +41,22 @@ public class PoolingRepositoryFactory implements RepositoryFactory {
     }
 
     @Override
+    public void dispose() {
+        SQLRepositoryService sqlRepositoryService = Framework.getLocalService(SQLRepositoryService.class);
+        RepositoryDescriptor descriptor = sqlRepositoryService.getRepositoryDescriptor(repositoryName);
+        try {
+            NuxeoContainer.disposeConnectionManager(descriptor.pool.getName());
+        } catch (Exception e) {
+            throw new RuntimeException("Cannot dispose pool " + descriptor.pool.getName());
+        }
+    }
+
+    @Override
     public Object call() {
         SQLRepositoryService sqlRepositoryService = Framework.getLocalService(SQLRepositoryService.class);
         RepositoryDescriptor descriptor = sqlRepositoryService.getRepositoryDescriptor(repositoryName);
         ManagedConnectionFactoryImpl managedConnectionFactory = new ManagedConnectionFactoryImpl();
+        descriptor.pool.setName("NuxeoConnectionManager/"+repositoryName);
         managedConnectionFactory.setName(descriptor.name);
         try {
             ConnectionManager connectionManager = lookupConnectionManager(descriptor.pool);
@@ -86,5 +98,7 @@ public class PoolingRepositoryFactory implements RepositoryFactory {
         // Creation from descriptor pool config
         return NuxeoContainer.initConnectionManager(pool);
     }
+
+
 
 }

@@ -14,15 +14,13 @@
 
 package org.nuxeo.ecm.core.schema;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 import org.nuxeo.common.xmap.annotation.XNode;
 import org.nuxeo.common.xmap.annotation.XNodeList;
 import org.nuxeo.common.xmap.annotation.XObject;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 
 /**
  * Document Type Descriptor.

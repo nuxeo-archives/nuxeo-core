@@ -32,6 +32,11 @@ public class SQLRepositoryFactory implements RepositoryFactory {
     }
 
     @Override
+    public void dispose() {
+        ;
+    }
+
+    @Override
     public Object call() {
         SQLRepositoryService sqlRepositoryService = Framework.getLocalService(SQLRepositoryService.class);
         RepositoryDescriptor descriptor = sqlRepositoryService.getRepositoryDescriptor(repositoryName);

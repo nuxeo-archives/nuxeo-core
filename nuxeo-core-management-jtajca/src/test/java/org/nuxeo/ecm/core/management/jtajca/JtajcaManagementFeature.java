@@ -26,7 +26,7 @@ import com.google.inject.name.Names;
 @Features({ TransactionalFeature.class, CoreFeature.class })
 @Deploy({ "org.nuxeo.runtime.metrics", "org.nuxeo.runtime.datasource",
         "org.nuxeo.ecm.core.management.jtajca" })
-@LocalDeploy("org.nuxeo.ecm.core.management.jtajca:ds-contrib.xml")
+@LocalDeploy({"org.nuxeo.ecm.core.management.jtajca:login-config.xml","org.nuxeo.ecm.core.management.jtajca:ds-contrib.xml"})
 public class JtajcaManagementFeature extends SimpleFeature {
 
     protected ObjectName nameOf(Class<?> itf) {

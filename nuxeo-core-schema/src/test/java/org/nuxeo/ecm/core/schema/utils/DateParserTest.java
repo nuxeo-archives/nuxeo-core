@@ -16,11 +16,9 @@
  */
 package org.nuxeo.ecm.core.schema.utils;
 
-import static org.junit.Assert.*;
 import static org.junit.Assert.assertEquals;
 
 import java.util.Calendar;
-import java.util.Date;
 
 import org.junit.Test;
 

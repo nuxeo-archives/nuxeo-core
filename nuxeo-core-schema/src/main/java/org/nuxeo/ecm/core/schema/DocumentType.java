@@ -12,9 +12,9 @@
  */
 package org.nuxeo.ecm.core.schema;
 
-import org.nuxeo.ecm.core.schema.types.CompositeType;
-
 import java.util.Set;
+
+import org.nuxeo.ecm.core.schema.types.CompositeType;
 
 /**
  * Document types are composite types made of several schemas.
