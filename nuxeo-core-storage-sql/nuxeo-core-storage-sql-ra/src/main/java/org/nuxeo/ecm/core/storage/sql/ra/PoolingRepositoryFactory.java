@@ -45,6 +45,7 @@ public class PoolingRepositoryFactory implements RepositoryFactory {
         SQLRepositoryService sqlRepositoryService = Framework.getLocalService(SQLRepositoryService.class);
         RepositoryDescriptor descriptor = sqlRepositoryService.getRepositoryDescriptor(repositoryName);
         ManagedConnectionFactoryImpl managedConnectionFactory = new ManagedConnectionFactoryImpl();
+        descriptor.pool.setName("NuxeoConnectionManager/"+repositoryName);
         managedConnectionFactory.setName(descriptor.name);
         try {
             ConnectionManager connectionManager = lookupConnectionManager(descriptor.pool);

@@ -30,7 +30,7 @@ public class IndexerDoesNotLeakTest {
 
     @Inject WorkManager works;
 
-    @Inject @Named("test")
+    @Inject @Named("NuxeoConnectionManager/test")
     StorageConnectionMonitor repoMonitor;
 
     @Inject @Named("jdbc/repository_test")
