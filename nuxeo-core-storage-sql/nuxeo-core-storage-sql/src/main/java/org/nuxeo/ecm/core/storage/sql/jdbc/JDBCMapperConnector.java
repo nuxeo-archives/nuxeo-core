@@ -5,6 +5,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 
+import javax.transaction.xa.XAResource;
+
 import org.nuxeo.ecm.core.storage.sql.Mapper;
 
 public class JDBCMapperConnector implements InvocationHandler {
@@ -28,6 +30,20 @@ public class JDBCMapperConnector implements InvocationHandler {
             throws Throwable {
         if (mapper.isConnected()) {
             return doInvoke(method, args);
+        }
+        // should not operate with tx mamagement (managed connection)
+        String name = method.getName();
+        if ("start".equals(name)) {
+            return XAResource.XA_OK;
+        }
+        if ("end".equals(name)) {
+            return null;
+        }
+        if ("prepare".equals(name)) {
+            return XAResource.XA_OK;
+        }
+        if ("commit".equals(name)) {
+            return null;
         }
         mapper.connect();
         try {
